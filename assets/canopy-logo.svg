@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Canopy Focus logo">
+  <rect width="128" height="128" rx="24" fill="#10251f"/>
+  <circle cx="84" cy="36" r="18" fill="#f4c267"/>
+  <path d="M64 98V49" fill="none" stroke="#8fd16b" stroke-width="10" stroke-linecap="round"/>
+  <path d="M64 64C51 48 36 45 24 53c6 18 24 24 40 11Z" fill="#62b36f"/>
+  <path d="M64 55c14-19 32-23 47-13-7 21-29 27-47 13Z" fill="#8fd16b"/>
+  <path d="M64 81c-11-11-25-12-35-5 7 14 22 18 35 5Z" fill="#d98b5f"/>
+  <path d="M45 102h38" fill="none" stroke="#f6f2e8" stroke-width="8" stroke-linecap="round"/>
+</svg>
