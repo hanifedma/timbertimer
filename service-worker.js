@@ -1,4 +1,5 @@
-const CACHE_NAME = "canopy-focus-v3";
+const CACHE_NAME = "canopy-focus-v8";
+const CACHE_PREFIX = "canopy-focus-";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -23,11 +24,27 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)));
+    caches.keys().then(async (keys) => {
+      const hadPreviousCache = keys.some((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME);
+      await Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)));
+      await self.clients.claim();
+
+      if (!hadPreviousCache) return;
+
+      const clients = await self.clients.matchAll({
+        includeUncontrolled: true,
+        type: "window",
+      });
+
+      await Promise.all(
+        clients.map((client) => {
+          const url = new URL(client.url);
+          if (url.origin !== self.location.origin) return Promise.resolve();
+          return client.navigate(client.url).catch(() => undefined);
+        })
+      );
     })
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {

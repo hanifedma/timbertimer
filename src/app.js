@@ -1,5 +1,6 @@
 (function () {
   const SUPABASE_MODULE = "https://esm.sh/@supabase/supabase-js@2?bundle";
+  const APP_TITLE = "Canopy Focus";
   const STORAGE_SESSIONS = "canopy-focus:sessions:v1";
   const STORAGE_TIMER = "canopy-focus:timer:v1";
   const STORAGE_SESSION_NAME = "canopy-focus:session-name:v1";
@@ -29,7 +30,10 @@
     startButton: document.getElementById("startButton"),
     finishButton: document.getElementById("finishButton"),
     recordsPanel: document.getElementById("recordsPanel"),
-    accountPanel: document.getElementById("accountPanel"),
+    accountButton: document.getElementById("accountButton"),
+    accountDialog: document.getElementById("accountDialog"),
+    closeAccountDialogButton: document.getElementById("closeAccountDialogButton"),
+    navAuthStatus: document.getElementById("navAuthStatus"),
     todayStat: document.getElementById("todayStat"),
     totalStat: document.getElementById("totalStat"),
     restState: document.getElementById("restState"),
@@ -56,7 +60,6 @@
     authActions: document.getElementById("authActions"),
     googleSignInButton: document.getElementById("googleSignInButton"),
     signedInActions: document.getElementById("signedInActions"),
-    importLocalButton: document.getElementById("importLocalButton"),
     signOutButton: document.getElementById("signOutButton"),
     recordDialog: document.getElementById("recordDialog"),
     recordForm: document.getElementById("recordForm"),
@@ -171,12 +174,17 @@
 
     els.googleSignInButton.addEventListener("click", signInWithGoogle);
     els.signOutButton.addEventListener("click", signOut);
-    els.importLocalButton.addEventListener("click", importLocalRecords);
+    els.accountButton.addEventListener("click", openAccountDialog);
+    els.closeAccountDialogButton.addEventListener("click", closeAccountDialog);
+    els.accountDialog.addEventListener("click", (event) => {
+      if (event.target === els.accountDialog) closeAccountDialog();
+    });
 
     document.querySelectorAll("[data-panel-jump]").forEach((button) => {
       button.addEventListener("click", () => {
-        const target = button.dataset.panelJump === "records" ? els.recordsPanel : els.accountPanel;
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (button.dataset.panelJump === "records") {
+          els.recordsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
       });
     });
   }
@@ -492,7 +500,14 @@
       button.disabled = isRunning;
     });
     setButtonLabel(els.restStartButton, "Start rest", "play");
+    updateDocumentTitle();
     refreshIcons();
+  }
+
+  function updateDocumentTitle() {
+    document.title = state.restTimer
+      ? `${formatClock(getRestRemainingSeconds())} Rest | ${APP_TITLE}`
+      : APP_TITLE;
   }
 
   function updateTimerDisplay(remainingSeconds, progress) {
@@ -658,6 +673,9 @@
     tree.style.setProperty("--tree-leaf-b", palette.leafB);
     tree.style.setProperty("--tree-bark-a", palette.barkA);
     tree.style.setProperty("--tree-bark-b", palette.barkB);
+    tree.style.setProperty("--tree-size", getGroveTreeScale(record));
+    tree.style.setProperty("--tree-tilt", `${(hashString(`${record.id}${record.title}`) % 7) - 3}deg`);
+    tree.style.setProperty("--tree-floor", `${index % 3}px`);
     tree.title = `${record.title}: ${species.label}, ${record.actual_minutes}m`;
     tree.setAttribute(
       "aria-label",
@@ -668,7 +686,7 @@
     visual.className = "tree-visual";
     visual.setAttribute("aria-hidden", "true");
     visual.innerHTML =
-      '<span class="tree-crown crown-a"></span><span class="tree-crown crown-b"></span><span class="tree-crown crown-c"></span><span class="tree-trunk"></span>';
+      '<span class="tree-shadow"></span><span class="tree-trunk"></span><span class="tree-branch limb-a"></span><span class="tree-branch limb-b"></span><span class="tree-branch limb-c"></span><span class="tree-crown crown-a"></span><span class="tree-crown crown-b"></span><span class="tree-crown crown-c"></span>';
 
     const label = document.createElement("span");
     label.className = "tree-label";
@@ -678,15 +696,20 @@
     return tree;
   }
 
+  function getGroveTreeScale(record) {
+    const minutes = clamp(Number(record.actual_minutes) || 0, 10, 120);
+    return (0.88 + (minutes / 120) * 0.24).toFixed(2);
+  }
+
   function renderAccount() {
-    const localCount = loadLocalSessions().length;
     els.authActions.hidden = !state.supabaseConfigured || Boolean(state.user);
     els.signedInActions.hidden = !state.user;
-    els.importLocalButton.hidden = !state.user || localCount === 0;
 
     if (!state.supabaseConfigured) {
       els.syncBadge.textContent = "Local";
       els.modeLabel.textContent = "Local garden";
+      els.navAuthStatus.textContent = "Local";
+      els.accountButton.title = "Account: local only";
       setAccountStatus("hard-drive", "Records are saved in this browser.");
       return;
     }
@@ -694,12 +717,16 @@
     if (!state.user) {
       els.syncBadge.textContent = "Ready";
       els.modeLabel.textContent = "Supabase ready";
+      els.navAuthStatus.textContent = "Sign in";
+      els.accountButton.title = "Sign in with Google";
       setAccountStatus("cloud", "Use Google to sync records across devices.");
       return;
     }
 
     els.syncBadge.textContent = "Synced";
     els.modeLabel.textContent = "Cloud garden";
+    els.navAuthStatus.textContent = "Signed in";
+    els.accountButton.title = `Signed in as ${getUserDisplayName(state.user)}`;
     setAccountStatus("badge-check", getUserDisplayName(state.user));
   }
 
@@ -723,6 +750,24 @@
     url.hash = "";
     url.search = "";
     return url.href;
+  }
+
+  function openAccountDialog() {
+    if (typeof els.accountDialog.showModal === "function") {
+      els.accountDialog.showModal();
+    } else {
+      els.accountDialog.setAttribute("open", "");
+    }
+
+    refreshIcons();
+  }
+
+  function closeAccountDialog() {
+    if (typeof els.accountDialog.close === "function") {
+      els.accountDialog.close();
+    } else {
+      els.accountDialog.removeAttribute("open");
+    }
   }
 
   function openRecordDialog(record) {
@@ -807,24 +852,6 @@
     if (!state.supabase) return;
     await state.supabase.auth.signOut();
     showToast("Signed out.");
-  }
-
-  async function importLocalRecords() {
-    if (!canUseCloud()) return;
-    const localRecords = loadLocalSessions();
-    if (!localRecords.length) return;
-
-    const rows = localRecords.map((record) => toCloudRecord(record));
-    const { error } = await state.supabase.from("focus_sessions").upsert(rows, { onConflict: "id" });
-    if (error) {
-      showToast("Import failed.");
-      console.warn(error);
-      return;
-    }
-
-    await loadSessions();
-    renderAll();
-    showToast("Local records imported.");
   }
 
   function canUseCloud() {
@@ -1121,8 +1148,15 @@
   function registerServiceWorker() {
     if (!("serviceWorker" in navigator) || window.location.protocol === "file:") return;
 
-    navigator.serviceWorker.register("./service-worker.js").catch((error) => {
-      console.warn(error);
-    });
+    navigator.serviceWorker
+      .register("./service-worker.js")
+      .then((registration) => {
+        registration.update().catch((error) => {
+          console.warn(error);
+        });
+      })
+      .catch((error) => {
+        console.warn(error);
+      });
   }
 })();

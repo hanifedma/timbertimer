@@ -36,18 +36,17 @@
         <nav class="top-actions" aria-label="Primary">
           <button class="icon-button" type="button" data-panel-jump="records" title="Records">
             <i data-lucide="list"></i>
-            <span>Records</span>
+            <span>Record</span>
           </button>
-          <button class="icon-button" type="button" data-panel-jump="account" title="Account">
+          <button id="accountButton" class="icon-button account-button" type="button" title="Account">
             <i data-lucide="user-round"></i>
-            <span>Account</span>
+            <span id="navAuthStatus">Local</span>
           </button>
         </nav>
       </header>
 
       <main class="workspace">
         <section class="focus-panel" aria-labelledby="focusTitle">
-          <div class="panel-kicker">Jungle timer</div>
           <h1 id="focusTitle">Plant one calm session.</h1>
 
           <form id="focusForm" class="focus-form">
@@ -90,6 +89,11 @@
               <div class="sun-orb" aria-hidden="true"></div>
               <div class="plant">
                 <span class="stem"></span>
+                <span class="plant-branch twig-a"></span>
+                <span class="plant-branch twig-b"></span>
+                <span class="plant-branch twig-c"></span>
+                <span class="plant-branch twig-d"></span>
+                <span class="plant-branch twig-e"></span>
                 <span class="leaf leaf-a"></span>
                 <span class="leaf leaf-b"></span>
                 <span class="leaf leaf-c"></span>
@@ -207,40 +211,43 @@
           <div id="recordsList" class="records-list" aria-live="polite"></div>
         </section>
 
-        <aside id="accountPanel" class="account-panel" aria-labelledby="accountTitle">
-          <div class="section-head">
-            <div>
-              <div class="panel-kicker">Accounts</div>
-              <h2 id="accountTitle">Google sync</h2>
-            </div>
-            <span id="syncBadge" class="sync-badge">Local</span>
-          </div>
-
-          <div id="accountStatus" class="account-status">
-            <i data-lucide="hard-drive"></i>
-            <span>Records are saved in this browser.</span>
-          </div>
-
-          <div id="authActions" class="auth-form" hidden>
-            <button id="googleSignInButton" class="primary-button google-button" type="button">
-              <i data-lucide="chrome"></i>
-              <span>Continue with Google</span>
-            </button>
-          </div>
-
-          <div id="signedInActions" class="signed-in-actions" hidden>
-            <button id="importLocalButton" class="secondary-button" type="button">
-              <i data-lucide="cloud-upload"></i>
-              <span>Import local records</span>
-            </button>
-            <button id="signOutButton" class="ghost-button" type="button">
-              <i data-lucide="log-out"></i>
-              <span>Sign out</span>
-            </button>
-          </div>
-        </aside>
       </main>
     </div>
+
+    <dialog id="accountDialog" class="account-dialog" aria-labelledby="accountTitle">
+      <div class="account-dialog-body">
+        <div class="section-head">
+          <div>
+            <div class="panel-kicker">Accounts</div>
+            <h2 id="accountTitle">Google sync</h2>
+          </div>
+          <button id="closeAccountDialogButton" class="icon-only" type="button" title="Close">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <span id="syncBadge" class="sync-badge">Local</span>
+
+        <div id="accountStatus" class="account-status">
+          <i data-lucide="hard-drive"></i>
+          <span>Records are saved in this browser.</span>
+        </div>
+
+        <div id="authActions" class="auth-form" hidden>
+          <button id="googleSignInButton" class="primary-button google-button" type="button">
+            <i data-lucide="chrome"></i>
+            <span>Continue with Google</span>
+          </button>
+        </div>
+
+        <div id="signedInActions" class="signed-in-actions" hidden>
+          <button id="signOutButton" class="ghost-button" type="button">
+            <i data-lucide="log-out"></i>
+            <span>Sign out</span>
+          </button>
+        </div>
+      </div>
+    </dialog>
 
     <dialog id="recordDialog" class="record-dialog">
       <form id="recordForm" method="dialog">

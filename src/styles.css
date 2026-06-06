@@ -90,6 +90,7 @@ button:disabled {
 .workspace > aside,
 .timer-card,
 .rest-card,
+.account-dialog,
 .record-dialog {
   border: 1px solid var(--line);
   background: var(--panel);
@@ -171,7 +172,7 @@ button:disabled {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(360px, 1.05fr) minmax(390px, 1fr) minmax(280px, 0.62fr);
+  grid-template-columns: minmax(360px, 0.9fr) minmax(390px, 1.1fr);
   gap: 18px;
   align-items: start;
   padding-top: 18px;
@@ -423,7 +424,58 @@ button:focus-visible {
   height: 130px;
   border-radius: 999px;
   background: linear-gradient(180deg, var(--active-bark-a, #7ec760), var(--active-bark-b, #315c3c));
+  box-shadow:
+    inset 3px 0 0 rgba(246, 242, 232, 0.14),
+    inset -4px 0 0 rgba(7, 22, 18, 0.22);
   transform: translateX(-50%);
+  z-index: 2;
+}
+
+.plant-branch {
+  position: absolute;
+  left: 50%;
+  width: 45px;
+  height: 7px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--active-bark-b, #315c3c), var(--active-bark-a, #7ec760));
+  box-shadow: 0 1px 0 rgba(246, 242, 232, 0.1);
+  transform-origin: 0 50%;
+  z-index: 2;
+}
+
+.twig-a {
+  top: 66px;
+  transform: translateX(-2px) rotate(-29deg);
+}
+
+.twig-b {
+  top: 88px;
+  right: 50%;
+  left: auto;
+  width: 43px;
+  transform: translateX(2px) rotate(-24deg);
+  transform-origin: 100% 50%;
+}
+
+.twig-c {
+  top: 106px;
+  width: 42px;
+  transform: translateX(-2px) rotate(4deg);
+}
+
+.twig-d {
+  top: 126px;
+  right: 50%;
+  left: auto;
+  width: 40px;
+  transform: translateX(2px) rotate(5deg);
+  transform-origin: 100% 50%;
+}
+
+.twig-e {
+  top: 47px;
+  width: 34px;
+  transform: translateX(-2px) rotate(-56deg);
 }
 
 .leaf {
@@ -433,7 +485,10 @@ button:focus-visible {
   border-radius: 100% 0 100% 0;
   background: linear-gradient(135deg, var(--active-leaf-a, var(--leaf)), var(--active-leaf-b, #2f6a45));
   transform-origin: 4px 31px;
-  box-shadow: inset -10px -6px 16px rgba(9, 32, 24, 0.26);
+  box-shadow:
+    inset -10px -6px 16px rgba(9, 32, 24, 0.26),
+    0 8px 18px rgba(4, 15, 12, 0.12);
+  z-index: 3;
 }
 
 .leaf::before {
@@ -445,6 +500,20 @@ button:focus-visible {
   border-radius: 999px;
   background: linear-gradient(90deg, var(--active-bark-b, #315c3c), var(--active-leaf-b, #2f6a45));
   content: "";
+}
+
+.leaf::after {
+  position: absolute;
+  bottom: 3px;
+  left: -2px;
+  width: 11px;
+  height: 9px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 60% 38%, rgba(246, 242, 232, 0.18), transparent 28%),
+    linear-gradient(135deg, var(--active-bark-a, #7ec760), var(--active-bark-b, #315c3c));
+  content: "";
+  opacity: 0.92;
 }
 
 .leaf-a {
@@ -491,13 +560,52 @@ button:focus-visible {
   border-radius: 100% 0 100% 0;
 }
 
+.plant-palm .plant-branch {
+  height: 5px;
+  background: linear-gradient(90deg, var(--active-bark-b, #7f5130), var(--active-bark-a, #d49a52));
+}
+
 .plant-pine .leaf {
-  width: 82px;
-  height: 58px;
+  left: 50%;
+  width: 92px;
+  height: 56px;
   border-radius: 4px;
   background: linear-gradient(180deg, var(--active-leaf-a, #79c75e), var(--active-leaf-b, #1f5639));
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
   transform-origin: center bottom;
+}
+
+.plant-pine .leaf::before,
+.plant-pine .leaf::after {
+  display: none;
+}
+
+.plant-pine .leaf-a {
+  top: 64px;
+  transform: translateX(-50%);
+}
+
+.plant-pine .leaf-b {
+  top: 42px;
+  width: 76px;
+  height: 50px;
+  transform: translateX(-50%);
+}
+
+.plant-pine .leaf-c {
+  top: 20px;
+  width: 58px;
+  height: 44px;
+  transform: translateX(-50%);
+}
+
+.plant-pine .leaf-d,
+.plant-pine .leaf-e {
+  display: none;
+}
+
+.plant-pine .plant-branch {
+  display: none;
 }
 
 .plant-bamboo .stem {
@@ -514,6 +622,11 @@ button:focus-visible {
   height: 74px;
   border-radius: 999px;
   background: linear-gradient(180deg, var(--active-leaf-a, #c3e572), var(--active-leaf-b, #4c8a45));
+}
+
+.plant-bamboo .plant-branch {
+  height: 5px;
+  background: linear-gradient(90deg, var(--active-leaf-b, #4c8a45), var(--active-leaf-a, #c3e572));
 }
 
 .plant-fern .stem {
@@ -641,6 +754,10 @@ button:focus-visible {
   background: rgba(246, 242, 232, 0.08);
 }
 
+.account-button {
+  min-width: 104px;
+}
+
 .icon-only {
   width: var(--control);
   height: var(--control);
@@ -748,23 +865,55 @@ svg {
 }
 
 .week-forest {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
-  gap: 10px;
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
   align-items: end;
-  min-height: 138px;
+  align-content: flex-end;
+  justify-content: center;
+  min-height: 156px;
   margin-top: 12px;
-  padding: 14px;
+  padding: 14px 12px 12px;
   overflow: hidden;
   border: 1px solid rgba(246, 242, 232, 0.12);
   border-radius: var(--radius);
   background:
-    linear-gradient(180deg, rgba(143, 208, 191, 0.08), transparent 42%),
-    linear-gradient(0deg, rgba(20, 55, 36, 0.54), rgba(9, 28, 23, 0.6));
+    radial-gradient(circle at 18% 12%, rgba(244, 194, 103, 0.18), transparent 24%),
+    radial-gradient(circle at 78% 8%, rgba(143, 208, 191, 0.13), transparent 26%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(20, 63, 36, 0.34) 0 34px,
+      rgba(8, 25, 20, 0.18) 34px 86px
+    ),
+    linear-gradient(180deg, rgba(143, 208, 191, 0.12), rgba(9, 28, 23, 0.42) 46%, rgba(18, 55, 34, 0.68)),
+    linear-gradient(0deg, rgba(14, 38, 27, 0.86), rgba(8, 24, 20, 0.76));
+}
+
+.week-forest::before,
+.week-forest::after {
+  position: absolute;
+  inset: auto 0 0;
+  pointer-events: none;
+  content: "";
+}
+
+.week-forest::before {
+  display: none;
+}
+
+.week-forest::after {
+  height: 26px;
+  background:
+    linear-gradient(180deg, rgba(30, 74, 42, 0.26), rgba(10, 31, 22, 0.82)),
+    repeating-linear-gradient(90deg, rgba(143, 209, 107, 0.08) 0 12px, transparent 12px 30px);
 }
 
 .week-forest-empty {
+  position: relative;
+  z-index: 1;
   display: grid;
+  flex: 1 0 100%;
   place-items: center;
   min-height: 108px;
   color: var(--muted);
@@ -774,110 +923,210 @@ svg {
 }
 
 .grove-tree {
+  position: relative;
+  z-index: 1;
   display: grid;
+  flex: 0 0 58px;
   align-content: end;
   justify-items: center;
   min-width: 0;
-  min-height: 112px;
-  padding: 7px 4px;
+  min-height: 108px;
+  padding: 4px 2px 12px;
   border: 1px solid transparent;
   border-radius: var(--radius);
-  background: rgba(246, 242, 232, 0.035);
   animation: tree-rise 220ms ease both;
   animation-delay: var(--tree-delay);
 }
 
+.grove-tree:hover {
+  background: rgba(246, 242, 232, 0.05);
+}
+
 .tree-label {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
   overflow: hidden;
-  width: 100%;
-  margin-top: 5px;
-  color: var(--muted);
+  max-width: calc(100% - 4px);
+  min-height: 18px;
+  padding: 2px 6px;
+  border: 1px solid rgba(246, 242, 232, 0.14);
+  border-radius: 999px;
+  color: var(--ink);
+  background: rgba(7, 22, 18, 0.82);
   font-size: 0.68rem;
   font-weight: 800;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  z-index: 5;
+}
+
+.grove-tree:hover .tree-label,
+.grove-tree:focus-within .tree-label {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .tree-visual {
   position: relative;
   display: block;
-  width: 48px;
-  height: 68px;
+  width: 62px;
+  height: 86px;
+  filter: drop-shadow(0 10px 13px rgba(3, 10, 9, 0.16));
+  transform: translateY(var(--tree-floor, 0)) rotate(var(--tree-tilt, 0deg)) scale(var(--tree-size, 1));
+  transform-origin: center bottom;
 }
 
+.tree-shadow,
 .tree-trunk,
-.tree-crown {
+.tree-crown,
+.tree-branch {
   position: absolute;
   display: block;
 }
 
-.tree-trunk {
-  bottom: 5px;
+.tree-shadow {
+  bottom: 2px;
   left: 50%;
-  width: 8px;
-  height: 32px;
+  width: 52px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(3, 10, 9, 0.36), transparent 70%);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+.tree-trunk {
+  bottom: 9px;
+  left: 50%;
+  width: 9px;
+  height: 38px;
   border-radius: 999px;
   background: linear-gradient(180deg, var(--tree-bark-a, #b58548), var(--tree-bark-b, #6d4328));
+  box-shadow:
+    inset 2px 0 0 rgba(246, 242, 232, 0.16),
+    inset -3px 0 0 rgba(7, 22, 18, 0.22);
   transform: translateX(-50%);
+  z-index: 2;
+}
+
+.tree-branch {
+  bottom: 39px;
+  left: 50%;
+  width: 25px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--tree-bark-b, #6d4328), var(--tree-bark-a, #b58548));
+  transform-origin: 0 50%;
+  z-index: 2;
+}
+
+.limb-a {
+  transform: translateX(-1px) rotate(-30deg);
+}
+
+.limb-b {
+  right: 50%;
+  left: auto;
+  width: 24px;
+  transform: translateX(1px) rotate(-26deg);
+  transform-origin: 100% 50%;
+}
+
+.limb-c {
+  bottom: 50px;
+  width: 20px;
+  transform: translateX(-1px) rotate(15deg);
 }
 
 .tree-crown {
-  border-radius: 999px;
+  border-radius: 58% 42% 54% 46%;
   background: linear-gradient(135deg, var(--tree-leaf-a, #9ad96d), var(--tree-leaf-b, #2d7047));
-  box-shadow: inset -8px -5px 12px rgba(7, 22, 18, 0.22);
+  box-shadow:
+    inset -9px -7px 14px rgba(7, 22, 18, 0.24),
+    inset 5px 5px 10px rgba(246, 242, 232, 0.1);
+  z-index: 3;
+}
+
+.tree-crown::after {
+  position: absolute;
+  top: 24%;
+  left: 24%;
+  width: 24%;
+  height: 18%;
+  border-radius: 50%;
+  background: rgba(246, 242, 232, 0.16);
+  filter: blur(1px);
+  content: "";
 }
 
 .crown-a {
-  top: 16px;
-  left: 3px;
-  width: 42px;
-  height: 34px;
+  top: 20px;
+  left: 5px;
+  width: 50px;
+  height: 38px;
 }
 
 .crown-b {
-  top: 7px;
-  left: 10px;
-  width: 29px;
-  height: 30px;
+  top: 9px;
+  left: 15px;
+  width: 34px;
+  height: 34px;
 }
 
 .crown-c {
-  top: 25px;
-  left: 17px;
-  width: 27px;
-  height: 27px;
+  top: 31px;
+  left: 26px;
+  width: 30px;
+  height: 30px;
 }
 
 .species-palm .tree-trunk {
-  height: 45px;
+  bottom: 9px;
+  height: 58px;
   width: 7px;
   background: linear-gradient(180deg, var(--tree-bark-a, #d49a52), var(--tree-bark-b, #7f5130));
   transform: translateX(-50%) rotate(7deg);
   transform-origin: center bottom;
 }
 
+.species-palm .tree-branch {
+  display: none;
+}
+
 .species-palm .tree-crown {
-  top: 12px;
-  left: 4px;
-  width: 41px;
-  height: 12px;
+  top: 18px;
+  left: 7px;
+  width: 51px;
+  height: 15px;
   border-radius: 100% 0 100% 0;
   background: linear-gradient(135deg, var(--tree-leaf-a, #a6df63), var(--tree-leaf-b, #2e7d4f));
-  transform-origin: 8px 10px;
+  transform-origin: 22px 13px;
 }
 
 .species-palm .crown-a {
-  transform: rotate(-28deg);
+  transform: rotate(-34deg);
 }
 
 .species-palm .crown-b {
-  transform: rotate(18deg);
+  transform: rotate(14deg);
 }
 
 .species-palm .crown-c {
-  left: 11px;
+  top: 12px;
+  left: 16px;
   transform: rotate(72deg);
+}
+
+.species-pine .tree-branch {
+  display: none;
 }
 
 .species-pine .tree-crown {
@@ -889,75 +1138,79 @@ svg {
 }
 
 .species-pine .crown-a {
-  top: 25px;
-  width: 45px;
-  height: 30px;
+  top: 36px;
+  width: 58px;
+  height: 36px;
 }
 
 .species-pine .crown-b {
-  top: 12px;
-  width: 36px;
-  height: 30px;
+  top: 20px;
+  width: 46px;
+  height: 34px;
 }
 
 .species-pine .crown-c {
-  top: 2px;
-  width: 27px;
-  height: 27px;
+  top: 7px;
+  width: 34px;
+  height: 30px;
 }
 
 .species-bamboo .tree-crown {
-  width: 7px;
-  height: 48px;
+  width: 8px;
+  height: 64px;
   border-radius: 999px;
   background: linear-gradient(180deg, var(--tree-leaf-a, #b4de67), var(--tree-leaf-b, #4a8a45));
+  box-shadow:
+    inset 2px 0 0 rgba(246, 242, 232, 0.14),
+    inset -2px 0 0 rgba(7, 22, 18, 0.22);
 }
 
 .species-bamboo .crown-a {
-  top: 8px;
-  left: 13px;
+  top: 15px;
+  left: 16px;
 }
 
 .species-bamboo .crown-b {
-  top: 1px;
-  left: 24px;
+  top: 7px;
+  left: 29px;
 }
 
 .species-bamboo .crown-c {
-  top: 13px;
-  left: 34px;
+  top: 19px;
+  left: 42px;
 }
 
-.species-bamboo .tree-trunk {
+.species-bamboo .tree-trunk,
+.species-bamboo .tree-branch {
   display: none;
 }
 
 .species-fern .tree-trunk {
-  height: 26px;
+  height: 30px;
 }
 
 .species-fern .tree-crown {
-  top: 22px;
-  width: 34px;
-  height: 14px;
+  top: 36px;
+  width: 42px;
+  height: 16px;
   border-radius: 999px 0 999px 0;
   background: linear-gradient(135deg, var(--tree-leaf-a, #9edb78), var(--tree-leaf-b, #286f45));
   transform-origin: 6px 13px;
 }
 
 .species-fern .crown-a {
-  left: 22px;
+  left: 27px;
   transform: rotate(-18deg);
 }
 
 .species-fern .crown-b {
-  left: 0;
+  left: 2px;
   transform: scaleX(-1) rotate(-18deg);
 }
 
 .species-fern .crown-c {
-  top: 11px;
-  left: 8px;
+  top: 23px;
+  left: 12px;
   transform: rotate(-46deg);
 }
 
@@ -971,29 +1224,29 @@ svg {
 }
 
 .species-kapok .crown-a {
-  top: 13px;
-  left: 0;
-  width: 48px;
-  height: 40px;
+  top: 20px;
+  left: 1px;
+  width: 58px;
+  height: 45px;
 }
 
 .species-kapok .crown-b {
-  top: 4px;
-  left: 10px;
-  width: 34px;
-  height: 33px;
+  top: 10px;
+  left: 14px;
+  width: 40px;
+  height: 38px;
 }
 
 .species-kapok .crown-c {
-  top: 24px;
-  left: 15px;
-  width: 31px;
-  height: 28px;
+  top: 35px;
+  left: 24px;
+  width: 34px;
+  height: 31px;
 }
 
 .species-mangrove .tree-trunk {
   width: 10px;
-  height: 33px;
+  height: 42px;
   background: linear-gradient(180deg, var(--tree-bark-a, #aa7651), var(--tree-bark-b, #6b402b));
 }
 
@@ -1002,19 +1255,19 @@ svg {
   position: absolute;
   bottom: -4px;
   width: 7px;
-  height: 22px;
+  height: 28px;
   border-radius: 999px;
   background: #8b5734;
   content: "";
 }
 
 .species-mangrove .tree-trunk::before {
-  left: -7px;
+  left: -9px;
   transform: rotate(25deg);
 }
 
 .species-mangrove .tree-trunk::after {
-  right: -7px;
+  right: -9px;
   transform: rotate(-25deg);
 }
 
@@ -1219,6 +1472,7 @@ svg {
   display: flex;
 }
 
+.account-dialog,
 .record-dialog {
   width: min(620px, calc(100% - 28px));
   max-height: calc(100vh - 28px);
@@ -1227,11 +1481,17 @@ svg {
   color: var(--ink);
 }
 
+.account-dialog {
+  width: min(440px, calc(100% - 28px));
+}
+
+.account-dialog::backdrop,
 .record-dialog::backdrop {
   background: rgba(3, 10, 9, 0.64);
   backdrop-filter: blur(4px);
 }
 
+.account-dialog-body,
 .record-dialog form {
   display: grid;
   gap: 14px;
@@ -1302,12 +1562,17 @@ svg {
   }
 
   .top-actions .icon-button {
-    width: var(--control);
-    padding: 0;
+    width: auto;
+    min-width: 84px;
+    padding: 0 9px;
   }
 
   .top-actions span {
-    display: none;
+    display: inline;
+    overflow: hidden;
+    max-width: 62px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .workspace {
@@ -1344,8 +1609,11 @@ svg {
   }
 
   .week-forest {
-    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
     padding: 12px;
+  }
+
+  .grove-tree {
+    flex-basis: 54px;
   }
 
   .custom-duration {
