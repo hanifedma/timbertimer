@@ -24,11 +24,12 @@ Then visit `http://localhost:4173`.
 - Today and total stats.
 - Local browser storage without setup.
 - Optional Supabase auth/database sync with Google login.
+- Cross-device active focus timer sync for signed-in users.
 - PWA shell for installable browser use after deployment.
 
 ## Supabase Setup
 
-GitHub Pages hosts static files. It does not run a database. For cross-device records, use Supabase as the database and auth provider.
+GitHub Pages hosts static files. It does not run a database. For cross-device records and active focus timers, use Supabase as the database and auth provider.
 
 1. Create a Supabase project.
 2. In Supabase, open SQL Editor.
@@ -45,7 +46,7 @@ window.CANOPY_FOCUS_SUPABASE = {
 };
 ```
 
-The anon key is safe to place in a browser app when row-level security is configured correctly. The SQL file restricts each signed-in user to their own focus records.
+The anon key is safe to place in a browser app when row-level security is configured correctly. The SQL file restricts each signed-in user to their own focus records and active timer.
 
 ## Google Login
 

@@ -87,6 +87,10 @@
     restTimer: null,
     tickId: null,
     toastId: null,
+    lastCloudTimerSyncAt: 0,
+    cloudTimerSyncing: false,
+    timerCompleting: false,
+    activeTimerSyncWarningShown: false,
   };
 
   init();
@@ -96,7 +100,7 @@
     await initSupabase();
     await loadSessions();
     hydrateSessionName();
-    hydrateTimer();
+    await hydrateTimer();
     renderAll();
     startTicker();
     registerServiceWorker();
@@ -212,6 +216,7 @@
         state.user = session ? session.user : null;
         state.dataMode = state.user ? "cloud" : "local";
         await loadSessions();
+        await hydrateTimer();
         renderAll();
       });
     } catch (error) {
@@ -327,7 +332,7 @@
     showToast("Record deleted.");
   }
 
-  function startOrResumeTimer() {
+  async function startOrResumeTimer() {
     if (state.timer) return;
 
     const minutes = cleanMinutes(els.durationInput.value, state.selectedDuration, 5);
@@ -337,6 +342,7 @@
     state.selectedDuration = minutes;
     rememberSessionName(title);
     state.timer = {
+      id: createId(),
       status: "running",
       title,
       durationMinutes: minutes,
@@ -344,43 +350,60 @@
       startedAt: new Date().toISOString(),
       endAt: Date.now() + durationSeconds * 1000,
       remainingSeconds: durationSeconds,
+      cloudSynced: false,
     };
 
     persistTimer();
     renderTimer();
     showToast("Session started.");
+    await saveActiveTimerToCloud();
   }
 
   async function completeTimer(status) {
-    if (!state.timer) return;
+    if (!state.timer || state.timerCompleting) return;
 
+    state.timerCompleting = true;
     const timer = state.timer;
-    const elapsedSeconds = getElapsedSeconds();
-    const actualMinutes =
-      status === "completed"
-        ? Math.max(1, Math.round(elapsedSeconds / 60))
-        : Math.max(0, Math.round(elapsedSeconds / 60));
-    const endedAt = new Date().toISOString();
-    const record = {
-      id: createId(),
-      title: timer.title,
-      duration_minutes: timer.durationMinutes,
-      actual_minutes: status === "completed" && elapsedSeconds >= timer.durationSeconds - 1
-        ? timer.durationMinutes
-        : actualMinutes,
-      status,
-      started_at: timer.startedAt,
-      ended_at: endedAt,
-      tree_kind: pickTreeKind(timer.title, status),
-      created_at: endedAt,
-      updated_at: endedAt,
-    };
+    try {
+      const claimed = await claimActiveTimer(timer);
+      if (!claimed) {
+        state.timer = null;
+        persistTimer();
+        await loadSessions();
+        renderAll();
+        showToast("Timer already finished on another device.");
+        return;
+      }
 
-    state.timer = null;
-    persistTimer();
-    await createRecord(record);
-    renderTimer();
-    showToast(status === "completed" ? "Session planted." : "Session recorded as abandoned.");
+      const elapsedSeconds = getElapsedSeconds();
+      const actualMinutes =
+        status === "completed"
+          ? Math.max(1, Math.round(elapsedSeconds / 60))
+          : Math.max(0, Math.round(elapsedSeconds / 60));
+      const endedAt = new Date().toISOString();
+      const record = {
+        id: createId(),
+        title: timer.title,
+        duration_minutes: timer.durationMinutes,
+        actual_minutes: status === "completed" && elapsedSeconds >= timer.durationSeconds - 1
+          ? timer.durationMinutes
+          : actualMinutes,
+        status,
+        started_at: timer.startedAt,
+        ended_at: endedAt,
+        tree_kind: pickTreeKind(timer.title, status),
+        created_at: endedAt,
+        updated_at: endedAt,
+      };
+
+      state.timer = null;
+      persistTimer();
+      await createRecord(record);
+      renderTimer();
+      showToast(status === "completed" ? "Session planted." : "Session recorded as abandoned.");
+    } finally {
+      state.timerCompleting = false;
+    }
   }
 
   function finishCurrentSession() {
@@ -409,18 +432,38 @@
     renderRestTimer();
   }
 
-  function hydrateTimer() {
+  async function hydrateTimer() {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_TIMER) || "null");
-      if (!saved) return;
+      const saved = readStoredTimer();
 
-      state.timer = saved;
-      if (state.timer.status === "paused") {
-        state.timer.status = "running";
-        state.timer.endAt = Date.now() + Number(state.timer.remainingSeconds || 0) * 1000;
+      if (canUseCloud()) {
+        const cloudTimer = await loadActiveTimerFromCloud();
+        if (cloudTimer) {
+          state.timer = cloudTimer;
+          persistTimer();
+          if (getRemainingSeconds() <= 0) {
+            await completeTimer("completed");
+          }
+          return;
+        }
+
+        state.timer = normalizeTimer(state.timer || saved);
+        if (state.timer) {
+          persistTimer();
+          await saveActiveTimerToCloud();
+          if (getRemainingSeconds() <= 0) {
+            await completeTimer("completed");
+          }
+          return;
+        }
+
+        persistTimer();
+        return;
       }
-      if (state.timer.status === "running" && getRemainingSeconds() <= 0) {
-        completeTimer("completed");
+
+      state.timer = normalizeTimer(saved);
+      if (state.timer && getRemainingSeconds() <= 0) {
+        await completeTimer("completed");
       }
     } catch (error) {
       localStorage.removeItem(STORAGE_TIMER);
@@ -439,6 +482,10 @@
         state.restTimer = null;
         renderRestTimer();
         showToast("Rest timer finished.");
+      }
+
+      if (canUseCloud() && Date.now() - state.lastCloudTimerSyncAt > 15000) {
+        refreshCloudActiveTimer();
       }
 
       if (state.timer) {
@@ -465,6 +512,7 @@
     const progress = durationSeconds ? clamp(1 - remainingSeconds / durationSeconds, 0, 1) : 0;
 
     updateTimerDisplay(remainingSeconds, progress);
+    updateDocumentTitle();
 
     if (!timer) {
       els.timerState.textContent = "Ready";
@@ -505,9 +553,17 @@
   }
 
   function updateDocumentTitle() {
-    document.title = state.restTimer
-      ? `${formatClock(getRestRemainingSeconds())} Rest | ${APP_TITLE}`
-      : APP_TITLE;
+    if (state.timer) {
+      document.title = `${formatClock(getRemainingSeconds())} Focus | ${APP_TITLE}`;
+      return;
+    }
+
+    if (state.restTimer) {
+      document.title = `${formatClock(getRestRemainingSeconds())} Rest | ${APP_TITLE}`;
+      return;
+    }
+
+    document.title = `Ready | ${APP_TITLE}`;
   }
 
   function updateTimerDisplay(remainingSeconds, progress) {
@@ -752,6 +808,97 @@
     return url.href;
   }
 
+  async function loadActiveTimerFromCloud(options = {}) {
+    if (!canUseCloud()) return null;
+
+    const { data, error } = await state.supabase
+      .from("active_focus_timers")
+      .select("*")
+      .eq("user_id", state.user.id)
+      .maybeSingle();
+
+    if (error) {
+      warnActiveTimerSync(error, options.silent);
+      return null;
+    }
+
+    return data ? fromCloudActiveTimer(data) : null;
+  }
+
+  async function saveActiveTimerToCloud() {
+    if (!canUseCloud() || !state.timer) return false;
+
+    const { error } = await state.supabase
+      .from("active_focus_timers")
+      .upsert(toCloudActiveTimer(state.timer), { onConflict: "user_id" });
+
+    if (error) {
+      warnActiveTimerSync(error);
+      return false;
+    }
+
+    state.timer.cloudSynced = true;
+    persistTimer();
+    return true;
+  }
+
+  async function claimActiveTimer(timer) {
+    if (!canUseCloud() || !timer.cloudSynced) return true;
+
+    const { data, error } = await state.supabase
+      .from("active_focus_timers")
+      .delete()
+      .eq("user_id", state.user.id)
+      .eq("timer_id", timer.id)
+      .select("user_id");
+
+    if (error) {
+      warnActiveTimerSync(error);
+      return true;
+    }
+
+    return Array.isArray(data) ? data.length > 0 : true;
+  }
+
+  async function refreshCloudActiveTimer() {
+    if (!canUseCloud() || state.cloudTimerSyncing || state.timerCompleting) return;
+
+    state.cloudTimerSyncing = true;
+    state.lastCloudTimerSyncAt = Date.now();
+    try {
+      const cloudTimer = await loadActiveTimerFromCloud({ silent: true });
+
+      if (cloudTimer) {
+        const previousStartedAt = state.timer ? state.timer.startedAt : "";
+        state.timer = cloudTimer;
+        persistTimer();
+
+        if (getRemainingSeconds() <= 0) {
+          await completeTimer("completed");
+        } else if (previousStartedAt !== state.timer.startedAt) {
+          renderTimer();
+        }
+        return;
+      }
+
+      if (state.timer && state.timer.cloudSynced) {
+        state.timer = null;
+        persistTimer();
+        await loadSessions();
+        renderAll();
+      }
+    } finally {
+      state.cloudTimerSyncing = false;
+    }
+  }
+
+  function warnActiveTimerSync(error, silent) {
+    console.warn(error);
+    if (silent || state.activeTimerSyncWarningShown) return;
+    state.activeTimerSyncWarningShown = true;
+    showToast("Cloud timer sync needs the updated Supabase SQL.");
+  }
+
   function openAccountDialog() {
     if (typeof els.accountDialog.showModal === "function") {
       els.accountDialog.showModal();
@@ -889,6 +1036,10 @@
     localStorage.setItem(STORAGE_SESSION_NAME, title);
   }
 
+  function readStoredTimer() {
+    return normalizeTimer(JSON.parse(localStorage.getItem(STORAGE_TIMER) || "null"));
+  }
+
   function persistTimer() {
     if (!state.timer) {
       localStorage.removeItem(STORAGE_TIMER);
@@ -896,6 +1047,36 @@
     }
 
     localStorage.setItem(STORAGE_TIMER, JSON.stringify(state.timer));
+  }
+
+  function normalizeTimer(timer) {
+    if (!timer) return null;
+
+    const durationMinutes = cleanMinutes(timer.durationMinutes || timer.duration_minutes, DEFAULT_DURATION, 1);
+    const durationSeconds = Number(timer.durationSeconds || timer.duration_seconds || durationMinutes * 60);
+    const startedAt = timer.startedAt || timer.started_at || new Date().toISOString();
+    const savedEndAt = timer.endAt || timer.end_at;
+    let endAt = typeof savedEndAt === "string" ? new Date(savedEndAt).getTime() : Number(savedEndAt);
+
+    if (!Number.isFinite(endAt)) {
+      endAt = new Date(startedAt).getTime() + durationSeconds * 1000;
+    }
+
+    if (timer.status === "paused") {
+      endAt = Date.now() + Number(timer.remainingSeconds || durationSeconds) * 1000;
+    }
+
+    return {
+      id: timer.id || timer.timer_id || createId(),
+      status: "running",
+      title: (timer.title || "Deep focus").trim() || "Deep focus",
+      durationMinutes,
+      durationSeconds,
+      startedAt,
+      endAt,
+      remainingSeconds: Math.max(0, Math.ceil((endAt - Date.now()) / 1000)),
+      cloudSynced: Boolean(timer.cloudSynced),
+    };
   }
 
   function normalizeRecord(record) {
@@ -938,6 +1119,31 @@
     }
 
     return row;
+  }
+
+  function toCloudActiveTimer(timer) {
+    return {
+      user_id: state.user.id,
+      timer_id: timer.id,
+      title: timer.title,
+      duration_minutes: Number(timer.durationMinutes),
+      duration_seconds: Number(timer.durationSeconds),
+      started_at: timer.startedAt,
+      end_at: new Date(timer.endAt).toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  function fromCloudActiveTimer(row) {
+    return normalizeTimer({
+      title: row.title,
+      id: row.timer_id,
+      durationMinutes: row.duration_minutes,
+      durationSeconds: row.duration_seconds,
+      startedAt: row.started_at,
+      endAt: row.end_at,
+      cloudSynced: true,
+    });
   }
 
   function setDuration(minutes) {
