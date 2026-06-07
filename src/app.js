@@ -437,7 +437,27 @@
       const saved = readStoredTimer();
 
       if (canUseCloud()) {
-        const cloudTimer = await loadActiveTimerFromCloud();
+        const activeTimerState = await fetchActiveTimerState();
+        const cloudTimer = activeTimerState.timer;
+
+        if (activeTimerState.ok && !cloudTimer) {
+          const currentTimer = normalizeTimer(state.timer);
+
+          if (currentTimer && !currentTimer.cloudSynced) {
+            state.timer = currentTimer;
+            persistTimer();
+            await saveActiveTimerToCloud();
+            if (getRemainingSeconds() <= 0) {
+              await completeTimer("completed");
+            }
+            return;
+          }
+
+          state.timer = null;
+          persistTimer();
+          return;
+        }
+
         if (cloudTimer) {
           state.timer = cloudTimer;
           persistTimer();
@@ -554,7 +574,7 @@
 
   function updateDocumentTitle() {
     if (state.timer) {
-      document.title = `${formatClock(getRemainingSeconds())} Focus | ${APP_TITLE}`;
+      document.title = `Focus running | ${APP_TITLE}`;
       return;
     }
 
@@ -809,7 +829,12 @@
   }
 
   async function loadActiveTimerFromCloud(options = {}) {
-    if (!canUseCloud()) return null;
+    const activeTimerState = await fetchActiveTimerState(options);
+    return activeTimerState.timer;
+  }
+
+  async function fetchActiveTimerState(options = {}) {
+    if (!canUseCloud()) return { ok: false, timer: null };
 
     const { data, error } = await state.supabase
       .from("active_focus_timers")
@@ -819,10 +844,10 @@
 
     if (error) {
       warnActiveTimerSync(error, options.silent);
-      return null;
+      return { ok: false, timer: null };
     }
 
-    return data ? fromCloudActiveTimer(data) : null;
+    return { ok: true, timer: data ? fromCloudActiveTimer(data) : null };
   }
 
   async function saveActiveTimerToCloud() {
@@ -866,7 +891,10 @@
     state.cloudTimerSyncing = true;
     state.lastCloudTimerSyncAt = Date.now();
     try {
-      const cloudTimer = await loadActiveTimerFromCloud({ silent: true });
+      const activeTimerState = await fetchActiveTimerState({ silent: true });
+      if (!activeTimerState.ok) return;
+
+      const cloudTimer = activeTimerState.timer;
 
       if (cloudTimer) {
         const previousStartedAt = state.timer ? state.timer.startedAt : "";

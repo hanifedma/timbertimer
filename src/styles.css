@@ -275,7 +275,7 @@ button:focus-visible {
 
 .duration-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(64px, 1fr)) minmax(124px, 1.4fr);
+  grid-template-columns: repeat(3, minmax(64px, 1fr)) minmax(144px, 1.4fr);
   gap: 8px;
 }
 
@@ -301,23 +301,40 @@ button:focus-visible {
 
 .custom-duration {
   display: grid;
-  grid-template-columns: auto minmax(54px, 1fr);
+  grid-template-columns: minmax(0, auto) minmax(52px, 76px);
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
   padding: 0 10px;
 }
 
 .custom-duration span {
+  min-width: 0;
+  overflow: hidden;
   color: var(--muted);
   font-size: 0.76rem;
   font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .custom-duration input {
+  min-width: 0;
   min-height: 34px;
   padding: 0 0 0 8px;
   border-color: transparent;
+  text-align: center;
   background: rgba(246, 242, 232, 0.08);
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.custom-duration input::-webkit-inner-spin-button,
+.custom-duration input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .timer-card,
@@ -694,7 +711,7 @@ button:focus-visible {
 
 .rest-duration-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(58px, 1fr)) minmax(118px, 1.25fr);
+  grid-template-columns: repeat(3, minmax(58px, 1fr)) minmax(144px, 1.25fr);
   gap: 8px;
   margin-top: 14px;
 }
@@ -1539,6 +1556,17 @@ svg {
 @media (max-width: 1160px) {
   .workspace {
     grid-template-columns: minmax(340px, 1fr) minmax(340px, 1fr);
+  }
+
+  .duration-row,
+  .rest-duration-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .duration-row .custom-duration,
+  .rest-duration-row .custom-duration {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) minmax(72px, 104px);
   }
 
   .account-panel {

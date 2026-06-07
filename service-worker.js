@@ -1,4 +1,4 @@
-const CACHE_NAME = "canopy-focus-v13";
+const CACHE_NAME = "canopy-focus-v14";
 const CACHE_PREFIX = "canopy-focus-";
 const APP_ASSETS = [
   "./",
