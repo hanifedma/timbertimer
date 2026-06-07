@@ -1,4 +1,4 @@
-const CACHE_NAME = "canopy-focus-v14";
+const CACHE_NAME = "canopy-focus-v19";
 const CACHE_PREFIX = "canopy-focus-";
 const APP_ASSETS = [
   "./",
@@ -49,19 +49,23 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  const requestUrl = new URL(event.request.url);
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return (
-        cached ||
-        fetch(event.request).then((response) => {
-          const copy = response.clone();
-          if (new URL(event.request.url).origin === self.location.origin) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          }
-          return response;
-        })
-      );
-    })
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        if (requestUrl.origin === self.location.origin) {
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          if (event.request.mode === "navigate") return caches.match("./index.html");
+          return Response.error();
+        });
+      })
   );
 });

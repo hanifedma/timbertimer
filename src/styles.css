@@ -275,7 +275,7 @@ button:focus-visible {
 
 .duration-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(64px, 1fr)) minmax(144px, 1.4fr);
+  grid-template-columns: repeat(3, minmax(58px, 1fr)) minmax(136px, 1.25fr);
   gap: 8px;
 }
 
@@ -301,28 +301,29 @@ button:focus-visible {
 
 .custom-duration {
   display: grid;
-  grid-template-columns: minmax(0, auto) minmax(52px, 76px);
+  grid-template-columns: max-content minmax(54px, 68px);
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 6px;
   min-width: 0;
-  overflow: hidden;
-  padding: 0 10px;
+  padding: 0 8px;
 }
 
 .custom-duration span {
-  min-width: 0;
-  overflow: hidden;
+  min-width: max-content;
+  overflow: visible;
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   font-weight: 800;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
 }
 
 .custom-duration input {
+  width: 100%;
   min-width: 0;
   min-height: 34px;
-  padding: 0 0 0 8px;
+  padding: 0 6px;
   border-color: transparent;
   text-align: center;
   background: rgba(246, 242, 232, 0.08);
@@ -356,7 +357,6 @@ button:focus-visible {
 .week-grove-summary,
 .record-tools,
 .timer-actions,
-.rest-duration-row,
 .auth-actions,
 .signed-in-actions,
 .dialog-actions {
@@ -709,13 +709,6 @@ button:focus-visible {
   margin-top: 18px;
 }
 
-.rest-duration-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(58px, 1fr)) minmax(144px, 1.25fr);
-  gap: 8px;
-  margin-top: 14px;
-}
-
 .rest-display {
   margin-top: 8px;
   font-variant-numeric: tabular-nums;
@@ -886,50 +879,24 @@ svg {
   position: relative;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 8px;
+  gap: 6px 10px;
   align-items: end;
   align-content: flex-end;
   justify-content: center;
-  min-height: 156px;
+  min-height: 174px;
   margin-top: 12px;
-  padding: 14px 12px 12px;
+  padding: 18px 14px 18px;
   overflow: hidden;
   border: 1px solid rgba(246, 242, 232, 0.12);
   border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(246, 242, 232, 0.08);
   background:
-    radial-gradient(circle at 18% 12%, rgba(244, 194, 103, 0.18), transparent 24%),
-    radial-gradient(circle at 78% 8%, rgba(143, 208, 191, 0.13), transparent 26%),
-    repeating-linear-gradient(
-      0deg,
-      rgba(20, 63, 36, 0.34) 0 34px,
-      rgba(8, 25, 20, 0.18) 34px 86px
-    ),
-    linear-gradient(180deg, rgba(143, 208, 191, 0.12), rgba(9, 28, 23, 0.42) 46%, rgba(18, 55, 34, 0.68)),
-    linear-gradient(0deg, rgba(14, 38, 27, 0.86), rgba(8, 24, 20, 0.76));
-}
-
-.week-forest::before,
-.week-forest::after {
-  position: absolute;
-  inset: auto 0 0;
-  pointer-events: none;
-  content: "";
-}
-
-.week-forest::before {
-  display: none;
-}
-
-.week-forest::after {
-  height: 26px;
-  background:
-    linear-gradient(180deg, rgba(30, 74, 42, 0.26), rgba(10, 31, 22, 0.82)),
-    repeating-linear-gradient(90deg, rgba(143, 209, 107, 0.08) 0 12px, transparent 12px 30px);
+    linear-gradient(180deg, rgba(33, 66, 56, 0.86), rgba(13, 34, 27, 0.92) 44%, rgba(21, 55, 35, 0.9));
 }
 
 .week-forest-empty {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   flex: 1 0 100%;
   place-items: center;
@@ -942,18 +909,33 @@ svg {
 
 .grove-tree {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
-  flex: 0 0 58px;
+  flex: 0 0 calc(54px + var(--tree-girth, 0px));
   align-content: end;
   justify-items: center;
   min-width: 0;
   min-height: 108px;
-  padding: 4px 2px 12px;
+  padding: 4px 2px calc(14px + var(--tree-depth, 0px));
   border: 1px solid transparent;
   border-radius: var(--radius);
   animation: tree-rise 220ms ease both;
   animation-delay: var(--tree-delay);
+}
+
+.grove-tree::before {
+  position: absolute;
+  bottom: calc(7px + var(--tree-depth, 0px));
+  left: 50%;
+  width: var(--tree-mound-width, 40px);
+  height: 18px;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at center, rgba(111, 93, 48, 0.68), rgba(35, 67, 37, 0.46) 58%, rgba(8, 23, 18, 0) 74%);
+  box-shadow: inset 0 -3px 0 rgba(8, 23, 18, 0.18);
+  content: "";
+  transform: translateX(-50%);
+  z-index: 0;
 }
 
 .grove-tree:hover {
@@ -997,7 +979,7 @@ svg {
   display: block;
   width: 62px;
   height: 86px;
-  transform: translateY(var(--tree-floor, 0)) rotate(var(--tree-tilt, 0deg)) scale(var(--tree-size, 1));
+  transform: translate(var(--tree-shift, 0), var(--tree-floor, 0)) rotate(var(--tree-tilt, 0deg)) scale(var(--tree-size, 1));
   transform-origin: center bottom;
 }
 
@@ -1012,10 +994,11 @@ svg {
 .tree-shadow {
   bottom: 2px;
   left: 50%;
-  width: 52px;
+  width: var(--tree-shadow-width, 52px);
   height: 12px;
   border-radius: 50%;
   background: radial-gradient(ellipse, rgba(3, 10, 9, 0.36), transparent 70%);
+  opacity: var(--tree-shadow-opacity, 1);
   transform: translateX(-50%);
   z-index: 0;
 }
@@ -1023,8 +1006,8 @@ svg {
 .tree-trunk {
   bottom: 9px;
   left: 50%;
-  width: 9px;
-  height: 38px;
+  width: var(--tree-trunk-width, 9px);
+  height: var(--tree-trunk-height, 38px);
   border-radius: 999px;
   background: linear-gradient(180deg, var(--tree-bark-a, #b58548), var(--tree-bark-b, #6d4328));
   box-shadow:
@@ -1037,7 +1020,7 @@ svg {
 .tree-branch {
   bottom: 39px;
   left: 50%;
-  width: 25px;
+  width: var(--tree-branch-width, 25px);
   height: 4px;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--tree-bark-b, #6d4328), var(--tree-bark-a, #b58548));
@@ -1080,7 +1063,6 @@ svg {
   height: 18%;
   border-radius: 50%;
   background: rgba(246, 242, 232, 0.16);
-  filter: blur(1px);
   content: "";
 }
 
@@ -1089,6 +1071,8 @@ svg {
   left: 5px;
   width: 50px;
   height: 38px;
+  scale: var(--tree-crown-scale, 1) var(--tree-crown-tall, 1);
+  translate: var(--tree-crown-a-x, 0) var(--tree-crown-a-y, 0);
 }
 
 .crown-b {
@@ -1096,6 +1080,8 @@ svg {
   left: 15px;
   width: 34px;
   height: 34px;
+  scale: var(--tree-crown-scale, 1) var(--tree-crown-tall, 1);
+  translate: var(--tree-crown-b-x, 0) var(--tree-crown-b-y, 0);
 }
 
 .crown-c {
@@ -1103,6 +1089,8 @@ svg {
   left: 26px;
   width: 30px;
   height: 30px;
+  scale: var(--tree-crown-scale, 1) var(--tree-crown-tall, 1);
+  translate: var(--tree-crown-c-x, 0) var(--tree-crown-c-y, 0);
 }
 
 .species-palm .tree-trunk {
@@ -1290,6 +1278,42 @@ svg {
 
 .species-mangrove .tree-crown {
   background: linear-gradient(135deg, var(--tree-leaf-a, #8fd0bf), var(--tree-leaf-b, #2f7650));
+}
+
+.shape-1 .tree-crown {
+  border-radius: 68% 32% 58% 42%;
+}
+
+.shape-1 .limb-a {
+  transform: translateX(-1px) rotate(-38deg);
+}
+
+.shape-1 .limb-b {
+  transform: translateX(1px) rotate(-18deg);
+}
+
+.shape-2 .tree-crown {
+  border-radius: 44% 56% 62% 38%;
+}
+
+.shape-2 .limb-a {
+  transform: translateX(-1px) rotate(-22deg);
+}
+
+.shape-2 .limb-c {
+  transform: translateX(-1px) rotate(24deg);
+}
+
+.shape-3 .tree-crown {
+  border-radius: 58% 42% 36% 64%;
+}
+
+.shape-3 .limb-b {
+  transform: translateX(1px) rotate(-34deg);
+}
+
+.shape-3 .limb-c {
+  transform: translateX(-1px) rotate(6deg);
 }
 
 @keyframes tree-rise {
@@ -1558,13 +1582,11 @@ svg {
     grid-template-columns: minmax(340px, 1fr) minmax(340px, 1fr);
   }
 
-  .duration-row,
-  .rest-duration-row {
+  .duration-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .duration-row .custom-duration,
-  .rest-duration-row .custom-duration {
+  .duration-row .custom-duration {
     grid-column: 1 / -1;
     grid-template-columns: minmax(0, 1fr) minmax(72px, 104px);
   }
@@ -1624,7 +1646,6 @@ svg {
   }
 
   .duration-row,
-  .rest-duration-row,
   .stats-grid,
   .form-grid {
     grid-template-columns: 1fr;
@@ -1644,7 +1665,7 @@ svg {
   }
 
   .grove-tree {
-    flex-basis: 54px;
+    flex-basis: calc(52px + var(--tree-girth, 0px));
   }
 
   .custom-duration {

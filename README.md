@@ -15,7 +15,7 @@ Then visit `http://localhost:4173`.
 ## What Works Now
 
 - Focus timer with one Finish action; finishing early records an abandoned session.
-- Separate rest timer that does not create records.
+- Separate rest stopwatch that does not create records.
 - Growing plant visual during a session.
 - Weekly forest visualizer with one tree per completed session.
 - Remembered session name between visits.

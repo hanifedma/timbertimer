@@ -68,7 +68,7 @@
                 <button class="pill-button is-selected" type="button" data-duration="25">
                   25m
                 </button>
-                <button class="pill-button" type="button" data-duration="45">45m</button>
+                <button class="pill-button" type="button" data-duration="120">120m</button>
                 <button class="pill-button" type="button" data-duration="60">60m</button>
                 <label class="custom-duration">
                   <span>Custom</span>
@@ -118,19 +118,10 @@
 
           <div class="rest-card" aria-live="polite">
             <div class="timer-meta">
-              <span id="restState">Rest timer</span>
-              <span id="restDurationLabel">5m</span>
+              <span id="restState">Rest stopwatch</span>
+              <span id="restModeLabel">Elapsed</span>
             </div>
-            <div id="restDisplay" class="rest-display">05:00</div>
-            <div class="rest-duration-row" role="group" aria-label="Rest duration presets">
-              <button class="pill-button is-selected" type="button" data-rest-duration="5">5m</button>
-              <button class="pill-button" type="button" data-rest-duration="10">10m</button>
-              <button class="pill-button" type="button" data-rest-duration="15">15m</button>
-              <label class="custom-duration">
-                <span>Custom</span>
-                <input id="restDurationInput" type="number" min="1" max="120" step="1" value="5" />
-              </label>
-            </div>
+            <div id="restDisplay" class="rest-display">00:00</div>
             <div class="timer-actions">
               <button id="restStartButton" class="secondary-button" type="button">
                 <i data-lucide="play"></i>

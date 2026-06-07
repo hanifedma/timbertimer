@@ -37,10 +37,8 @@
     todayStat: document.getElementById("todayStat"),
     totalStat: document.getElementById("totalStat"),
     restState: document.getElementById("restState"),
-    restDurationLabel: document.getElementById("restDurationLabel"),
+    restModeLabel: document.getElementById("restModeLabel"),
     restDisplay: document.getElementById("restDisplay"),
-    restDurationInput: document.getElementById("restDurationInput"),
-    restDurationButtons: Array.from(document.querySelectorAll("[data-rest-duration]")),
     restStartButton: document.getElementById("restStartButton"),
     restResetButton: document.getElementById("restResetButton"),
     weekRange: document.getElementById("weekRange"),
@@ -81,7 +79,6 @@
     dataMode: "local",
     sessions: [],
     selectedDuration: DEFAULT_DURATION,
-    selectedRestDuration: 5,
     weekStart: startOfWeek(new Date()),
     timer: null,
     restTimer: null,
@@ -125,21 +122,6 @@
       updateDurationButtons();
       if (!state.timer) {
         updateTimerDisplay(minutes * 60, 0);
-      }
-    });
-
-    els.restDurationButtons.forEach((button) => {
-      button.addEventListener("click", () => {
-        setRestDuration(Number(button.dataset.restDuration));
-      });
-    });
-
-    els.restDurationInput.addEventListener("input", () => {
-      const minutes = cleanMinutes(els.restDurationInput.value, 5, 1);
-      state.selectedRestDuration = minutes;
-      updateRestDurationButtons();
-      if (!state.restTimer) {
-        renderRestTimer();
       }
     });
 
@@ -415,15 +397,10 @@
   function startRestTimer() {
     if (state.restTimer) return;
 
-    const minutes = cleanMinutes(els.restDurationInput.value, state.selectedRestDuration, 1);
-    const durationSeconds = minutes * 60;
-    state.selectedRestDuration = minutes;
     state.restTimer = {
-      durationSeconds,
-      endAt: Date.now() + durationSeconds * 1000,
+      startedAt: Date.now(),
     };
 
-    updateRestDurationButtons();
     renderRestTimer();
   }
 
@@ -498,12 +475,6 @@
         completeTimer("completed");
       }
 
-      if (state.restTimer && getRestRemainingSeconds() <= 0) {
-        state.restTimer = null;
-        renderRestTimer();
-        showToast("Rest timer finished.");
-      }
-
       if (canUseCloud() && Date.now() - state.lastCloudTimerSyncAt > 15000) {
         refreshCloudActiveTimer();
       }
@@ -553,20 +524,14 @@
   }
 
   function renderRestTimer() {
-    const remainingSeconds = state.restTimer
-      ? getRestRemainingSeconds()
-      : state.selectedRestDuration * 60;
+    const elapsedSeconds = state.restTimer ? getRestElapsedSeconds() : 0;
     const isRunning = Boolean(state.restTimer);
 
-    els.restDisplay.textContent = formatClock(remainingSeconds);
-    els.restState.textContent = isRunning ? "Resting" : "Rest timer";
-    els.restDurationLabel.textContent = `${state.selectedRestDuration}m`;
+    els.restDisplay.textContent = formatClock(elapsedSeconds);
+    els.restState.textContent = isRunning ? "Resting" : "Rest stopwatch";
+    els.restModeLabel.textContent = "Elapsed";
     els.restStartButton.disabled = isRunning;
     els.restResetButton.disabled = !isRunning;
-    els.restDurationInput.disabled = isRunning;
-    els.restDurationButtons.forEach((button) => {
-      button.disabled = isRunning;
-    });
     setButtonLabel(els.restStartButton, "Start rest", "play");
     updateDocumentTitle();
     refreshIcons();
@@ -579,7 +544,7 @@
     }
 
     if (state.restTimer) {
-      document.title = `${formatClock(getRestRemainingSeconds())} Rest | ${APP_TITLE}`;
+      document.title = `${formatClock(getRestElapsedSeconds())} Rest | ${APP_TITLE}`;
       return;
     }
 
@@ -741,17 +706,35 @@
 
   function createGroveTree(record, index) {
     const species = getTreeForSession(record.title, record.status);
-    const palette = getTreePalette(record.title);
+    const seed = getTreeSeed(record.title);
+    const palette = getTreePalette(seed);
+    const shape = hashString(`${seed}:shape`) % 4;
     const tree = document.createElement("article");
-    tree.className = `grove-tree species-${species.id}`;
+    tree.className = `grove-tree species-${species.id} shape-${shape}`;
     tree.style.setProperty("--tree-delay", `${(index % 9) * 40}ms`);
     tree.style.setProperty("--tree-leaf-a", palette.leafA);
     tree.style.setProperty("--tree-leaf-b", palette.leafB);
     tree.style.setProperty("--tree-bark-a", palette.barkA);
     tree.style.setProperty("--tree-bark-b", palette.barkB);
-    tree.style.setProperty("--tree-size", getGroveTreeScale(record));
-    tree.style.setProperty("--tree-tilt", `${(hashString(`${record.id}${record.title}`) % 7) - 3}deg`);
-    tree.style.setProperty("--tree-floor", `${index % 3}px`);
+    tree.style.setProperty("--tree-size", getGroveTreeScale(seed));
+    tree.style.setProperty("--tree-tilt", `${Math.round(seededRange(seed, "tilt", -5, 5))}deg`);
+    tree.style.setProperty("--tree-floor", `${Math.round(seededRange(seed, "floor", -5, 5))}px`);
+    tree.style.setProperty("--tree-shift", `${Math.round(seededRange(seed, "shift", -4, 4))}px`);
+    tree.style.setProperty("--tree-girth", `${Math.round(seededRange(seed, "girth", -3, 5))}px`);
+    tree.style.setProperty("--tree-depth", `${Math.round(seededRange(seed, "depth", -2, 4))}px`);
+    tree.style.setProperty("--tree-trunk-width", `${seededRange(seed, "trunk-width", 7, 11).toFixed(1)}px`);
+    tree.style.setProperty("--tree-trunk-height", `${seededRange(seed, "trunk-height", 34, 44).toFixed(1)}px`);
+    tree.style.setProperty("--tree-branch-width", `${seededRange(seed, "branch-width", 20, 29).toFixed(1)}px`);
+    tree.style.setProperty("--tree-crown-scale", seededRange(seed, "crown-scale", 0.9, 1.14).toFixed(2));
+    tree.style.setProperty("--tree-crown-tall", seededRange(seed, "crown-tall", 0.88, 1.16).toFixed(2));
+    tree.style.setProperty("--tree-crown-a-x", `${Math.round(seededRange(seed, "crown-a-x", -4, 4))}px`);
+    tree.style.setProperty("--tree-crown-a-y", `${Math.round(seededRange(seed, "crown-a-y", -4, 3))}px`);
+    tree.style.setProperty("--tree-crown-b-x", `${Math.round(seededRange(seed, "crown-b-x", -3, 4))}px`);
+    tree.style.setProperty("--tree-crown-b-y", `${Math.round(seededRange(seed, "crown-b-y", -5, 3))}px`);
+    tree.style.setProperty("--tree-crown-c-x", `${Math.round(seededRange(seed, "crown-c-x", -4, 4))}px`);
+    tree.style.setProperty("--tree-crown-c-y", `${Math.round(seededRange(seed, "crown-c-y", -3, 5))}px`);
+    tree.style.setProperty("--tree-shadow-width", `${seededRange(seed, "shadow", 44, 60).toFixed(1)}px`);
+    tree.style.setProperty("--tree-mound-width", `${seededRange(seed, "mound", 32, 46).toFixed(1)}px`);
     tree.title = `${record.title}: ${species.label}, ${record.actual_minutes}m`;
     tree.setAttribute(
       "aria-label",
@@ -772,9 +755,8 @@
     return tree;
   }
 
-  function getGroveTreeScale(record) {
-    const minutes = clamp(Number(record.actual_minutes) || 0, 10, 120);
-    return (0.88 + (minutes / 120) * 0.24).toFixed(2);
+  function getGroveTreeScale(seed) {
+    return seededRange(seed, "size", 0.94, 1.14).toFixed(2);
   }
 
   function renderAccount() {
@@ -1183,24 +1165,9 @@
     }
   }
 
-  function setRestDuration(minutes) {
-    state.selectedRestDuration = cleanMinutes(minutes, 5, 1);
-    els.restDurationInput.value = state.selectedRestDuration;
-    updateRestDurationButtons();
-    if (!state.restTimer) {
-      renderRestTimer();
-    }
-  }
-
   function updateDurationButtons() {
     els.durationButtons.forEach((button) => {
       button.classList.toggle("is-selected", Number(button.dataset.duration) === state.selectedDuration);
-    });
-  }
-
-  function updateRestDurationButtons() {
-    els.restDurationButtons.forEach((button) => {
-      button.classList.toggle("is-selected", Number(button.dataset.restDuration) === state.selectedRestDuration);
     });
   }
 
@@ -1222,9 +1189,9 @@
     return Math.max(0, Math.ceil((state.timer.endAt - Date.now()) / 1000));
   }
 
-  function getRestRemainingSeconds() {
-    if (!state.restTimer) return state.selectedRestDuration * 60;
-    return Math.max(0, Math.ceil((state.restTimer.endAt - Date.now()) / 1000));
+  function getRestElapsedSeconds() {
+    if (!state.restTimer) return 0;
+    return Math.max(0, Math.floor((Date.now() - state.restTimer.startedAt) / 1000));
   }
 
   function getElapsedSeconds() {
@@ -1246,26 +1213,38 @@
 
   function getTreeForSession(title, status) {
     if (status === "abandoned") return WILTED_TREE;
-    const normalizedTitle = (title || "Deep focus").trim().toLowerCase() || "deep focus";
-    return TREE_SPECIES[hashString(normalizedTitle) % TREE_SPECIES.length];
+    return TREE_SPECIES[hashString(getTreeSeed(title)) % TREE_SPECIES.length];
   }
 
-  function getTreePalette(title) {
-    const seed = hashString((title || "Deep focus").trim().toLowerCase() || "deep focus");
-    const hue = 92 + (seed % 76);
-    const barkHue = 24 + (seed % 22);
+  function getTreePalette(seedSource) {
+    const normalizedSeed = getTreeSeed(seedSource);
+    const seed = hashString(normalizedSeed);
+    const hue = 80 + (seed % 94);
+    const leafSat = 48 + (Math.floor(seed / 17) % 18);
+    const leafLight = 58 + (Math.floor(seed / 29) % 13);
+    const barkHue = 22 + (Math.floor(seed / 7) % 32);
     return {
-      leafA: `hsl(${hue}, 55%, 66%)`,
-      leafB: `hsl(${hue + 18}, 46%, 33%)`,
-      barkA: `hsl(${barkHue}, 48%, 56%)`,
-      barkB: `hsl(${barkHue}, 42%, 32%)`,
+      leafA: `hsl(${hue}, ${leafSat}%, ${leafLight}%)`,
+      leafB: `hsl(${hue + 14 + (seed % 12)}, ${Math.max(38, leafSat - 9)}%, ${29 + (Math.floor(seed / 41) % 10)}%)`,
+      barkA: `hsl(${barkHue}, ${44 + (seed % 9)}%, ${49 + (Math.floor(seed / 11) % 12)}%)`,
+      barkB: `hsl(${barkHue}, ${38 + (Math.floor(seed / 13) % 9)}%, ${27 + (Math.floor(seed / 19) % 8)}%)`,
     };
+  }
+
+  function seededRange(seed, salt, min, max) {
+    const unit = (hashString(`${seed}:${salt}`) % 1000) / 999;
+    return min + (max - min) * unit;
+  }
+
+  function getTreeSeed(title) {
+    return String(title || "Deep focus").trim().toLowerCase() || "deep focus";
   }
 
   function hashString(value) {
     let hash = 0;
-    for (let index = 0; index < value.length; index += 1) {
-      hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+    const text = String(value);
+    for (let index = 0; index < text.length; index += 1) {
+      hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
     }
     return hash;
   }
