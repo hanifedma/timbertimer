@@ -58,9 +58,11 @@
                 type="text"
                 maxlength="80"
                 value="Deep focus"
+                list="sessionTitleSuggestions"
                 autocomplete="off"
               />
             </label>
+            <datalist id="sessionTitleSuggestions"></datalist>
 
             <div class="field">
               <span>Duration</span>
@@ -185,7 +187,12 @@
           <div class="record-tools">
             <label class="search-field">
               <i data-lucide="search"></i>
-              <input id="searchInput" type="search" placeholder="Search records" />
+              <input
+                id="searchInput"
+                type="search"
+                list="sessionTitleSuggestions"
+                placeholder="Search records"
+              />
             </label>
             <select id="statusFilter" aria-label="Filter records">
               <option value="all">All</option>
@@ -256,7 +263,13 @@
 
         <label class="field">
           <span>Session</span>
-          <input id="recordTitleInput" type="text" maxlength="80" required />
+          <input
+            id="recordTitleInput"
+            type="text"
+            maxlength="80"
+            list="sessionTitleSuggestions"
+            required
+          />
         </label>
 
         <div class="form-grid">

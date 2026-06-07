@@ -20,6 +20,7 @@
     modeLabel: document.getElementById("modeLabel"),
     focusForm: document.getElementById("focusForm"),
     sessionTitle: document.getElementById("sessionTitle"),
+    sessionTitleSuggestions: document.getElementById("sessionTitleSuggestions"),
     durationInput: document.getElementById("durationInput"),
     durationButtons: Array.from(document.querySelectorAll("[data-duration]")),
     timerState: document.getElementById("timerState"),
@@ -488,6 +489,7 @@
 
   function renderAll() {
     renderAccount();
+    renderSessionSuggestions();
     renderStats();
     renderWeekGrove();
     renderRecords();
@@ -521,6 +523,24 @@
     setButtonLabel(els.startButton, "Start", "play");
     setFormDisabled(true);
     refreshIcons();
+  }
+
+  function renderSessionSuggestions() {
+    const fragment = document.createDocumentFragment();
+    const seen = new Set();
+
+    sortedSessions().forEach((record) => {
+      const title = (record.title || "").trim();
+      const key = title.toLowerCase();
+      if (!title || seen.has(key)) return;
+
+      seen.add(key);
+      const option = document.createElement("option");
+      option.value = title;
+      fragment.appendChild(option);
+    });
+
+    els.sessionTitleSuggestions.replaceChildren(fragment);
   }
 
   function renderRestTimer() {
