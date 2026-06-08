@@ -564,6 +564,99 @@ button:focus-visible {
   transform: rotate(-58deg) scale(0.74);
 }
 
+.plant-canopy .stem {
+  width: 15px;
+  height: 126px;
+  background: linear-gradient(180deg, var(--active-bark-a, #aa7444), var(--active-bark-b, #664227));
+}
+
+.plant-canopy .plant-branch {
+  width: 38px;
+  height: 6px;
+  background: linear-gradient(90deg, var(--active-bark-b, #664227), var(--active-bark-a, #aa7444));
+}
+
+.plant-canopy .twig-a {
+  top: 74px;
+  right: 50%;
+  left: auto;
+  transform: translateX(2px) rotate(-24deg);
+  transform-origin: 100% 50%;
+}
+
+.plant-canopy .twig-b {
+  top: 70px;
+  transform: translateX(-2px) rotate(-15deg);
+}
+
+.plant-canopy .twig-c {
+  top: 58px;
+  width: 31px;
+  transform: translateX(-2px) rotate(-58deg);
+}
+
+.plant-canopy .twig-d {
+  top: 96px;
+  right: 50%;
+  left: auto;
+  width: 29px;
+  transform: translateX(2px) rotate(12deg);
+  transform-origin: 100% 50%;
+}
+
+.plant-canopy .twig-e {
+  top: 54px;
+  width: 34px;
+  transform: translateX(-2px) rotate(-40deg);
+}
+
+.plant-canopy .leaf {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(246, 242, 232, 0.2), transparent 30%),
+    linear-gradient(135deg, var(--active-leaf-a, #9ad96d), var(--active-leaf-b, #2d7047));
+  transform: none;
+  transform-origin: center;
+}
+
+.plant-canopy .leaf::before,
+.plant-canopy .leaf::after {
+  display: none;
+}
+
+.plant-canopy .leaf-a {
+  top: 54px;
+  left: 31px;
+}
+
+.plant-canopy .leaf-b {
+  top: 34px;
+  left: 52px;
+  width: 46px;
+  height: 46px;
+}
+
+.plant-canopy .leaf-c {
+  top: 56px;
+  left: 76px;
+}
+
+.plant-canopy .leaf-d {
+  top: 78px;
+  left: 48px;
+  width: 40px;
+  height: 40px;
+}
+
+.plant-canopy .leaf-e {
+  top: 27px;
+  left: 76px;
+  width: 36px;
+  height: 36px;
+}
+
 .plant-palm .stem {
   height: 136px;
   width: 10px;
@@ -738,6 +831,109 @@ button:focus-visible {
 
 .plant-growth-3 .stem {
   height: 130px;
+}
+
+.plant-canopy.plant-growth-0 .stem {
+  height: 76px;
+}
+
+.plant-canopy.plant-growth-0 .leaf-a {
+  top: 72px;
+  left: 58px;
+  width: 32px;
+  height: 32px;
+}
+
+.plant-canopy.plant-growth-1 .stem {
+  height: 96px;
+}
+
+.plant-canopy.plant-growth-1 .leaf-a {
+  top: 62px;
+  left: 42px;
+  width: 38px;
+  height: 38px;
+}
+
+.plant-canopy.plant-growth-1 .leaf-b {
+  top: 50px;
+  left: 66px;
+  width: 40px;
+  height: 40px;
+}
+
+.plant-canopy.plant-growth-1 .leaf-c {
+  top: 78px;
+  left: 58px;
+  width: 34px;
+  height: 34px;
+}
+
+.plant-canopy.plant-growth-2 .stem {
+  height: 116px;
+}
+
+.plant-canopy.plant-growth-2 .leaf-a {
+  top: 56px;
+  left: 34px;
+}
+
+.plant-canopy.plant-growth-2 .leaf-b {
+  top: 38px;
+  left: 56px;
+  width: 44px;
+  height: 44px;
+}
+
+.plant-canopy.plant-growth-2 .leaf-c {
+  top: 60px;
+  left: 78px;
+}
+
+.plant-canopy.plant-growth-2 .leaf-d {
+  top: 80px;
+  left: 52px;
+  width: 38px;
+  height: 38px;
+}
+
+.plant-canopy.plant-growth-3 .stem {
+  height: 130px;
+}
+
+.plant-canopy.plant-growth-3 .leaf-a {
+  top: 45px;
+  left: 27px;
+  width: 48px;
+  height: 48px;
+}
+
+.plant-canopy.plant-growth-3 .leaf-b {
+  top: 20px;
+  left: 48px;
+  width: 52px;
+  height: 52px;
+}
+
+.plant-canopy.plant-growth-3 .leaf-c {
+  top: 43px;
+  left: 77px;
+  width: 48px;
+  height: 48px;
+}
+
+.plant-canopy.plant-growth-3 .leaf-d {
+  top: 70px;
+  left: 45px;
+  width: 46px;
+  height: 46px;
+}
+
+.plant-canopy.plant-growth-3 .leaf-e {
+  top: 17px;
+  left: 77px;
+  width: 42px;
+  height: 42px;
 }
 
 .timer-display {
