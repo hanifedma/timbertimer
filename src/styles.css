@@ -719,25 +719,111 @@ button:focus-visible {
   display: none;
 }
 
-.plant-bamboo .stem {
-  width: 16px;
-  background: repeating-linear-gradient(
-    180deg,
-    var(--active-leaf-a, #a6d96d) 0 18px,
-    var(--active-leaf-b, #5b9849) 18px 21px
-  );
+.plant-bamboo {
+  --bamboo-stalk-background:
+    linear-gradient(
+      90deg,
+      rgba(246, 242, 232, 0.22) 0 18%,
+      rgba(246, 242, 232, 0.08) 19% 38%,
+      transparent 39% 64%,
+      rgba(7, 22, 18, 0.2) 65% 100%
+    ),
+    repeating-linear-gradient(
+      180deg,
+      var(--active-leaf-a, #a6d96d) 0 13px,
+      rgba(246, 242, 232, 0.28) 13px 14px,
+      var(--active-leaf-b, #5b9849) 14px 18px,
+      rgba(7, 22, 18, 0.24) 18px 20px
+    );
+  --bamboo-stalk-shadow:
+    inset 2px 0 0 rgba(246, 242, 232, 0.12),
+    inset -3px 0 0 rgba(7, 22, 18, 0.2);
 }
 
-.plant-bamboo .leaf {
-  width: 34px;
-  height: 74px;
+.plant-bamboo .stem,
+.plant-bamboo .plant-branch {
+  width: 15px;
   border-radius: 999px;
-  background: linear-gradient(180deg, var(--active-leaf-a, #c3e572), var(--active-leaf-b, #4c8a45));
+  background: var(--bamboo-stalk-background);
+  box-shadow: var(--bamboo-stalk-shadow);
+}
+
+.plant-bamboo .stem {
+  z-index: 4;
 }
 
 .plant-bamboo .plant-branch {
-  height: 5px;
-  background: linear-gradient(90deg, var(--active-leaf-b, #4c8a45), var(--active-leaf-a, #c3e572));
+  top: auto;
+  right: auto;
+  bottom: 0;
+  left: 50%;
+  height: 104px;
+  transform-origin: center bottom;
+  z-index: 3;
+}
+
+.plant-bamboo .twig-a {
+  height: 116px;
+  transform: translateX(-30px) rotate(-2deg);
+}
+
+.plant-bamboo .twig-b {
+  height: 101px;
+  transform: translateX(22px) rotate(3deg);
+}
+
+.plant-bamboo .twig-c {
+  height: 86px;
+  transform: translateX(-14px) rotate(1deg);
+}
+
+.plant-bamboo .twig-d {
+  height: 74px;
+  transform: translateX(38px) rotate(-3deg);
+}
+
+.plant-bamboo .twig-e {
+  height: 126px;
+  transform: translateX(5px) rotate(-1deg);
+}
+
+.plant-bamboo .leaf {
+  width: 25px;
+  height: 9px;
+  border-radius: 999px 0 999px 0;
+  background: linear-gradient(135deg, var(--active-leaf-a, #c3e572), var(--active-leaf-b, #4c8a45));
+  box-shadow: 0 4px 10px rgba(4, 15, 12, 0.1);
+  transform-origin: 3px 7px;
+  z-index: 5;
+}
+
+.plant-bamboo .leaf::before,
+.plant-bamboo .leaf::after {
+  display: none;
+}
+
+.plant-bamboo .leaf-a {
+  top: 42px;
+  left: 82px;
+  transform: rotate(-26deg);
+}
+
+.plant-bamboo .leaf-b {
+  top: 60px;
+  left: 41px;
+  transform: scaleX(-1) rotate(-18deg);
+}
+
+.plant-bamboo .leaf-c {
+  top: 90px;
+  left: 85px;
+  width: 21px;
+  transform: rotate(20deg);
+}
+
+.plant-bamboo .leaf-d,
+.plant-bamboo .leaf-e {
+  display: none;
 }
 
 .plant-fern .stem {
@@ -831,6 +917,113 @@ button:focus-visible {
 
 .plant-growth-3 .stem {
   height: 130px;
+}
+
+.plant-bamboo.plant-growth-0 .stem {
+  width: 12px;
+  height: 74px;
+}
+
+.plant-bamboo.plant-growth-0 .leaf-a {
+  top: 70px;
+  left: 75px;
+  width: 18px;
+  height: 7px;
+  transform: rotate(-24deg);
+}
+
+.plant-bamboo.plant-growth-1 .stem {
+  height: 94px;
+}
+
+.plant-bamboo.plant-growth-1 .twig-a {
+  height: 82px;
+  transform: translateX(-20px) rotate(-2deg);
+}
+
+.plant-bamboo.plant-growth-1 .twig-b {
+  height: 76px;
+  transform: translateX(18px) rotate(3deg);
+}
+
+.plant-bamboo.plant-growth-1 .twig-c {
+  display: none;
+}
+
+.plant-bamboo.plant-growth-1 .leaf-a {
+  top: 51px;
+  left: 78px;
+  width: 21px;
+  height: 8px;
+}
+
+.plant-bamboo.plant-growth-1 .leaf-b {
+  top: 68px;
+  left: 43px;
+  width: 20px;
+  height: 8px;
+}
+
+.plant-bamboo.plant-growth-1 .leaf-c {
+  display: none;
+}
+
+.plant-bamboo.plant-growth-2 .stem {
+  height: 112px;
+}
+
+.plant-bamboo.plant-growth-2 .twig-a {
+  height: 102px;
+  transform: translateX(-27px) rotate(-2deg);
+}
+
+.plant-bamboo.plant-growth-2 .twig-b {
+  height: 94px;
+  transform: translateX(22px) rotate(3deg);
+}
+
+.plant-bamboo.plant-growth-2 .twig-c {
+  height: 76px;
+  transform: translateX(-10px) rotate(1deg);
+}
+
+.plant-bamboo.plant-growth-2 .leaf-a {
+  top: 43px;
+  left: 80px;
+}
+
+.plant-bamboo.plant-growth-2 .leaf-b {
+  top: 65px;
+  left: 40px;
+}
+
+.plant-bamboo.plant-growth-2 .leaf-c {
+  top: 92px;
+  left: 83px;
+}
+
+.plant-bamboo.plant-growth-3 .stem {
+  height: 130px;
+}
+
+.plant-bamboo.plant-growth-3 .twig-a {
+  height: 116px;
+}
+
+.plant-bamboo.plant-growth-3 .twig-b {
+  height: 101px;
+}
+
+.plant-bamboo.plant-growth-3 .twig-c {
+  height: 86px;
+}
+
+.plant-bamboo.plant-growth-3 .twig-d {
+  height: 74px;
+}
+
+.plant-bamboo.plant-growth-3 .twig-e {
+  height: 126px;
 }
 
 .plant-canopy.plant-growth-0 .stem {
