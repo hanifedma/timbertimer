@@ -1,319 +1,296 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="A minimalist jungle focus timer with editable focus records."
-    />
-    <meta name="theme-color" content="#173d2a" />
-    <title>Canopy Focus</title>
-    <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="icon" href="assets/canopy-logo.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="assets/canopy-logo-192.png" />
-    <link rel="stylesheet" href="src/styles.css" />
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
-    <script src="src/supabase-config.js" defer></script>
-    <script src="src/app.js" defer></script>
-  </head>
-  <body>
-    <div class="app-backdrop" aria-hidden="true"></div>
-    <div class="leaf-wash" aria-hidden="true"></div>
 
-    <div class="app-shell">
-      <header class="topbar">
-        <a class="brand" href="./" aria-label="Canopy Focus home">
-          <span class="brand-mark" aria-hidden="true">
-            <i data-lucide="sprout"></i>
-          </span>
-          <span>
-            <strong>Canopy Focus</strong>
-            <small id="modeLabel">Local garden</small>
-          </span>
-        </a>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A minimalist jungle focus timer with editable focus records." />
+  <meta name="theme-color" content="#173d2a" />
+  <title>Canopy Focus</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="assets/canopy-logo.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="assets/canopy-logo-192.png" />
+  <link rel="stylesheet" href="src/styles.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="src/supabase-config.js" defer></script>
+  <script src="src/app.js" defer></script>
+</head>
 
-        <nav class="top-actions" aria-label="Primary">
-          <button class="icon-button" type="button" data-panel-jump="records" title="Records">
-            <i data-lucide="list"></i>
-            <span>Record</span>
-          </button>
-          <button id="accountButton" class="icon-button account-button" type="button" title="Account">
-            <i data-lucide="user-round"></i>
-            <span id="navAuthStatus">Local</span>
-          </button>
-        </nav>
-      </header>
+<body>
+  <div class="app-backdrop" aria-hidden="true"></div>
+  <div class="leaf-wash" aria-hidden="true"></div>
 
-      <main class="workspace">
-        <section class="focus-panel" aria-labelledby="focusTitle">
-          <h1 id="focusTitle">Plant one calm session.</h1>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Canopy Focus home">
+        <span class="brand-mark" aria-hidden="true">
+          <i data-lucide="sprout"></i>
+        </span>
+        <span>
+          <strong>Canopy Focus</strong>
+          <small id="modeLabel">Local garden</small>
+        </span>
+      </a>
 
-          <form id="focusForm" class="focus-form">
-            <label class="field">
-              <span>Session</span>
-              <input
-                id="sessionTitle"
-                name="sessionTitle"
-                type="text"
-                maxlength="80"
-                value="Deep focus"
-                list="sessionTitleSuggestions"
-                autocomplete="off"
-              />
-            </label>
-            <datalist id="sessionTitleSuggestions"></datalist>
+      <nav class="top-actions" aria-label="Primary">
+        <button class="icon-button" type="button" data-panel-jump="records" title="Records">
+          <i data-lucide="list"></i>
+          <span>Record</span>
+        </button>
+        <button id="accountButton" class="icon-button account-button" type="button" title="Account">
+          <i data-lucide="user-round"></i>
+          <span id="navAuthStatus">Local</span>
+        </button>
+      </nav>
+    </header>
 
-            <div class="field">
-              <span>Duration</span>
-              <div class="duration-row" role="group" aria-label="Duration presets">
-                <button class="pill-button is-selected" type="button" data-duration="25">
-                  25m
-                </button>
-                <button class="pill-button" type="button" data-duration="120">120m</button>
-                <button class="pill-button" type="button" data-duration="60">60m</button>
-                <label class="custom-duration">
-                  <span>Custom</span>
-                  <input id="durationInput" type="number" min="1" max="240" step="1" value="25" />
-                </label>
-              </div>
-            </div>
+    <main class="workspace">
+      <section class="focus-panel" aria-labelledby="focusTitle">
+        <h1 id="focusTitle">Forget all else, feel the tree grow.</h1>
 
-          </form>
+        <form id="focusForm" class="focus-form">
+          <label class="field">
+            <span>Session</span>
+            <input id="sessionTitle" name="sessionTitle" type="text" maxlength="80" value="Deep focus"
+              list="sessionTitleSuggestions" autocomplete="off" />
+          </label>
+          <datalist id="sessionTitleSuggestions"></datalist>
 
-          <div class="timer-card" aria-live="polite">
-            <div class="timer-meta">
-              <span id="timerState">Ready</span>
-              <span id="timerProgressLabel">0%</span>
-            </div>
-
-            <div class="growth-stage" style="--growth: 0.08">
-              <div class="sun-orb" aria-hidden="true"></div>
-              <div class="plant">
-                <span class="stem"></span>
-                <span class="plant-branch twig-a"></span>
-                <span class="plant-branch twig-b"></span>
-                <span class="plant-branch twig-c"></span>
-                <span class="plant-branch twig-d"></span>
-                <span class="plant-branch twig-e"></span>
-                <span class="leaf leaf-a"></span>
-                <span class="leaf leaf-b"></span>
-                <span class="leaf leaf-c"></span>
-                <span class="leaf leaf-d"></span>
-                <span class="leaf leaf-e"></span>
-              </div>
-            </div>
-
-            <div id="timerDisplay" class="timer-display">25:00</div>
-
-            <div class="timer-actions">
-              <button id="startButton" class="primary-button" type="button">
-                <i data-lucide="play"></i>
-                <span>Start</span>
+          <div class="field">
+            <span>Duration</span>
+            <div class="duration-row" role="group" aria-label="Duration presets">
+              <button class="pill-button is-selected" type="button" data-duration="25">
+                25m
               </button>
-              <button id="finishButton" class="secondary-button" type="button" disabled>
-                <i data-lucide="check"></i>
-                <span>Finish</span>
-              </button>
-              <button
-                id="soundToggleButton"
-                class="ghost-button"
-                type="button"
-                aria-pressed="true"
-                title="Timer sound on"
-              >
-                <i data-lucide="volume-2"></i>
-                <span>Sound on</span>
-              </button>
+              <button class="pill-button" type="button" data-duration="120">120m</button>
+              <button class="pill-button" type="button" data-duration="60">60m</button>
+              <label class="custom-duration">
+                <span>Custom</span>
+                <input id="durationInput" type="number" min="1" max="240" step="1" value="25" />
+              </label>
             </div>
           </div>
 
-          <div class="rest-card" aria-live="polite">
-            <div class="timer-meta">
-              <span id="restState">Rest stopwatch</span>
-              <span id="restModeLabel">Elapsed</span>
-            </div>
-            <div id="restDisplay" class="rest-display">00:00</div>
-            <div class="timer-actions">
-              <button id="restStartButton" class="secondary-button" type="button">
-                <i data-lucide="play"></i>
-                <span>Start rest</span>
-              </button>
-              <button id="restResetButton" class="ghost-button" type="button" disabled>
-                <i data-lucide="rotate-ccw"></i>
-                <span>Reset</span>
-              </button>
+        </form>
+
+        <div class="timer-card" aria-live="polite">
+          <div class="timer-meta">
+            <span id="timerState">Ready</span>
+            <span id="timerProgressLabel">0%</span>
+          </div>
+
+          <div class="growth-stage" style="--growth: 0.08">
+            <div class="sun-orb" aria-hidden="true"></div>
+            <div class="plant">
+              <span class="stem"></span>
+              <span class="plant-branch twig-a"></span>
+              <span class="plant-branch twig-b"></span>
+              <span class="plant-branch twig-c"></span>
+              <span class="plant-branch twig-d"></span>
+              <span class="plant-branch twig-e"></span>
+              <span class="leaf leaf-a"></span>
+              <span class="leaf leaf-b"></span>
+              <span class="leaf leaf-c"></span>
+              <span class="leaf leaf-d"></span>
+              <span class="leaf leaf-e"></span>
             </div>
           </div>
-        </section>
 
-        <section id="recordsPanel" class="records-panel" aria-labelledby="recordsTitle">
-          <div class="section-head">
-            <div>
-              <div class="panel-kicker">Garden record</div>
-              <h2 id="recordsTitle">Focus history</h2>
-            </div>
-            <button id="addRecordButton" class="icon-only" type="button" title="Add record">
-              <i data-lucide="plus"></i>
+          <div id="timerDisplay" class="timer-display">25:00</div>
+
+          <div class="timer-actions">
+            <button id="startButton" class="primary-button" type="button">
+              <i data-lucide="play"></i>
+              <span>Start</span>
+            </button>
+            <button id="finishButton" class="secondary-button" type="button" disabled>
+              <i data-lucide="check"></i>
+              <span>Finish</span>
+            </button>
+            <button id="soundToggleButton" class="ghost-button" type="button" aria-pressed="true"
+              title="Timer sound on">
+              <i data-lucide="volume-2"></i>
+              <span>Sound on</span>
             </button>
           </div>
+        </div>
 
-          <div class="stats-grid" aria-label="Focus stats">
-            <article class="stat">
-              <span>Today</span>
-              <strong id="todayStat">0m</strong>
-            </article>
-            <article class="stat">
-              <span>Total</span>
-              <strong id="totalStat">0h</strong>
-            </article>
+        <div class="rest-card" aria-live="polite">
+          <div class="timer-meta">
+            <span id="restState">Rest stopwatch</span>
+            <span id="restModeLabel">Elapsed</span>
           </div>
-
-          <div class="week-grove" aria-label="Weekly forest">
-            <div class="week-grove-head">
-              <div>
-                <div class="panel-kicker">Weekly forest</div>
-                <p id="weekRange">Loading</p>
-              </div>
-              <div class="week-nav" aria-label="Week navigation">
-                <button id="prevWeekButton" class="icon-only" type="button" title="Previous week">
-                  <i data-lucide="chevron-left"></i>
-                </button>
-                <button id="thisWeekButton" class="secondary-button week-today" type="button">
-                  Current
-                </button>
-                <button id="nextWeekButton" class="icon-only" type="button" title="Next week">
-                  <i data-lucide="chevron-right"></i>
-                </button>
-              </div>
-            </div>
-            <div class="week-grove-summary">
-              <span id="weekTreeCount">0 trees</span>
-              <span id="weekFocusTime">0m focused</span>
-            </div>
-            <div id="weekForest" class="week-forest" aria-live="polite"></div>
+          <div id="restDisplay" class="rest-display">00:00</div>
+          <div class="timer-actions">
+            <button id="restStartButton" class="secondary-button" type="button">
+              <i data-lucide="play"></i>
+              <span>Start rest</span>
+            </button>
+            <button id="restResetButton" class="ghost-button" type="button" disabled>
+              <i data-lucide="rotate-ccw"></i>
+              <span>Reset</span>
+            </button>
           </div>
+        </div>
+      </section>
 
-          <div class="record-tools">
-            <label class="search-field">
-              <i data-lucide="search"></i>
-              <input
-                id="searchInput"
-                type="search"
-                list="sessionTitleSuggestions"
-                placeholder="Search records"
-              />
-            </label>
-            <select id="statusFilter" aria-label="Filter records">
-              <option value="all">All</option>
-              <option value="completed">Completed</option>
-              <option value="abandoned">Abandoned</option>
-            </select>
-          </div>
-
-          <div id="emptyState" class="empty-state" hidden>
-            <i data-lucide="tree-palm"></i>
-            <strong>No records yet.</strong>
-          </div>
-
-          <div id="recordsList" class="records-list" aria-live="polite"></div>
-        </section>
-
-      </main>
-    </div>
-
-    <dialog id="accountDialog" class="account-dialog" aria-labelledby="accountTitle">
-      <div class="account-dialog-body">
+      <section id="recordsPanel" class="records-panel" aria-labelledby="recordsTitle">
         <div class="section-head">
           <div>
-            <div class="panel-kicker">Accounts</div>
-            <h2 id="accountTitle">Google sync</h2>
+            <div class="panel-kicker">Garden record</div>
+            <h2 id="recordsTitle">Focus history</h2>
           </div>
-          <button id="closeAccountDialogButton" class="icon-only" type="button" title="Close">
-            <i data-lucide="x"></i>
+          <button id="addRecordButton" class="icon-only" type="button" title="Add record">
+            <i data-lucide="plus"></i>
           </button>
         </div>
 
-        <span id="syncBadge" class="sync-badge">Local</span>
-
-        <div id="accountStatus" class="account-status">
-          <i data-lucide="hard-drive"></i>
-          <span>Records are saved in this browser.</span>
+        <div class="stats-grid" aria-label="Focus stats">
+          <article class="stat">
+            <span>Today</span>
+            <strong id="todayStat">0m</strong>
+          </article>
+          <article class="stat">
+            <span>Total</span>
+            <strong id="totalStat">0h</strong>
+          </article>
         </div>
 
-        <div id="authActions" class="auth-form" hidden>
-          <button id="googleSignInButton" class="primary-button google-button" type="button">
-            <i data-lucide="chrome"></i>
-            <span>Continue with Google</span>
-          </button>
+        <div class="week-grove" aria-label="Weekly forest">
+          <div class="week-grove-head">
+            <div>
+              <div class="panel-kicker">Weekly forest</div>
+              <p id="weekRange">Loading</p>
+            </div>
+            <div class="week-nav" aria-label="Week navigation">
+              <button id="prevWeekButton" class="icon-only" type="button" title="Previous week">
+                <i data-lucide="chevron-left"></i>
+              </button>
+              <button id="thisWeekButton" class="secondary-button week-today" type="button">
+                Current
+              </button>
+              <button id="nextWeekButton" class="icon-only" type="button" title="Next week">
+                <i data-lucide="chevron-right"></i>
+              </button>
+            </div>
+          </div>
+          <div class="week-grove-summary">
+            <span id="weekTreeCount">0 trees</span>
+            <span id="weekFocusTime">0m focused</span>
+          </div>
+          <div id="weekForest" class="week-forest" aria-live="polite"></div>
         </div>
 
-        <div id="signedInActions" class="signed-in-actions" hidden>
-          <button id="signOutButton" class="ghost-button" type="button">
-            <i data-lucide="log-out"></i>
-            <span>Sign out</span>
-          </button>
+        <div class="record-tools">
+          <label class="search-field">
+            <i data-lucide="search"></i>
+            <input id="searchInput" type="search" list="sessionTitleSuggestions" placeholder="Search records" />
+          </label>
+          <select id="statusFilter" aria-label="Filter records">
+            <option value="all">All</option>
+            <option value="completed">Completed</option>
+            <option value="abandoned">Abandoned</option>
+          </select>
         </div>
+
+        <div id="emptyState" class="empty-state" hidden>
+          <i data-lucide="tree-palm"></i>
+          <strong>No records yet.</strong>
+        </div>
+
+        <div id="recordsList" class="records-list" aria-live="polite"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <dialog id="accountDialog" class="account-dialog" aria-labelledby="accountTitle">
+    <div class="account-dialog-body">
+      <div class="section-head">
+        <div>
+          <div class="panel-kicker">Accounts</div>
+          <h2 id="accountTitle">Google sync</h2>
+        </div>
+        <button id="closeAccountDialogButton" class="icon-only" type="button" title="Close">
+          <i data-lucide="x"></i>
+        </button>
       </div>
-    </dialog>
 
-    <dialog id="recordDialog" class="record-dialog">
-      <form id="recordForm" method="dialog">
-        <div class="section-head">
-          <div>
-            <div class="panel-kicker">Record</div>
-            <h2 id="dialogTitle">Edit session</h2>
-          </div>
-          <button class="icon-only" value="cancel" type="submit" title="Close">
-            <i data-lucide="x"></i>
-          </button>
+      <span id="syncBadge" class="sync-badge">Local</span>
+
+      <div id="accountStatus" class="account-status">
+        <i data-lucide="hard-drive"></i>
+        <span>Records are saved in this browser.</span>
+      </div>
+
+      <div id="authActions" class="auth-form" hidden>
+        <button id="googleSignInButton" class="primary-button google-button" type="button">
+          <i data-lucide="chrome"></i>
+          <span>Continue with Google</span>
+        </button>
+      </div>
+
+      <div id="signedInActions" class="signed-in-actions" hidden>
+        <button id="signOutButton" class="ghost-button" type="button">
+          <i data-lucide="log-out"></i>
+          <span>Sign out</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="recordDialog" class="record-dialog">
+    <form id="recordForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <div class="panel-kicker">Record</div>
+          <h2 id="dialogTitle">Edit session</h2>
         </div>
+        <button class="icon-only" value="cancel" type="submit" title="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
 
-        <input id="recordIdInput" type="hidden" />
+      <input id="recordIdInput" type="hidden" />
 
+      <label class="field">
+        <span>Session</span>
+        <input id="recordTitleInput" type="text" maxlength="80" list="sessionTitleSuggestions" required />
+      </label>
+
+      <div class="form-grid">
         <label class="field">
-          <span>Session</span>
-          <input
-            id="recordTitleInput"
-            type="text"
-            maxlength="80"
-            list="sessionTitleSuggestions"
-            required
-          />
+          <span>Started</span>
+          <input id="recordStartedInput" type="datetime-local" required />
         </label>
+        <label class="field">
+          <span>Status</span>
+          <select id="recordStatusInput">
+            <option value="completed">Completed</option>
+            <option value="abandoned">Abandoned</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Goal minutes</span>
+          <input id="recordDurationInput" type="number" min="1" max="600" required />
+        </label>
+        <label class="field">
+          <span>Actual minutes</span>
+          <input id="recordActualInput" type="number" min="0" max="600" required />
+        </label>
+      </div>
 
-        <div class="form-grid">
-          <label class="field">
-            <span>Started</span>
-            <input id="recordStartedInput" type="datetime-local" required />
-          </label>
-          <label class="field">
-            <span>Status</span>
-            <select id="recordStatusInput">
-              <option value="completed">Completed</option>
-              <option value="abandoned">Abandoned</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Goal minutes</span>
-            <input id="recordDurationInput" type="number" min="1" max="600" required />
-          </label>
-          <label class="field">
-            <span>Actual minutes</span>
-            <input id="recordActualInput" type="number" min="0" max="600" required />
-          </label>
-        </div>
+      <menu class="dialog-actions">
+        <button class="ghost-button" value="cancel" type="submit">Cancel</button>
+        <button id="saveRecordButton" class="primary-button" value="default" type="button">
+          <i data-lucide="save"></i>
+          <span>Save</span>
+        </button>
+      </menu>
+    </form>
+  </dialog>
 
-        <menu class="dialog-actions">
-          <button class="ghost-button" value="cancel" type="submit">Cancel</button>
-          <button id="saveRecordButton" class="primary-button" value="default" type="button">
-            <i data-lucide="save"></i>
-            <span>Save</span>
-          </button>
-        </menu>
-      </form>
-    </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
 
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  </body>
 </html>

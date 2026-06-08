@@ -83,13 +83,12 @@ button:disabled {
   width: min(1480px, 100%);
   min-height: 100vh;
   margin: 0 auto;
-  padding: 24px calc(var(--shell-x) + env(safe-area-inset-right)) 24px
-    calc(var(--shell-x) + env(safe-area-inset-left));
+  padding: 24px calc(var(--shell-x) + env(safe-area-inset-right)) 24px calc(var(--shell-x) + env(safe-area-inset-left));
 }
 
 .topbar,
-.workspace > section,
-.workspace > aside,
+.workspace>section,
+.workspace>aside,
 .timer-card,
 .rest-card,
 .account-dialog,
@@ -125,7 +124,7 @@ button:disabled {
   text-decoration: none;
 }
 
-.brand > span:last-child {
+.brand>span:last-child {
   min-width: 0;
 }
 
@@ -179,8 +178,8 @@ button:disabled {
   padding-top: 18px;
 }
 
-.workspace > section,
-.workspace > aside {
+.workspace>section,
+.workspace>aside {
   min-width: 0;
   border-radius: var(--radius);
 }
@@ -208,8 +207,8 @@ h3 {
 }
 
 h1 {
-  max-width: 12ch;
-  font-size: 3.8rem;
+  max-width: 9999ch;
+  font-size: 2.8rem;
 }
 
 h2 {
@@ -232,8 +231,8 @@ h3 {
   min-width: 0;
 }
 
-.field > span,
-.search-field > span {
+.field>span,
+.search-field>span {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 700;
@@ -721,20 +720,16 @@ button:focus-visible {
 
 .plant-bamboo {
   --bamboo-stalk-background:
-    linear-gradient(
-      90deg,
+    linear-gradient(90deg,
       rgba(246, 242, 232, 0.22) 0 18%,
       rgba(246, 242, 232, 0.08) 19% 38%,
       transparent 39% 64%,
-      rgba(7, 22, 18, 0.2) 65% 100%
-    ),
-    repeating-linear-gradient(
-      180deg,
+      rgba(7, 22, 18, 0.2) 65% 100%),
+    repeating-linear-gradient(180deg,
       var(--active-leaf-a, #a6d96d) 0 13px,
       rgba(246, 242, 232, 0.28) 13px 14px,
       var(--active-leaf-b, #5b9849) 14px 18px,
-      rgba(7, 22, 18, 0.24) 18px 20px
-    );
+      rgba(7, 22, 18, 0.24) 18px 20px);
   --bamboo-stalk-shadow:
     inset 2px 0 0 rgba(246, 242, 232, 0.12),
     inset -3px 0 0 rgba(7, 22, 18, 0.2);
@@ -1386,12 +1381,7 @@ svg {
   height: 152px;
   pointer-events: none;
   transform:
-    translateX(-50%)
-    translate(var(--tree-shift, 0), var(--tree-floor, 0))
-    rotate(var(--tree-tilt, 0deg))
-    scale(var(--active-scale, 0.56))
-    scaleX(var(--grove-stretch-x, 1))
-    scaleY(var(--grove-stretch-y, 1));
+    translateX(-50%) translate(var(--tree-shift, 0), var(--tree-floor, 0)) rotate(var(--tree-tilt, 0deg)) scale(var(--active-scale, 0.56)) scaleX(var(--grove-stretch-x, 1)) scaleY(var(--grove-stretch-y, 1));
   transform-origin: center bottom;
   transition: none;
   z-index: 1;
@@ -1675,12 +1665,10 @@ svg {
 }
 
 .species-kapok .tree-crown {
-  background: linear-gradient(
-    135deg,
-    var(--tree-leaf-a, #b6da64),
-    var(--tree-leaf-b, #367c3f) 66%,
-    #245735
-  );
+  background: linear-gradient(135deg,
+      var(--tree-leaf-a, #b6da64),
+      var(--tree-leaf-b, #367c3f) 66%,
+      #245735);
 }
 
 .species-kapok .crown-a {
@@ -2201,8 +2189,8 @@ svg {
   }
 
   h1 {
-    max-width: 10ch;
-    font-size: 2.55rem;
+    max-width: 9999ch;
+    font-size: 1.55rem;
   }
 
   .duration-row,
