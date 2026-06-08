@@ -4,7 +4,10 @@
   const STORAGE_SESSIONS = "canopy-focus:sessions:v1";
   const STORAGE_TIMER = "canopy-focus:timer:v1";
   const STORAGE_SESSION_NAME = "canopy-focus:session-name:v1";
+  const STORAGE_SOUND_ENABLED = "canopy-focus:sound-enabled:v1";
   const DEFAULT_DURATION = 25;
+  const PLANT_MARKUP =
+    '<span class="stem"></span><span class="plant-branch twig-a"></span><span class="plant-branch twig-b"></span><span class="plant-branch twig-c"></span><span class="plant-branch twig-d"></span><span class="plant-branch twig-e"></span><span class="leaf leaf-a"></span><span class="leaf leaf-b"></span><span class="leaf leaf-c"></span><span class="leaf leaf-d"></span><span class="leaf leaf-e"></span>';
   const TREE_SPECIES = [
     { id: "canopy", label: "canopy tree" },
     { id: "palm", label: "palm tree" },
@@ -30,6 +33,7 @@
     plant: document.querySelector(".plant"),
     startButton: document.getElementById("startButton"),
     finishButton: document.getElementById("finishButton"),
+    soundToggleButton: document.getElementById("soundToggleButton"),
     recordsPanel: document.getElementById("recordsPanel"),
     accountButton: document.getElementById("accountButton"),
     accountDialog: document.getElementById("accountDialog"),
@@ -80,6 +84,10 @@
     dataMode: "local",
     sessions: [],
     selectedDuration: DEFAULT_DURATION,
+    soundEnabled: loadSoundPreference(),
+    audioContext: null,
+    activeSoundMasters: [],
+    finishSoonSoundTimerId: null,
     weekStart: startOfWeek(new Date()),
     timer: null,
     restTimer: null,
@@ -118,7 +126,7 @@
     });
 
     els.durationInput.addEventListener("input", () => {
-      const minutes = cleanMinutes(els.durationInput.value, DEFAULT_DURATION, 5);
+      const minutes = cleanMinutes(els.durationInput.value, DEFAULT_DURATION, 1);
       state.selectedDuration = minutes;
       updateDurationButtons();
       if (!state.timer) {
@@ -128,6 +136,7 @@
 
     els.startButton.addEventListener("click", startOrResumeTimer);
     els.finishButton.addEventListener("click", finishCurrentSession);
+    els.soundToggleButton.addEventListener("click", toggleTimerSound);
     els.restStartButton.addEventListener("click", startRestTimer);
     els.restResetButton.addEventListener("click", resetRestTimer);
 
@@ -318,12 +327,13 @@
   async function startOrResumeTimer() {
     if (state.timer) return;
 
-    const minutes = cleanMinutes(els.durationInput.value, state.selectedDuration, 5);
+    const minutes = cleanMinutes(els.durationInput.value, state.selectedDuration, 1);
     const title = els.sessionTitle.value.trim() || "Deep focus";
     const durationSeconds = minutes * 60;
 
     state.selectedDuration = minutes;
     rememberSessionName(title);
+    state.finishSoonSoundTimerId = null;
     state.timer = {
       id: createId(),
       status: "running",
@@ -337,6 +347,7 @@
     };
 
     persistTimer();
+    primeCompletionSound();
     renderTimer();
     showToast("Session started.");
     await saveActiveTimerToCloud();
@@ -350,7 +361,9 @@
     try {
       const claimed = await claimActiveTimer(timer);
       if (!claimed) {
+        stopActiveTimerSounds();
         state.timer = null;
+        state.finishSoonSoundTimerId = null;
         persistTimer();
         await loadSessions();
         renderAll();
@@ -379,7 +392,14 @@
         updated_at: endedAt,
       };
 
+      if (status === "completed") {
+        playCompletionSound();
+      } else {
+        stopActiveTimerSounds();
+      }
+
       state.timer = null;
+      state.finishSoonSoundTimerId = null;
       persistTimer();
       await createRecord(record);
       renderTimer();
@@ -472,8 +492,15 @@
   function startTicker() {
     window.clearInterval(state.tickId);
     state.tickId = window.setInterval(() => {
-      if (state.timer && state.timer.status === "running" && getRemainingSeconds() <= 0) {
-        completeTimer("completed");
+      if (state.timer && state.timer.status === "running") {
+        const remainingSeconds = getRemainingSeconds();
+        if (remainingSeconds > 0 && remainingSeconds <= 10) {
+          playFinishSoonSound(remainingSeconds);
+        }
+
+        if (remainingSeconds <= 0) {
+          completeTimer("completed");
+        }
       }
 
       if (canUseCloud() && Date.now() - state.lastCloudTimerSyncAt > 15000) {
@@ -495,6 +522,7 @@
     renderRecords();
     renderTimer();
     renderRestTimer();
+    renderSoundToggle();
     refreshIcons();
   }
 
@@ -543,6 +571,14 @@
     els.sessionTitleSuggestions.replaceChildren(fragment);
   }
 
+  function renderSoundToggle() {
+    const label = state.soundEnabled ? "Sound on" : "Sound off";
+    const icon = state.soundEnabled ? "volume-2" : "volume-x";
+    setButtonLabel(els.soundToggleButton, label, icon);
+    els.soundToggleButton.setAttribute("aria-pressed", String(state.soundEnabled));
+    els.soundToggleButton.title = `Timer ${label.toLowerCase()}`;
+  }
+
   function renderRestTimer() {
     const elapsedSeconds = state.restTimer ? getRestElapsedSeconds() : 0;
     const isRunning = Boolean(state.restTimer);
@@ -575,15 +611,21 @@
     els.timerDisplay.textContent = formatClock(remainingSeconds);
     els.timerProgressLabel.textContent = `${Math.round(progress * 100)}%`;
     els.growthStage.style.setProperty("--growth", String(Math.max(0.08, progress)));
-    renderActiveTree();
+    renderActiveTree(progress);
   }
 
-  function renderActiveTree() {
+  function renderActiveTree(progress = 0) {
     const title = state.timer ? state.timer.title : els.sessionTitle.value;
+    const elapsedMinutes = state.timer ? getElapsedSeconds() / 60 : 0;
+    const growthStage = getFocusGrowthStage(elapsedMinutes);
+    const activeStageScales = [0.84, 0.96, 1.08, 1.2];
+    const progressScale = 0.25 + Math.max(0.08, progress) * 0.82;
     const species = getTreeForSession(title, "completed");
     const palette = getTreePalette(title);
-    els.plant.className = `plant plant-${species.id}`;
+    els.plant.className = `plant plant-${species.id} plant-growth-${growthStage}`;
     els.growthStage.dataset.tree = species.id;
+    els.growthStage.dataset.growthStage = String(growthStage);
+    els.growthStage.style.setProperty("--active-scale", (progressScale * activeStageScales[growthStage]).toFixed(3));
     els.growthStage.style.setProperty("--active-leaf-a", palette.leafA);
     els.growthStage.style.setProperty("--active-leaf-b", palette.leafB);
     els.growthStage.style.setProperty("--active-bark-a", palette.barkA);
@@ -729,32 +771,23 @@
     const seed = getTreeSeed(record.title);
     const palette = getTreePalette(seed);
     const shape = hashString(`${seed}:shape`) % 4;
+    const growthStage = getFocusGrowthStage(record.actual_minutes);
     const tree = document.createElement("article");
-    tree.className = `grove-tree species-${species.id} shape-${shape}`;
+    tree.className = `grove-tree shape-${shape}`;
     tree.style.setProperty("--tree-delay", `${(index % 9) * 40}ms`);
-    tree.style.setProperty("--tree-leaf-a", palette.leafA);
-    tree.style.setProperty("--tree-leaf-b", palette.leafB);
-    tree.style.setProperty("--tree-bark-a", palette.barkA);
-    tree.style.setProperty("--tree-bark-b", palette.barkB);
-    tree.style.setProperty("--tree-size", getGroveTreeScale(seed));
+    tree.style.setProperty("--active-leaf-a", palette.leafA);
+    tree.style.setProperty("--active-leaf-b", palette.leafB);
+    tree.style.setProperty("--active-bark-a", palette.barkA);
+    tree.style.setProperty("--active-bark-b", palette.barkB);
+    tree.style.setProperty("--active-scale", getGroveTreeScale(record.actual_minutes, seed));
     tree.style.setProperty("--tree-tilt", `${Math.round(seededRange(seed, "tilt", -5, 5))}deg`);
-    tree.style.setProperty("--tree-floor", `${Math.round(seededRange(seed, "floor", -5, 5))}px`);
+    tree.style.setProperty("--tree-floor", `${Math.round(seededRange(seed, "floor", -3, 3))}px`);
     tree.style.setProperty("--tree-shift", `${Math.round(seededRange(seed, "shift", -4, 4))}px`);
     tree.style.setProperty("--tree-girth", `${Math.round(seededRange(seed, "girth", -3, 5))}px`);
     tree.style.setProperty("--tree-depth", `${Math.round(seededRange(seed, "depth", -2, 4))}px`);
-    tree.style.setProperty("--tree-trunk-width", `${seededRange(seed, "trunk-width", 7, 11).toFixed(1)}px`);
-    tree.style.setProperty("--tree-trunk-height", `${seededRange(seed, "trunk-height", 34, 44).toFixed(1)}px`);
-    tree.style.setProperty("--tree-branch-width", `${seededRange(seed, "branch-width", 20, 29).toFixed(1)}px`);
-    tree.style.setProperty("--tree-crown-scale", seededRange(seed, "crown-scale", 0.9, 1.14).toFixed(2));
-    tree.style.setProperty("--tree-crown-tall", seededRange(seed, "crown-tall", 0.88, 1.16).toFixed(2));
-    tree.style.setProperty("--tree-crown-a-x", `${Math.round(seededRange(seed, "crown-a-x", -4, 4))}px`);
-    tree.style.setProperty("--tree-crown-a-y", `${Math.round(seededRange(seed, "crown-a-y", -4, 3))}px`);
-    tree.style.setProperty("--tree-crown-b-x", `${Math.round(seededRange(seed, "crown-b-x", -3, 4))}px`);
-    tree.style.setProperty("--tree-crown-b-y", `${Math.round(seededRange(seed, "crown-b-y", -5, 3))}px`);
-    tree.style.setProperty("--tree-crown-c-x", `${Math.round(seededRange(seed, "crown-c-x", -4, 4))}px`);
-    tree.style.setProperty("--tree-crown-c-y", `${Math.round(seededRange(seed, "crown-c-y", -3, 5))}px`);
-    tree.style.setProperty("--tree-shadow-width", `${seededRange(seed, "shadow", 44, 60).toFixed(1)}px`);
-    tree.style.setProperty("--tree-mound-width", `${seededRange(seed, "mound", 32, 46).toFixed(1)}px`);
+    tree.style.setProperty("--tree-mound-width", `${seededRange(seed, "mound", 34, 54).toFixed(1)}px`);
+    tree.style.setProperty("--grove-stretch-x", seededRange(seed, `shape-${shape}-x`, 0.96, 1.04).toFixed(2));
+    tree.style.setProperty("--grove-stretch-y", seededRange(seed, `shape-${shape}-y`, 0.98, 1.06).toFixed(2));
     tree.title = `${record.title}: ${species.label}, ${record.actual_minutes}m`;
     tree.setAttribute(
       "aria-label",
@@ -762,10 +795,9 @@
     );
 
     const visual = document.createElement("span");
-    visual.className = "tree-visual";
+    visual.className = `grove-plant plant plant-${species.id} plant-growth-${growthStage}`;
     visual.setAttribute("aria-hidden", "true");
-    visual.innerHTML =
-      '<span class="tree-shadow"></span><span class="tree-trunk"></span><span class="tree-branch limb-a"></span><span class="tree-branch limb-b"></span><span class="tree-branch limb-c"></span><span class="tree-crown crown-a"></span><span class="tree-crown crown-b"></span><span class="tree-crown crown-c"></span>';
+    visual.innerHTML = PLANT_MARKUP;
 
     const label = document.createElement("span");
     label.className = "tree-label";
@@ -775,8 +807,21 @@
     return tree;
   }
 
-  function getGroveTreeScale(seed) {
-    return seededRange(seed, "size", 0.94, 1.14).toFixed(2);
+  function getGroveTreeScale(minutes, seed) {
+    const safeMinutes = Math.max(0, Number(minutes) || 0);
+    const cappedMinutes = Math.min(120, safeMinutes);
+    const stageScales = [0.4, 0.51, 0.62, 0.74];
+    const growthStage = getFocusGrowthStage(minutes);
+    const timeBonus = (cappedMinutes / 120) * 0.09;
+    return (stageScales[growthStage] + timeBonus + seededRange(seed, "size", -0.004, 0.004)).toFixed(2);
+  }
+
+  function getFocusGrowthStage(minutes) {
+    const safeMinutes = Math.max(0, Number(minutes) || 0);
+    if (safeMinutes <= 15) return 0;
+    if (safeMinutes <= 30) return 1;
+    if (safeMinutes <= 45) return 2;
+    return 3;
   }
 
   function renderAccount() {
@@ -1177,7 +1222,7 @@
   }
 
   function setDuration(minutes) {
-    state.selectedDuration = cleanMinutes(minutes, DEFAULT_DURATION, 5);
+    state.selectedDuration = cleanMinutes(minutes, DEFAULT_DURATION, 1);
     els.durationInput.value = state.selectedDuration;
     updateDurationButtons();
     if (!state.timer) {
@@ -1202,6 +1247,198 @@
 
   function setButtonLabel(button, label, icon) {
     button.innerHTML = `<i data-lucide="${icon}"></i><span>${label}</span>`;
+  }
+
+  function toggleTimerSound() {
+    state.soundEnabled = !state.soundEnabled;
+    saveSoundPreference();
+    renderSoundToggle();
+    refreshIcons();
+
+    if (state.soundEnabled) {
+      playCompletionSound({ preview: true });
+    } else {
+      stopActiveTimerSounds();
+    }
+
+    showToast(`Timer sound ${state.soundEnabled ? "on" : "off"}.`);
+  }
+
+  function loadSoundPreference() {
+    return localStorage.getItem(STORAGE_SOUND_ENABLED) !== "off";
+  }
+
+  function saveSoundPreference() {
+    localStorage.setItem(STORAGE_SOUND_ENABLED, state.soundEnabled ? "on" : "off");
+  }
+
+  function getAudioContext() {
+    if (state.audioContext) return state.audioContext;
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+
+    state.audioContext = new AudioContextClass();
+    return state.audioContext;
+  }
+
+  function primeCompletionSound() {
+    if (!state.soundEnabled) return;
+
+    const context = getAudioContext();
+    if (!context || context.state !== "suspended") return;
+
+    context.resume().catch((error) => {
+      console.warn(error);
+    });
+  }
+
+  function playCompletionSound(options = {}) {
+    if (!state.soundEnabled) return;
+
+    const context = getAudioContext();
+    if (!context) return;
+
+    const play = () => {
+      const startTime = context.currentTime + 0.02;
+      const frequencies = options.preview ? [659.25, 783.99] : [523.25, 659.25, 783.99];
+      const duration = options.preview ? 0.82 : 1.35;
+      const master = context.createGain();
+      master.gain.setValueAtTime(0.0001, startTime);
+      master.gain.exponentialRampToValueAtTime(0.14, startTime + 0.04);
+      master.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+      master.connect(context.destination);
+      trackSoundMaster(master, options.preview ? 1000 : 1600);
+
+      frequencies.forEach((frequency, index) => {
+        const oscillator = context.createOscillator();
+        const envelope = context.createGain();
+        const noteStart = startTime + index * 0.12;
+        const noteEnd = noteStart + (options.preview ? 0.46 : 0.78);
+
+        oscillator.type = "triangle";
+        oscillator.frequency.setValueAtTime(frequency, noteStart);
+        envelope.gain.setValueAtTime(0.0001, noteStart);
+        envelope.gain.exponentialRampToValueAtTime(0.42, noteStart + 0.05);
+        envelope.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+
+        oscillator.connect(envelope);
+        envelope.connect(master);
+        oscillator.start(noteStart);
+        oscillator.stop(noteEnd + 0.03);
+      });
+
+    };
+
+    if (context.state === "suspended") {
+      context.resume().then(play).catch((error) => {
+        console.warn(error);
+      });
+      return;
+    }
+
+    play();
+  }
+
+  function playFinishSoonSound(remainingSeconds) {
+    if (!state.soundEnabled || !state.timer) return;
+    if (state.finishSoonSoundTimerId === state.timer.id) return;
+
+    const timerId = state.timer.id;
+    const context = getAudioContext();
+    if (!context) return;
+
+    const play = () => {
+      if (!state.timer || state.timer.id !== timerId || state.finishSoonSoundTimerId === timerId) return;
+
+      state.finishSoonSoundTimerId = timerId;
+      const exactRemainingSeconds = (state.timer.endAt - Date.now()) / 1000;
+      const safeDuration = clamp(exactRemainingSeconds, 1, 10);
+      const startTime = context.currentTime + 0.03;
+      const endTime = startTime + safeDuration;
+      const fadeStartTime = startTime + Math.max(0.25, safeDuration - 0.35);
+      const master = context.createGain();
+      master.gain.setValueAtTime(0.0001, startTime);
+      master.gain.exponentialRampToValueAtTime(0.08, startTime + 0.12);
+      master.gain.setValueAtTime(0.08, fadeStartTime);
+      master.gain.exponentialRampToValueAtTime(0.0001, endTime);
+      master.connect(context.destination);
+      trackSoundMaster(master, (safeDuration + 0.3) * 1000);
+
+      [220, 329.63].forEach((frequency) => {
+        const oscillator = context.createOscillator();
+        const envelope = context.createGain();
+
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(frequency, startTime);
+        envelope.gain.setValueAtTime(0.0001, startTime);
+        envelope.gain.exponentialRampToValueAtTime(0.14, startTime + 0.18);
+        envelope.gain.setValueAtTime(0.14, fadeStartTime);
+        envelope.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+        oscillator.connect(envelope);
+        envelope.connect(master);
+        oscillator.start(startTime);
+        oscillator.stop(endTime + 0.03);
+      });
+
+      for (let index = 0; index < safeDuration * 2; index += 1) {
+        const oscillator = context.createOscillator();
+        const envelope = context.createGain();
+        const noteStart = startTime + index * 0.5;
+        const noteEnd = Math.min(noteStart + 0.34, endTime);
+        if (noteEnd <= noteStart) continue;
+
+        oscillator.type = "triangle";
+        oscillator.frequency.setValueAtTime(index % 2 ? 659.25 : 523.25, noteStart);
+        envelope.gain.setValueAtTime(0.0001, noteStart);
+        envelope.gain.exponentialRampToValueAtTime(0.28, noteStart + 0.04);
+        envelope.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+
+        oscillator.connect(envelope);
+        envelope.connect(master);
+        oscillator.start(noteStart);
+        oscillator.stop(noteEnd + 0.03);
+      }
+    };
+
+    if (context.state === "suspended") {
+      context.resume().then(play).catch((error) => {
+        console.warn(error);
+      });
+      return;
+    }
+
+    play();
+  }
+
+  function trackSoundMaster(master, durationMs) {
+    state.activeSoundMasters.push(master);
+    window.setTimeout(() => {
+      disconnectSoundMaster(master);
+    }, durationMs);
+  }
+
+  function disconnectSoundMaster(master) {
+    try {
+      master.disconnect();
+    } catch (error) {
+      // The node may already be disconnected when sound is toggled off.
+    }
+
+    state.activeSoundMasters = state.activeSoundMasters.filter((item) => item !== master);
+  }
+
+  function stopActiveTimerSounds() {
+    state.finishSoonSoundTimerId = null;
+    state.activeSoundMasters.forEach((master) => {
+      try {
+        master.disconnect();
+      } catch (error) {
+        // The node may already be disconnected by its timeout.
+      }
+    });
+    state.activeSoundMasters = [];
   }
 
   function getRemainingSeconds() {

@@ -428,7 +428,7 @@ button:focus-visible {
   position: relative;
   width: 138px;
   height: 152px;
-  transform: scale(calc(0.25 + (var(--growth) * 0.82)));
+  transform: scale(var(--active-scale, calc(0.25 + (var(--growth) * 0.82))));
   transform-origin: center bottom;
   transition: transform 500ms ease;
   z-index: 1;
@@ -694,6 +694,52 @@ button:focus-visible {
   transform: rotate(-24deg);
 }
 
+.plant-growth-0 .stem {
+  height: 76px;
+}
+
+.plant-growth-0 .plant-branch,
+.plant-growth-0 .leaf-b,
+.plant-growth-0 .leaf-c,
+.plant-growth-0 .leaf-d,
+.plant-growth-0 .leaf-e,
+.plant-growth-0 .stem::before,
+.plant-growth-0 .stem::after {
+  display: none;
+}
+
+.plant-growth-0 .leaf-a {
+  top: 76px;
+  width: 46px;
+  height: 25px;
+}
+
+.plant-growth-1 .stem {
+  height: 96px;
+}
+
+.plant-growth-1 .twig-d,
+.plant-growth-1 .twig-e,
+.plant-growth-1 .leaf-d,
+.plant-growth-1 .leaf-e,
+.plant-growth-1 .stem::before,
+.plant-growth-1 .stem::after {
+  display: none;
+}
+
+.plant-growth-2 .stem {
+  height: 116px;
+}
+
+.plant-growth-2 .twig-e,
+.plant-growth-2 .leaf-e {
+  display: none;
+}
+
+.plant-growth-3 .stem {
+  height: 130px;
+}
+
 .timer-display {
   margin-top: 16px;
   font-variant-numeric: tabular-nums;
@@ -911,11 +957,11 @@ svg {
   position: relative;
   z-index: 2;
   display: grid;
-  flex: 0 0 calc(54px + var(--tree-girth, 0px));
+  flex: 0 0 calc(96px + var(--tree-girth, 0px));
   align-content: end;
   justify-items: center;
   min-width: 0;
-  min-height: 108px;
+  min-height: 164px;
   padding: 4px 2px calc(14px + var(--tree-depth, 0px));
   border: 1px solid transparent;
   border-radius: var(--radius);
@@ -940,6 +986,26 @@ svg {
 
 .grove-tree:hover {
   background: rgba(246, 242, 232, 0.05);
+}
+
+.grove-plant {
+  position: absolute;
+  bottom: calc(16px + var(--tree-depth, 0px));
+  left: 50%;
+  display: block;
+  width: 138px;
+  height: 152px;
+  pointer-events: none;
+  transform:
+    translateX(-50%)
+    translate(var(--tree-shift, 0), var(--tree-floor, 0))
+    rotate(var(--tree-tilt, 0deg))
+    scale(var(--active-scale, 0.56))
+    scaleX(var(--grove-stretch-x, 1))
+    scaleY(var(--grove-stretch-y, 1));
+  transform-origin: center bottom;
+  transition: none;
+  z-index: 1;
 }
 
 .tree-label {
@@ -1314,6 +1380,111 @@ svg {
 
 .shape-3 .limb-c {
   transform: translateX(-1px) rotate(6deg);
+}
+
+.tree-growth-0 .tree-branch,
+.tree-growth-0 .crown-b,
+.tree-growth-0 .crown-c {
+  display: none;
+}
+
+.tree-growth-0 .tree-trunk {
+  height: 26px;
+}
+
+.tree-growth-0 .crown-a {
+  top: 38px;
+  left: 17px;
+  width: 30px;
+  height: 24px;
+  translate: 0 0;
+}
+
+.tree-growth-1 .limb-c,
+.tree-growth-1 .crown-c {
+  display: none;
+}
+
+.tree-growth-1 .tree-trunk {
+  height: 32px;
+}
+
+.tree-growth-1 .crown-a {
+  top: 29px;
+  left: 10px;
+  width: 42px;
+  height: 32px;
+  translate: 0 0;
+}
+
+.tree-growth-1 .crown-b {
+  top: 18px;
+  left: 22px;
+  width: 28px;
+  height: 28px;
+  translate: 0 0;
+}
+
+.tree-growth-2 .tree-trunk {
+  height: 38px;
+}
+
+.tree-growth-3 .tree-trunk {
+  height: 46px;
+}
+
+.tree-growth-3 .tree-branch {
+  width: calc(var(--tree-branch-width, 25px) + 4px);
+}
+
+.tree-growth-3 .tree-shadow {
+  height: 15px;
+}
+
+.species-pine.tree-growth-0 .tree-trunk {
+  height: 22px;
+}
+
+.species-pine.tree-growth-0 .crown-a {
+  top: 44px;
+  width: 36px;
+  height: 25px;
+}
+
+.species-pine.tree-growth-1 .tree-trunk {
+  height: 29px;
+}
+
+.species-pine.tree-growth-1 .crown-a {
+  top: 38px;
+  width: 46px;
+  height: 30px;
+}
+
+.species-pine.tree-growth-1 .crown-b {
+  top: 25px;
+  width: 34px;
+  height: 26px;
+}
+
+.species-pine.tree-growth-2 .tree-trunk {
+  height: 36px;
+}
+
+.species-pine.tree-growth-2 .crown-a {
+  top: 36px;
+}
+
+.species-pine.tree-growth-2 .crown-b {
+  top: 20px;
+}
+
+.species-pine.tree-growth-2 .crown-c {
+  top: 9px;
+}
+
+.species-pine.tree-growth-3 .tree-trunk {
+  height: 44px;
 }
 
 @keyframes tree-rise {

@@ -74,7 +74,7 @@
                 <button class="pill-button" type="button" data-duration="60">60m</button>
                 <label class="custom-duration">
                   <span>Custom</span>
-                  <input id="durationInput" type="number" min="5" max="240" step="5" value="25" />
+                  <input id="durationInput" type="number" min="1" max="240" step="1" value="25" />
                 </label>
               </div>
             </div>
@@ -114,6 +114,16 @@
               <button id="finishButton" class="secondary-button" type="button" disabled>
                 <i data-lucide="check"></i>
                 <span>Finish</span>
+              </button>
+              <button
+                id="soundToggleButton"
+                class="ghost-button"
+                type="button"
+                aria-pressed="true"
+                title="Timer sound on"
+              >
+                <i data-lucide="volume-2"></i>
+                <span>Sound on</span>
               </button>
             </div>
           </div>
