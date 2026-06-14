@@ -1,6 +1,6 @@
 {
-  "name": "Canopy Focus",
-  "short_name": "Canopy",
+  "name": "TimberTimer",
+  "short_name": "TimberTimer",
   "description": "A minimalist jungle focus timer with editable focus records.",
   "start_url": "./",
   "scope": "./",

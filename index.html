@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="A minimalist jungle focus timer with editable focus records." />
   <meta name="theme-color" content="#173d2a" />
-  <title>Canopy Focus</title>
+  <title>TimberTimer</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="assets/canopy-logo.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/canopy-logo-192.png" />
@@ -22,12 +22,12 @@
 
   <div class="app-shell">
     <header class="topbar">
-      <a class="brand" href="./" aria-label="Canopy Focus home">
+      <a class="brand" href="./" aria-label="TimberTimer home">
         <span class="brand-mark" aria-hidden="true">
           <i data-lucide="sprout"></i>
         </span>
         <span>
-          <strong>Canopy Focus</strong>
+          <strong>TimberTimer</strong>
           <small id="modeLabel">Local garden</small>
         </span>
       </a>
@@ -46,7 +46,18 @@
 
     <main class="workspace">
       <section class="focus-panel" aria-labelledby="focusTitle">
-        <h1 id="focusTitle">Forget all else, feel the tree grow.</h1>
+        <h1 id="focusTitle">Forget all else, feel the timber grow.</h1>
+
+        <div class="timer-mode-toggle" role="group" aria-label="Timer mode">
+          <button class="pill-button is-selected" id="modeCountdownButton" type="button">
+            <i data-lucide="timer"></i>
+            Countdown
+          </button>
+          <button class="pill-button" id="modeStopwatchButton" type="button">
+            <i data-lucide="watch"></i>
+            Stopwatch
+          </button>
+        </div>
 
         <form id="focusForm" class="focus-form">
           <label class="field">
@@ -56,7 +67,7 @@
           </label>
           <datalist id="sessionTitleSuggestions"></datalist>
 
-          <div class="field">
+          <div id="durationField" class="field">
             <span>Duration</span>
             <div class="duration-row" role="group" aria-label="Duration presets">
               <button class="pill-button is-selected" type="button" data-duration="25">
@@ -71,6 +82,11 @@
             </div>
           </div>
 
+          <div class="field">
+            <span>Tree</span>
+            <select id="treePicker" aria-label="Tree type"></select>
+          </div>
+
         </form>
 
         <div class="timer-card" aria-live="polite">
@@ -81,37 +97,40 @@
 
           <div class="growth-stage" style="--growth: 0.08">
             <div class="sun-orb" aria-hidden="true"></div>
-            <div class="plant">
-              <span class="stem"></span>
-              <span class="plant-branch twig-a"></span>
-              <span class="plant-branch twig-b"></span>
-              <span class="plant-branch twig-c"></span>
-              <span class="plant-branch twig-d"></span>
-              <span class="plant-branch twig-e"></span>
-              <span class="leaf leaf-a"></span>
-              <span class="leaf leaf-b"></span>
-              <span class="leaf leaf-c"></span>
-              <span class="leaf leaf-d"></span>
-              <span class="leaf leaf-e"></span>
-            </div>
+            <div class="plant"></div>
           </div>
 
-          <div id="timerDisplay" class="timer-display">25:00</div>
+          <div class="timer-ring-wrap">
+            <svg class="progress-ring" viewBox="0 0 200 200" aria-hidden="true">
+              <circle class="progress-ring-track" cx="100" cy="100" r="86"/>
+              <circle id="progressRingFill" class="progress-ring-fill" cx="100" cy="100" r="86"/>
+            </svg>
+            <div id="timerDisplay" class="timer-display">25:00</div>
+          </div>
 
           <div class="timer-actions">
-            <button id="startButton" class="primary-button" type="button">
-              <i data-lucide="play"></i>
-              <span>Start</span>
-            </button>
-            <button id="finishButton" class="secondary-button" type="button" disabled>
-              <i data-lucide="check"></i>
-              <span>Finish</span>
-            </button>
-            <button id="soundToggleButton" class="ghost-button" type="button" aria-pressed="true"
-              title="Timer sound on">
-              <i data-lucide="volume-2"></i>
-              <span>Sound on</span>
-            </button>
+            <div class="timer-primary-actions">
+              <button id="startButton" class="primary-button" type="button">
+                <i data-lucide="play"></i>
+                <span>Start</span>
+              </button>
+              <button id="finishButton" class="secondary-button" type="button" disabled>
+                <i data-lucide="check"></i>
+                <span>Finish</span>
+              </button>
+            </div>
+            <div class="sound-group">
+              <button id="soundToggleButton" class="secondary-button" type="button" aria-pressed="true"
+                title="Timer sound on">
+                <i data-lucide="volume-2"></i>
+                <span>Sound on</span>
+              </button>
+              <div id="volumeRow" class="volume-row">
+                <input id="volumeSlider" type="range" min="0" max="200" step="5" value="80"
+                  class="volume-slider" aria-label="Sound volume" />
+                <span id="volumeLabel" class="volume-label">80%</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -134,14 +153,32 @@
         </div>
       </section>
 
+      <div class="records-col">
+
+      <section class="notes-panel" aria-labelledby="notesTitle">
+        <div class="section-head">
+          <div>
+            <div class="panel-kicker">Tasks</div>
+            <h2 id="notesTitle">To-Do</h2>
+          </div>
+        </div>
+        <ul id="notesList" class="notes-list" aria-live="polite" aria-label="Task list"></ul>
+        <form id="notesForm" class="notes-form">
+          <input id="notesInput" type="text" maxlength="500" placeholder="Add a task…" autocomplete="off" />
+          <button class="icon-only" type="submit" title="Add task">
+            <i data-lucide="corner-down-left"></i>
+          </button>
+        </form>
+      </section>
+
       <section id="recordsPanel" class="records-panel" aria-labelledby="recordsTitle">
         <div class="section-head">
           <div>
-            <div class="panel-kicker">Garden record</div>
+            <div class="panel-kicker">Forest record</div>
             <h2 id="recordsTitle">Focus history</h2>
           </div>
-          <button id="addRecordButton" class="icon-only" type="button" title="Add record">
-            <i data-lucide="plus"></i>
+          <button id="addRecordButton" class="secondary-button" type="button" title="Add session">
+            <i data-lucide="plus"></i>Add session
           </button>
         </div>
 
@@ -156,22 +193,29 @@
           </article>
         </div>
 
-        <div class="week-grove" aria-label="Weekly forest">
+        <div class="week-grove" aria-label="Your forest">
           <div class="week-grove-head">
-            <div>
-              <div class="panel-kicker">Weekly forest</div>
-              <p id="weekRange">Loading</p>
+            <div class="week-grove-title">
+              <div class="panel-kicker" id="grovePanelKicker">Weekly forest</div>
+              <div class="week-range-nav" aria-label="Navigate period">
+                <button id="prevWeekButton" class="icon-only range-nav-btn" type="button" title="Previous">
+                  <i data-lucide="chevron-left"></i>
+                </button>
+                <p id="weekRange">Loading</p>
+                <button id="nextWeekButton" class="icon-only range-nav-btn" type="button" title="Next">
+                  <i data-lucide="chevron-right"></i>
+                </button>
+                <button id="thisWeekButton" class="secondary-button week-today" type="button">
+                  Current
+                </button>
+              </div>
             </div>
-            <div class="week-nav" aria-label="Week navigation">
-              <button id="prevWeekButton" class="icon-only" type="button" title="Previous week">
-                <i data-lucide="chevron-left"></i>
-              </button>
-              <button id="thisWeekButton" class="secondary-button week-today" type="button">
-                Current
-              </button>
-              <button id="nextWeekButton" class="icon-only" type="button" title="Next week">
-                <i data-lucide="chevron-right"></i>
-              </button>
+            <div class="grove-controls-row">
+              <div class="grove-view-toggle" role="group" aria-label="Forest view">
+                <button class="pill-button" id="groveTodayButton" type="button">Today</button>
+                <button class="pill-button is-selected" id="groveWeekButton" type="button">Week</button>
+                <button class="pill-button" id="groveMonthButton" type="button">Month</button>
+              </div>
             </div>
           </div>
           <div class="week-grove-summary">
@@ -200,6 +244,8 @@
 
         <div id="recordsList" class="records-list" aria-live="polite"></div>
       </section>
+
+      </div>
 
     </main>
   </div>
@@ -234,6 +280,13 @@
         <button id="signOutButton" class="ghost-button" type="button">
           <i data-lucide="log-out"></i>
           <span>Sign out</span>
+        </button>
+      </div>
+
+      <div class="danger-zone">
+        <button id="deleteAllDataButton" class="ghost-button danger-button" type="button">
+          <i data-lucide="trash-2"></i>
+          <span>Delete all records</span>
         </button>
       </div>
     </div>
@@ -279,6 +332,11 @@
           <input id="recordActualInput" type="number" min="0" max="600" required />
         </label>
       </div>
+
+      <label class="field">
+        <span>Tree</span>
+        <select id="recordTreeInput" aria-label="Tree type"></select>
+      </label>
 
       <menu class="dialog-actions">
         <button class="ghost-button" value="cancel" type="submit">Cancel</button>

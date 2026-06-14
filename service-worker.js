@@ -1,5 +1,5 @@
-const CACHE_NAME = "canopy-focus-v34";
-const CACHE_PREFIX = "canopy-focus-";
+const CACHE_NAME = "timbertimer-v42";
+const CACHE_PREFIX = "timbertimer-";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -51,8 +51,17 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const requestUrl = new URL(event.request.url);
 
+  // For our own HTML/CSS/JS, revalidate with the server so a deploy is picked
+  // up immediately instead of being shadowed by a stale HTTP cache entry.
+  const sameOrigin = requestUrl.origin === self.location.origin;
+  const isCoreAsset =
+    sameOrigin && /\.(html|css|js|webmanifest)$|\/$/.test(requestUrl.pathname);
+  const fetchRequest = isCoreAsset
+    ? new Request(event.request, { cache: "no-cache" })
+    : event.request;
+
   event.respondWith(
-    fetch(event.request)
+    fetch(fetchRequest)
       .then((response) => {
         const copy = response.clone();
         if (requestUrl.origin === self.location.origin) {

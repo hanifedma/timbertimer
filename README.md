@@ -1,4 +1,4 @@
-# Canopy Focus
+# TimberTimer
 
 A minimalist jungle focus timer with editable records, local browser storage, and optional Supabase sync with Google accounts.
 
@@ -40,7 +40,7 @@ GitHub Pages hosts static files. It does not run a database. For cross-device re
 7. Edit `src/supabase-config.js`:
 
 ```js
-window.CANOPY_FOCUS_SUPABASE = {
+window.PINETIME_SUPABASE = {
   url: "https://your-project.supabase.co",
   anonKey: "your-anon-public-key",
 };
