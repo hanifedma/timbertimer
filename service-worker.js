@@ -1,4 +1,4 @@
-const CACHE_NAME = "timbertimer-v42";
+const CACHE_NAME = "timbertimer-v44";
 const CACHE_PREFIX = "timbertimer-";
 const APP_ASSETS = [
   "./",

@@ -134,10 +134,27 @@
 
   async function init() {
     bindEvents();
-    await initSupabase();
-    await reloadState({ hydrateName: true });
+    // Phase 1: paint visuals from local storage immediately so nothing is stuck
+    // on "Loading" while the Supabase library downloads from its CDN. The live
+    // timer is hydrated later (phase 2) so an expired timer is reconciled and
+    // completed exactly once, with the correct local/cloud context.
+    await loadSessions();
+    hydrateSessionName();
+    await loadNotes();
+    renderAll();
     startTicker();
     registerServiceWorker();
+
+    // Phase 2: bring up cloud, reload from it if signed in, then hydrate timers.
+    await initSupabase();
+    if (state.user) {
+      await loadSessions();
+      await loadNotes();
+    }
+    await hydrateTimer();
+    if (state.timer?.selectedTreeId) state.selectedTreeId = state.timer.selectedTreeId;
+    await hydrateRestTimer();
+    renderAll();
   }
 
   // Load every piece of remote/local state and repaint. Shared by startup and
@@ -276,6 +293,9 @@
 
     if (!state.supabaseConfigured) return;
 
+    // Show the sign-in affordance right away, before the CDN library loads.
+    renderAccount();
+
     try {
       const { createClient } = await import(SUPABASE_MODULE);
       state.supabase = createClient(config.url, config.anonKey, {
@@ -289,7 +309,10 @@
       state.user = data.session ? data.session.user : null;
       state.dataMode = state.user ? "cloud" : "local";
 
-      state.supabase.auth.onAuthStateChange(async (_event, session) => {
+      state.supabase.auth.onAuthStateChange(async (event, session) => {
+        // init() already handles the very first load; only react to real
+        // sign-in / sign-out afterwards so the timer isn't hydrated twice.
+        if (event === "INITIAL_SESSION") return;
         state.user = session ? session.user : null;
         state.dataMode = state.user ? "cloud" : "local";
         await reloadState();
@@ -300,6 +323,7 @@
       state.dataMode = "local";
       showToast("Cloud sync could not load. Local records are still available.");
       console.warn(error);
+      renderAccount();
     }
   }
 
@@ -1234,8 +1258,8 @@
     }
 
     if (!state.user) {
-      els.syncBadge.textContent = "Ready";
-      els.modeLabel.textContent = "Cloud sync";
+      els.syncBadge.textContent = "Local";
+      els.modeLabel.textContent = "Local garden";
       els.navAuthStatus.textContent = "Sign in";
       els.accountButton.title = "Sign in with Google";
       setAccountStatus("cloud", "Use Google to sync records across devices.");
