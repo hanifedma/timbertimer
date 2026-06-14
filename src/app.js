@@ -1517,17 +1517,22 @@
     const actualMinutes = cleanMinutes(els.recordActualInput.value, 0, 0);
     const durationMinutes = cleanMinutes(els.recordDurationInput.value, actualMinutes || 1, 1);
     const endedAt = new Date(startedAt.getTime() + actualMinutes * 60000).toISOString();
+    const title = els.recordTitleInput.value.trim() || "Deep focus";
     const changes = {
       id,
-      title: els.recordTitleInput.value.trim() || "Deep focus",
+      title,
       started_at: startedAt.toISOString(),
       ended_at: endedAt,
       status: els.recordStatusInput.value,
       duration_minutes: durationMinutes,
       actual_minutes: actualMinutes,
-      tree_kind: pickTreeKind(els.recordTitleInput.value.trim(), els.recordStatusInput.value, els.recordTreeInput.value),
+      tree_kind: pickTreeKind(title, els.recordStatusInput.value, els.recordTreeInput.value),
       updated_at: new Date().toISOString(),
     };
+
+    // Remember the chosen species for this session name, just like the timer's
+    // tree picker does, so the next "eating ayam" session defaults to it.
+    saveTreePref(title, els.recordTreeInput.value);
 
     if (els.recordIdInput.value) {
       await updateRecord(id, changes);
