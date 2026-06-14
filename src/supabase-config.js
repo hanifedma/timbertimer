@@ -1,4 +1,4 @@
 window.TIMBERTIMER_SUPABASE = {
-  url: "https://fhmbrgvibplbhysxmbnd.supabase.co",
-  anonKey: "sb_publishable_IxLdtSF3dEBQwOkm5yrcWg_Zsr-nxIg",
+  url: "https://frfnthlokksynreadten.supabase.co",
+  anonKey: "sb_publishable_ps4gSvjGkpi7lAX4J3EGJA_HZ2CmOhG",
 };

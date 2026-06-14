@@ -2443,8 +2443,12 @@
   function registerServiceWorker() {
     if (!("serviceWorker" in navigator) || window.location.protocol === "file:") return;
 
+    // updateViaCache: "none" forces the browser to revalidate the worker
+    // script every load, so a new deploy is picked up promptly. The worker's
+    // activate handler then clears old caches and reloads open tabs, which
+    // makes every device that already has the site re-download fresh assets.
     navigator.serviceWorker
-      .register("./service-worker.js")
+      .register("./service-worker.js", { updateViaCache: "none" })
       .then((registration) => {
         registration.update().catch((error) => {
           console.warn(error);
