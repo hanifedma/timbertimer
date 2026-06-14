@@ -152,7 +152,11 @@
       await loadNotes();
     }
     await hydrateTimer();
-    if (state.timer?.selectedTreeId) state.selectedTreeId = state.timer.selectedTreeId;
+    if (state.timer?.selectedTreeId) {
+      state.selectedTreeId = state.timer.selectedTreeId;
+    } else {
+      state.selectedTreeId = resolveTreeForName(els.sessionTitle.value);
+    }
     await hydrateRestTimer();
     renderAll();
   }
@@ -163,7 +167,13 @@
     await loadSessions();
     if (hydrateName) hydrateSessionName();
     await hydrateTimer();
-    if (state.timer?.selectedTreeId) state.selectedTreeId = state.timer.selectedTreeId;
+    // A running timer fixes the species; otherwise re-resolve from the current
+    // name so a freshly-loaded (e.g. just-signed-in) history takes effect.
+    if (state.timer?.selectedTreeId) {
+      state.selectedTreeId = state.timer.selectedTreeId;
+    } else {
+      state.selectedTreeId = resolveTreeForName(els.sessionTitle.value);
+    }
     await hydrateRestTimer();
     await loadNotes();
     renderAll();
@@ -179,8 +189,7 @@
 
     els.sessionTitle.addEventListener("input", () => {
       rememberSessionName();
-      const name = els.sessionTitle.value.trim();
-      state.selectedTreeId = getTreePrefForName(name) || defaultTreeForName(name);
+      state.selectedTreeId = resolveTreeForName(els.sessionTitle.value.trim());
       renderTreePicker();
       renderTimer();
     });
@@ -266,8 +275,7 @@
     els.addRecordButton.addEventListener("click", () => openRecordDialog());
     els.saveRecordButton.addEventListener("click", saveDialogRecord);
     els.recordTitleInput.addEventListener("input", () => {
-      const name = els.recordTitleInput.value.trim();
-      els.recordTreeInput.value = getTreePrefForName(name) || defaultTreeForName(name);
+      els.recordTreeInput.value = resolveTreeForName(els.recordTitleInput.value.trim());
     });
 
     els.googleSignInButton.addEventListener("click", signInWithGoogle);
@@ -863,9 +871,7 @@
       els.timerState.textContent = "Growing";
       els.startButton.disabled = true;
       els.finishButton.disabled = false;
-      setButtonLabel(els.startButton, "Start", "play");
       setFormDisabled(true);
-      refreshIcons();
       return;
     }
 
@@ -881,18 +887,14 @@
       els.timerDisplay.textContent = isStopwatch ? "00:00" : formatClock(state.selectedDuration * 60);
       els.startButton.disabled = false;
       els.finishButton.disabled = true;
-      setButtonLabel(els.startButton, "Start", "play");
       setFormDisabled(false);
-      refreshIcons();
       return;
     }
 
     els.timerState.textContent = "Growing";
     els.startButton.disabled = true;
     els.finishButton.disabled = false;
-    setButtonLabel(els.startButton, "Start", "play");
     setFormDisabled(true);
-    refreshIcons();
   }
 
   function renderSessionSuggestions() {
@@ -916,9 +918,11 @@
   function renderSoundToggle() {
     const label = state.soundEnabled ? "Sound on" : "Sound off";
     const icon = state.soundEnabled ? "volume-2" : "volume-x";
+    // This is the one button whose icon actually changes, so rebuild + refresh.
     setButtonLabel(els.soundToggleButton, label, icon);
     els.soundToggleButton.setAttribute("aria-pressed", String(state.soundEnabled));
     els.soundToggleButton.title = `Timer ${label.toLowerCase()}`;
+    refreshIcons();
   }
 
   function renderRestTimer() {
@@ -930,9 +934,7 @@
     els.restModeLabel.textContent = "Elapsed";
     els.restStartButton.disabled = isRunning;
     els.restResetButton.disabled = !isRunning;
-    setButtonLabel(els.restStartButton, "Start rest", "play");
     updateDocumentTitle();
-    refreshIcons();
   }
 
   function updateDocumentTitle() {
@@ -1195,10 +1197,6 @@
     const tree = document.createElement("article");
     tree.className = `grove-tree shape-${shape}`;
     tree.style.setProperty("--tree-delay", `${(index % 9) * 40}ms`);
-    tree.style.setProperty("--active-leaf-a", palette.leafA);
-    tree.style.setProperty("--active-leaf-b", palette.leafB);
-    tree.style.setProperty("--active-bark-a", palette.barkA);
-    tree.style.setProperty("--active-bark-b", palette.barkB);
     tree.style.setProperty("--active-scale", getGroveTreeScale(record.actual_minutes, seed));
     tree.style.setProperty("--tree-tilt", `${Math.round(seededRange(seed, "tilt", -5, 5))}deg`);
     tree.style.setProperty("--tree-floor", `${Math.round(seededRange(seed, "floor", -3, 3))}px`);
@@ -1497,8 +1495,8 @@
     els.recordDurationInput.value = value.duration_minutes;
     els.recordActualInput.value = value.actual_minutes;
     els.recordTreeInput.value = record
-      ? (TREE_SPECIES.find((s) => s.label === record.tree_kind)?.id || defaultTreeForName(value.title))
-      : (getTreePrefForName(value.title) || defaultTreeForName(value.title));
+      ? (TREE_SPECIES.find((s) => s.label === record.tree_kind)?.id || resolveTreeForName(value.title))
+      : resolveTreeForName(value.title);
 
     if (typeof els.recordDialog.showModal === "function") {
       els.recordDialog.showModal();
@@ -1597,7 +1595,7 @@
     const latestTitle = sortedSessions()[0] ? sortedSessions()[0].title : "Deep focus";
     els.sessionTitle.value = savedTitle || latestTitle;
     rememberSessionName(els.sessionTitle.value);
-    state.selectedTreeId = getTreePrefForName(els.sessionTitle.value) || defaultTreeForName(els.sessionTitle.value);
+    state.selectedTreeId = resolveTreeForName(els.sessionTitle.value);
   }
 
   function rememberSessionName(value) {
@@ -1807,7 +1805,6 @@
     state.soundEnabled = !state.soundEnabled;
     saveSoundPreference();
     renderSoundToggle();
-    refreshIcons();
 
     if (state.soundEnabled) {
       playCompletionSound({ preview: true });
@@ -2119,7 +2116,27 @@
     return TREE_SPECIES.find((s) => s.id === fallbackId) || TREE_SPECIES[0];
   }
 
-  // A new session name (one without a saved preference) gets a stable tree
+  // The tree a session name should default to, in priority order:
+  //   1. an explicit choice saved on this device,
+  //   2. the species of the most recent completed session with that name —
+  //      this is synced to the cloud, so it follows the account across devices,
+  //   3. a stable per-name random as a last resort.
+  function resolveTreeForName(name) {
+    return getTreePrefForName(name) || treeIdFromHistory(name) || defaultTreeForName(name);
+  }
+
+  // Look up the species used for the most recent completed session of this name.
+  function treeIdFromHistory(name) {
+    const key = (name || "").toLowerCase().trim() || "deep focus";
+    const match = sortedSessions().find(
+      (record) => record.status === "completed" && (record.title || "").toLowerCase().trim() === key
+    );
+    if (!match) return null;
+    const species = TREE_SPECIES.find((s) => s.label === match.tree_kind);
+    return species ? species.id : null;
+  }
+
+  // A new session name (one with no preference or history) gets a stable tree
   // derived from the name itself, so new sessions vary across species instead
   // of all defaulting to pine. The user can still change it any time.
   function defaultTreeForName(name) {
