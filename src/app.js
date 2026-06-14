@@ -860,6 +860,16 @@
     const timer = state.timer;
     updateDocumentTitle();
 
+    // Reflect an active timer's identity in the UI. This matters across devices:
+    // when a timer started elsewhere is adopted here, show its name and tree.
+    if (timer) {
+      if (els.sessionTitle.value !== timer.title) {
+        els.sessionTitle.value = timer.title;
+        rememberSessionName(timer.title);
+      }
+      if (timer.selectedTreeId) state.selectedTreeId = timer.selectedTreeId;
+    }
+
     const isStopwatchMode = timer ? timer.mode === "stopwatch" : state.timerMode === "stopwatch";
     els.progressRing.style.visibility = isStopwatchMode ? "hidden" : "visible";
 
@@ -1765,6 +1775,10 @@
       mode: row.mode || "countdown",
       title: row.title,
       id: row.timer_id,
+      // The active-timer table has no species column, so derive the tree from
+      // the synced name. The per-name default is deterministic and history is
+      // synced, so another device resolves the same tree.
+      selectedTreeId: resolveTreeForName(row.title),
       durationMinutes: row.duration_minutes,
       durationSeconds: row.duration_seconds,
       startedAt: row.started_at,
