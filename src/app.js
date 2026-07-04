@@ -949,7 +949,10 @@
 
   function updateDocumentTitle() {
     if (state.timer) {
-      document.title = `Focus running | ${APP_TITLE}`;
+      // Countdown shows its remaining time in the tab; the stopwatch does not.
+      document.title = state.timer.mode === "stopwatch"
+        ? `Focus running | ${APP_TITLE}`
+        : `${formatClock(getRemainingSeconds())} Focus | ${APP_TITLE}`;
       return;
     }
 
