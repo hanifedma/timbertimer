@@ -1,5 +1,7 @@
-const CACHE_NAME = "timbertimer-v49";
+const CACHE_NAME = "timbertimer-v50";
 const CACHE_PREFIX = "timbertimer-";
+// Every entry must resolve: cache.addAll() rejects the whole install if any
+// single request 404s, which would silently disable the worker.
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -10,7 +12,6 @@ const APP_ASSETS = [
   "./assets/canopy-logo.svg",
   "./assets/canopy-logo-192.png",
   "./assets/canopy-logo-512.png",
-  "./assets/jungle-focus-bg.webp",
 ];
 
 self.addEventListener("install", (event) => {

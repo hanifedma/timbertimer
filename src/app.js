@@ -10,6 +10,8 @@
   const STORAGE_TREE_PREF = "timbertimer:tree-pref:v1";
   const STORAGE_NOTES = "timbertimer:notes:v1";
   const STORAGE_NOTES_ORDER = "timbertimer:notes-order:v1";
+  const STORAGE_THEME = "timbertimer:theme:v1";
+  const THEME_COLORS = { dark: "#000000", light: "#f2f2f7" };
   const DEFAULT_DURATION = 25;
   const TREE_SPECIES = [
     { id: "canopy", label: "canopy tree" },
@@ -98,6 +100,8 @@
     volumeRow: document.getElementById("volumeRow"),
     volumeSlider: document.getElementById("volumeSlider"),
     volumeLabel: document.getElementById("volumeLabel"),
+    themeToggleButton: document.getElementById("themeToggleButton"),
+    themeColorMeta: document.getElementById("themeColorMeta"),
   };
 
   const state = {
@@ -111,6 +115,7 @@
     soundVolume: loadSoundVolume(),
     masterGainNode: null,
     timerMode: loadTimerMode(),
+    theme: loadTheme(),
     selectedTreeId: "pine",
     notes: [],
     audioContext: null,
@@ -212,6 +217,7 @@
     els.modeCountdownButton.addEventListener("click", () => setTimerMode("countdown"));
     els.modeStopwatchButton.addEventListener("click", () => setTimerMode("stopwatch"));
     els.deleteAllDataButton.addEventListener("click", deleteAllData);
+    els.themeToggleButton.addEventListener("click", toggleTheme);
 
     els.volumeSlider.addEventListener("input", () => {
       state.soundVolume = clamp(Number(els.volumeSlider.value) / 100, 0, 2);
@@ -841,6 +847,7 @@
   }
 
   function renderAll() {
+    renderTheme();
     renderAccount();
     renderSessionSuggestions();
     renderStats();
@@ -1856,6 +1863,29 @@
     const pct = Math.round(state.soundVolume * 100);
     els.volumeSlider.value = pct;
     els.volumeLabel.textContent = `${pct}%`;
+  }
+
+  // --- Appearance ---------------------------------------------------------
+  // Dark is the default; light is opt-in and remembered per device.
+
+  function loadTheme() {
+    return localStorage.getItem(STORAGE_THEME) === "light" ? "light" : "dark";
+  }
+
+  function toggleTheme() {
+    state.theme = state.theme === "dark" ? "light" : "dark";
+    localStorage.setItem(STORAGE_THEME, state.theme);
+    renderTheme();
+  }
+
+  function renderTheme() {
+    const isDark = state.theme === "dark";
+    document.documentElement.dataset.theme = state.theme;
+    els.themeColorMeta.setAttribute("content", THEME_COLORS[state.theme]);
+    // Offer the appearance you'd switch *to*.
+    els.themeToggleButton.innerHTML = `<i data-lucide="${isDark ? "sun" : "moon"}"></i>`;
+    els.themeToggleButton.title = isDark ? "Switch to light appearance" : "Switch to dark appearance";
+    refreshIcons();
   }
 
   function loadTimerMode() {

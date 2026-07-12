@@ -1,6 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="TimberTimer logo">
-  <rect width="128" height="128" rx="28" fill="#10251f"/>
-  <path d="M64 94V42" fill="none" stroke="#d9efb5" stroke-width="10" stroke-linecap="round"/>
-  <path d="M64 59c-15-19-34-20-47-8 8 22 31 26 47 8Z" fill="#8fd16b"/>
-  <path d="M64 49c16-21 38-22 52-9-8 25-35 29-52 9Z" fill="#8fd16b"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="TimberTimer">
+  <defs>
+    <linearGradient id="tt-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3ee06a" />
+      <stop offset="1" stop-color="#24a34a" />
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#tt-bg)" />
+  <g fill="none" stroke="#06210f" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M45 101h38" />
+    <path d="M62 101c20-9 3-23 11-36" />
+    <path d="M60 52c4 3 7 8 8.5 13.5-7.5 1.5-13 1.5-17.5-1s-8.5-7-11-15c10-2 16 0 20 2.5z" />
+    <path d="M77 40a26 26 0 0 0-4 15c7-.5 12-2.5 16-5.5 3.5-3.5 6-8.5 6.5-17-10 .5-15 3.5-18.5 7.5z" />
+  </g>
 </svg>

@@ -4,9 +4,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="A minimalist jungle focus timer with editable focus records." />
-  <meta name="theme-color" content="#173d2a" />
+  <meta name="description" content="A minimalist focus timer with editable focus records." />
+  <meta id="themeColorMeta" name="theme-color" content="#000000" />
   <title>TimberTimer</title>
+  <script>
+    // Apply the saved theme before first paint so there is no flash of the
+    // wrong appearance. Dark is the default.
+    (function () {
+      var saved = null;
+      try { saved = localStorage.getItem("timbertimer:theme:v1"); } catch (e) { }
+      document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
+    })();
+  </script>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="assets/canopy-logo.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/canopy-logo-192.png" />
@@ -42,6 +51,10 @@
         <button class="icon-button" type="button" data-panel-jump="records" title="Records">
           <i data-lucide="list"></i>
           <span>Record</span>
+        </button>
+        <button id="themeToggleButton" class="icon-only" type="button" title="Switch appearance"
+          aria-label="Switch appearance">
+          <i data-lucide="sun"></i>
         </button>
         <button id="accountButton" class="icon-button account-button" type="button" title="Account">
           <i data-lucide="user-round"></i>

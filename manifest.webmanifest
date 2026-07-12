@@ -1,12 +1,12 @@
 {
   "name": "TimberTimer",
   "short_name": "TimberTimer",
-  "description": "A minimalist jungle focus timer with editable focus records.",
+  "description": "A minimalist focus timer with editable focus records.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#10251f",
-  "theme_color": "#173d2a",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "icons": [
     {
       "src": "assets/canopy-logo.svg",
