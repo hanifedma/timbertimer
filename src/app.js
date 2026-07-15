@@ -934,12 +934,11 @@
 
   function renderSoundToggle() {
     const label = state.soundEnabled ? "Sound on" : "Sound off";
-    const icon = state.soundEnabled ? "volume-2" : "volume-x";
-    // This is the one button whose icon actually changes, so rebuild + refresh.
-    setButtonLabel(els.soundToggleButton, label, icon);
+    const emoji = state.soundEnabled ? "🔊" : "🔇";
+    els.soundToggleButton.innerHTML =
+      `<span class="btn-emoji" aria-hidden="true">${emoji}</span><span>${label}</span>`;
     els.soundToggleButton.setAttribute("aria-pressed", String(state.soundEnabled));
     els.soundToggleButton.title = `Timer ${label.toLowerCase()}`;
-    refreshIcons();
   }
 
   function renderRestTimer() {
@@ -1070,8 +1069,8 @@
     const actions = document.createElement("div");
     actions.className = "record-actions";
     actions.append(
-      createActionButton("edit", record.id, "Edit", "pencil"),
-      createActionButton("delete", record.id, "Delete", "trash-2")
+      createActionButton("edit", record.id, "Edit", "✏️"),
+      createActionButton("delete", record.id, "Delete", "🗑️")
     );
 
     item.append(main, actions);
@@ -1085,15 +1084,15 @@
     return metric;
   }
 
-  function createActionButton(action, id, label, icon) {
+  function createActionButton(action, id, label, emoji) {
     const button = document.createElement("button");
-    button.className = "icon-only";
+    button.className = "icon-only emoji-btn";
     button.type = "button";
     button.dataset.action = action;
     button.dataset.id = id;
     button.title = label;
     button.setAttribute("aria-label", label);
-    button.innerHTML = `<i data-lucide="${icon}"></i>`;
+    button.textContent = emoji;
     return button;
   }
 

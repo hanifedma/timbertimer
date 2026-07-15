@@ -67,11 +67,11 @@
 
         <div class="timer-mode-toggle" role="group" aria-label="Timer mode">
           <button class="pill-button is-selected" id="modeCountdownButton" type="button">
-            <i data-lucide="timer"></i>
+            <span class="btn-emoji" aria-hidden="true">⏳</span>
             Countdown
           </button>
           <button class="pill-button" id="modeStopwatchButton" type="button">
-            <i data-lucide="watch"></i>
+            <span class="btn-emoji" aria-hidden="true">⏱️</span>
             Stopwatch
           </button>
         </div>
@@ -128,18 +128,18 @@
           <div class="timer-actions">
             <div class="timer-primary-actions">
               <button id="startButton" class="primary-button" type="button">
-                <i data-lucide="play"></i>
+                <span class="btn-emoji" aria-hidden="true">▶️</span>
                 <span>Start</span>
               </button>
               <button id="finishButton" class="secondary-button" type="button" disabled>
-                <i data-lucide="check"></i>
+                <span class="btn-emoji" aria-hidden="true">✅</span>
                 <span>Finish</span>
               </button>
             </div>
             <div class="sound-group">
               <button id="soundToggleButton" class="secondary-button" type="button" aria-pressed="true"
                 title="Timer sound on">
-                <i data-lucide="volume-2"></i>
+                <span class="btn-emoji" aria-hidden="true">🔊</span>
                 <span>Sound on</span>
               </button>
               <div id="volumeRow" class="volume-row">
@@ -159,11 +159,11 @@
           <div id="restDisplay" class="rest-display">00:00</div>
           <div class="timer-actions">
             <button id="restStartButton" class="secondary-button" type="button">
-              <i data-lucide="play"></i>
+              <span class="btn-emoji" aria-hidden="true">▶️</span>
               <span>Start rest</span>
             </button>
             <button id="restResetButton" class="ghost-button" type="button" disabled>
-              <i data-lucide="rotate-ccw"></i>
+              <span class="btn-emoji" aria-hidden="true">🔄</span>
               <span>Reset</span>
             </button>
           </div>
