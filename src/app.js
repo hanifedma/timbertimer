@@ -1882,10 +1882,9 @@
     const isDark = state.theme === "dark";
     document.documentElement.dataset.theme = state.theme;
     els.themeColorMeta.setAttribute("content", THEME_COLORS[state.theme]);
-    // Offer the appearance you'd switch *to*.
-    els.themeToggleButton.innerHTML = `<i data-lucide="${isDark ? "sun" : "moon"}"></i>`;
+    // Colourful emoji, offering the appearance you'd switch *to*.
+    els.themeToggleButton.textContent = isDark ? "☀️" : "🌙";
     els.themeToggleButton.title = isDark ? "Switch to light appearance" : "Switch to dark appearance";
-    refreshIcons();
   }
 
   function loadTimerMode() {

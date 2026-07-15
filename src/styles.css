@@ -197,12 +197,10 @@ button:disabled {
   width: 44px;
   height: 44px;
   flex: 0 0 44px;
-  border: none;
+  border: 1px solid var(--accent-line);
   border-radius: var(--radius);
-  /* Emoji app-icon look on a soft light square, matching the favicon. */
-  background: #fbfaf6;
-  font-size: 26px;
-  line-height: 1;
+  color: var(--accent-ink);
+  background: var(--accent);
 }
 
 .brand strong,
@@ -609,8 +607,35 @@ button:focus-visible {
   background: var(--accent);
 }
 
+/* Standard white "Sign in with Google" button, works in both themes. */
 .google-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   width: 100%;
+  min-height: var(--control);
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  color: #1f1f1f;
+  background: #ffffff;
+  font-weight: 800;
+}
+
+.google-g {
+  flex: 0 0 auto;
+}
+
+/* Colourful emoji in place of flat icons. */
+.emoji-btn {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.btn-emoji {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .secondary-button {
