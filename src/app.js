@@ -12,7 +12,195 @@
   const STORAGE_NOTES_ORDER = "timbertimer:notes-order:v1";
   const STORAGE_THEME = "timbertimer:theme:v1";
   const THEME_COLORS = { dark: "#000000", light: "#f2f2f7" };
+  const STORAGE_LANG = "timbertimer:lang:v1";
   const DEFAULT_DURATION = 25;
+
+  // --- i18n (English default, Korean opt-in) ------------------------------
+  const TR = {
+    "nav.record": { en: "Record", ko: "기록" },
+    "nav.records": { en: "Records", ko: "기록" },
+    "nav.account": { en: "Account", ko: "계정" },
+    "nav.local": { en: "Local", ko: "로컬" },
+    "nav.sign_in": { en: "Sign in", ko: "로그인" },
+    "nav.signed_in": { en: "Signed in", ko: "로그인됨" },
+    "lang.switch": { en: "언어 / Language", ko: "언어 / Language" },
+    "theme.switch": { en: "Switch appearance", ko: "테마 전환" },
+    "app.slogan": { en: "Forget all else, feel the timber grow.", ko: "모든 걸 잊고, 나무가 자라는 걸 느껴보세요." },
+    "mode.countdown": { en: "Countdown", ko: "카운트다운" },
+    "mode.stopwatch": { en: "Stopwatch", ko: "스톱워치" },
+    "field.session": { en: "Session", ko: "세션" },
+    "field.duration": { en: "Duration", ko: "시간" },
+    "field.custom": { en: "Custom", ko: "직접 입력" },
+    "field.tree": { en: "Tree", ko: "나무" },
+    "field.started": { en: "Started", ko: "시작 시각" },
+    "field.status": { en: "Status", ko: "상태" },
+    "field.goal_minutes": { en: "Goal minutes", ko: "목표 (분)" },
+    "field.actual_minutes": { en: "Actual minutes", ko: "실제 (분)" },
+    "timer.ready": { en: "Ready", ko: "준비됨" },
+    "timer.growing": { en: "Growing", ko: "자라는 중" },
+    "btn.start": { en: "Start", ko: "시작" },
+    "btn.finish": { en: "Finish", ko: "완료" },
+    "btn.cancel": { en: "Cancel", ko: "취소" },
+    "btn.save": { en: "Save", ko: "저장" },
+    "sound.on": { en: "Sound on", ko: "소리 켜짐" },
+    "sound.off": { en: "Sound off", ko: "소리 꺼짐" },
+    "rest.title": { en: "Rest stopwatch", ko: "휴식 스톱워치" },
+    "rest.resting": { en: "Resting", ko: "휴식 중" },
+    "rest.elapsed": { en: "Elapsed", ko: "경과" },
+    "rest.start": { en: "Start rest", ko: "휴식 시작" },
+    "rest.reset": { en: "Reset", ko: "초기화" },
+    "notes.kicker": { en: "Tasks", ko: "할 일" },
+    "notes.title": { en: "To-Do", ko: "투두" },
+    "notes.placeholder": { en: "Add a task…", ko: "할 일 추가…" },
+    "notes.add": { en: "Add task", ko: "할 일 추가" },
+    "notes.empty": { en: "No tasks yet.", ko: "아직 할 일이 없어요." },
+    "notes.mark_complete": { en: "Mark complete", ko: "완료로 표시" },
+    "notes.mark_incomplete": { en: "Mark incomplete", ko: "미완료로 표시" },
+    "notes.delete": { en: "Delete task", ko: "할 일 삭제" },
+    "records.kicker": { en: "Forest record", ko: "숲 기록" },
+    "records.title": { en: "Focus history", ko: "집중 기록" },
+    "records.add": { en: "Add session", ko: "세션 추가" },
+    "records.search": { en: "Search records", ko: "기록 검색" },
+    "records.empty": { en: "No records yet.", ko: "아직 기록이 없어요." },
+    "stats.today": { en: "Today", ko: "오늘" },
+    "stats.total": { en: "Total", ko: "전체" },
+    "grove.weekly": { en: "Weekly forest", ko: "주간 숲" },
+    "grove.monthly": { en: "Monthly forest", ko: "월간 숲" },
+    "grove.today": { en: "Today's forest", ko: "오늘의 숲" },
+    "grove.current": { en: "Current", ko: "현재" },
+    "grove.view_today": { en: "Today", ko: "오늘" },
+    "grove.view_week": { en: "Week", ko: "주" },
+    "grove.view_month": { en: "Month", ko: "월" },
+    "grove.loading": { en: "Loading", ko: "불러오는 중" },
+    "grove.empty_today": { en: "No trees planted today.", ko: "오늘 심은 나무가 없어요." },
+    "grove.empty_week": { en: "No trees planted this week.", ko: "이번 주에 심은 나무가 없어요." },
+    "grove.empty_month": { en: "No trees planted this month.", ko: "이번 달에 심은 나무가 없어요." },
+    "grove.tree_one": { en: "1 tree", ko: "1그루" },
+    "grove.trees": { en: "{n} trees", ko: "{n}그루" },
+    "grove.focused": { en: "{time} focused", ko: "{time} 집중" },
+    "filter.all": { en: "All", ko: "전체" },
+    "filter.completed": { en: "Completed", ko: "완료" },
+    "filter.abandoned": { en: "Abandoned", ko: "중단" },
+    "status.completed": { en: "Completed", ko: "완료" },
+    "status.abandoned": { en: "Abandoned", ko: "중단" },
+    "record.planted": { en: "Planted", ko: "심음" },
+    "record.abandoned": { en: "Abandoned", ko: "중단" },
+    "metric.focused": { en: "{n}m focused", ko: "{n}분 집중" },
+    "metric.goal": { en: "{n}m goal", ko: "목표 {n}분" },
+    "action.edit": { en: "Edit", ko: "편집" },
+    "action.delete": { en: "Delete", ko: "삭제" },
+    "account.kicker": { en: "Accounts", ko: "계정" },
+    "account.title": { en: "Google sync", ko: "Google 동기화" },
+    "account.close": { en: "Close", ko: "닫기" },
+    "account.status_local": { en: "Records are saved in this browser.", ko: "기록이 이 브라우저에 저장됩니다." },
+    "account.status_cloud": { en: "Use Google to sync records across devices.", ko: "Google로 로그인하면 기기 간에 동기화돼요." },
+    "account.continue_google": { en: "Continue with Google", ko: "Google로 계속하기" },
+    "account.sign_out": { en: "Sign out", ko: "로그아웃" },
+    "account.delete_all": { en: "Delete all records", ko: "모든 기록 삭제" },
+    "badge.local": { en: "Local", ko: "로컬" },
+    "badge.ready": { en: "Ready", ko: "대기" },
+    "badge.synced": { en: "Synced", ko: "동기화됨" },
+    "brand.local_garden": { en: "Local garden", ko: "로컬 정원" },
+    "brand.cloud_garden": { en: "Cloud garden", ko: "클라우드 정원" },
+    "dialog.record": { en: "Record", ko: "기록" },
+    "dialog.edit_session": { en: "Edit session", ko: "세션 편집" },
+    "dialog.add_session": { en: "Add session", ko: "세션 추가" },
+    "footer.tagline": { en: "🌲 <strong>TimberTimer</strong> — grow a forest while you focus.", ko: "🌲 <strong>TimberTimer</strong> — 집중하며 숲을 키워요." },
+    "footer.meta": { en: "Your records stay in this browser, or sync privately with Google.", ko: "기록은 이 브라우저에 저장되거나 Google로 비공개 동기화됩니다." },
+    "toast.session_started": { en: "Session started.", ko: "세션을 시작했어요." },
+    "toast.stopwatch_started": { en: "Stopwatch started.", ko: "스톱워치를 시작했어요." },
+    "toast.session_planted": { en: "Session planted.", ko: "세션을 심었어요." },
+    "toast.session_abandoned": { en: "Session recorded as abandoned.", ko: "세션을 중단으로 기록했어요." },
+    "toast.timer_finished_elsewhere": { en: "Timer already finished on another device.", ko: "다른 기기에서 이미 타이머가 끝났어요." },
+    "toast.record_saved": { en: "Record saved.", ko: "기록을 저장했어요." },
+    "toast.record_deleted": { en: "Record deleted.", ko: "기록을 삭제했어요." },
+    "toast.signed_out": { en: "Signed out.", ko: "로그아웃했어요." },
+    "toast.sound_on": { en: "Timer sound on.", ko: "타이머 소리를 켰어요." },
+    "toast.sound_off": { en: "Timer sound off.", ko: "타이머 소리를 껐어요." },
+    "toast.all_deleted": { en: "All records deleted.", ko: "모든 기록을 삭제했어요." },
+    "toast.cloud_load_fail": { en: "Cloud sync could not load. Local records are still available.", ko: "클라우드 동기화를 불러오지 못했어요. 로컬 기록은 그대로 사용할 수 있어요." },
+    "toast.cloud_not_ready": { en: "Cloud table is not ready. Using local records.", ko: "클라우드 테이블이 준비되지 않았어요. 로컬 기록을 사용해요." },
+    "toast.cloud_save_fail": { en: "Cloud save failed. Saved locally.", ko: "클라우드 저장에 실패했어요. 로컬에 저장했어요." },
+    "toast.cloud_update_fail": { en: "Cloud update failed.", ko: "클라우드 업데이트에 실패했어요." },
+    "toast.cloud_delete_fail": { en: "Cloud delete failed.", ko: "클라우드 삭제에 실패했어요." },
+    "toast.cloud_delete_all_fail": { en: "Failed to delete cloud records.", ko: "클라우드 기록 삭제에 실패했어요." },
+    "toast.cloud_timer_sql": { en: "Cloud timer sync needs the updated Supabase SQL.", ko: "클라우드 타이머 동기화에는 최신 Supabase SQL이 필요해요." },
+    "confirm.delete_all_cloud": { en: "Delete all cloud records? This cannot be undone.", ko: "모든 클라우드 기록을 삭제할까요? 되돌릴 수 없어요." },
+    "confirm.delete_all_local": { en: "Delete all local records? This cannot be undone.", ko: "모든 로컬 기록을 삭제할까요? 되돌릴 수 없어요." },
+    "confirm.delete_record": { en: 'Delete "{title}"?', ko: '"{title}"을(를) 삭제할까요?' },
+    "title.focus_running": { en: "Focus running", ko: "집중 진행 중" },
+    "title.focus": { en: "Focus", ko: "집중" },
+    "title.rest": { en: "Rest", ko: "휴식" },
+    "title.ready": { en: "Ready", ko: "준비됨" },
+    "unit.m": { en: "m", ko: "분" },
+    "unit.h": { en: "h", ko: "시간" },
+    "tree.canopy": { en: "Canopy tree", ko: "캐노피 나무" },
+    "tree.palm": { en: "Palm tree", ko: "야자수" },
+    "tree.pine": { en: "Pine tree", ko: "소나무" },
+    "tree.bamboo": { en: "Bamboo stand", ko: "대나무" },
+    "tree.fern": { en: "Fern tree", ko: "고사리 나무" },
+    "tree.kapok": { en: "Kapok tree", ko: "케이폭 나무" },
+    "tree.mangrove": { en: "Mangrove tree", ko: "맹그로브 나무" },
+    "tree.wilted": { en: "Wilted sprout", ko: "시든 새싹" },
+  };
+
+  function loadLang() {
+    return localStorage.getItem(STORAGE_LANG) === "ko" ? "ko" : "en";
+  }
+
+  function t(key, vars) {
+    const entry = TR[key];
+    let s = entry ? (entry[state.lang] || entry.en) : key;
+    if (vars) {
+      Object.keys(vars).forEach((k) => {
+        s = s.replace(new RegExp("\\{" + k + "\\}", "g"), vars[k]);
+      });
+    }
+    return s;
+  }
+
+  function localeTag() {
+    return state.lang === "ko" ? "ko" : "en";
+  }
+
+  // Translated display name for a tree species (records store English labels).
+  function treeDisplayFromKind(kind) {
+    const species = TREE_SPECIES.find((s) => s.label === kind);
+    if (species) return t("tree." + species.id);
+    if (kind === WILTED_TREE.label) return t("tree.wilted");
+    return kind;
+  }
+
+  function applyStaticI18n() {
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      el.textContent = t(el.dataset.i18n);
+    });
+    document.querySelectorAll("[data-i18n-html]").forEach((el) => {
+      el.innerHTML = t(el.dataset.i18nHtml);
+    });
+    document.querySelectorAll("[data-i18n-ph]").forEach((el) => {
+      el.setAttribute("placeholder", t(el.dataset.i18nPh));
+    });
+    document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+      el.title = t(el.dataset.i18nTitle);
+    });
+    document.querySelectorAll("[data-i18n-aria]").forEach((el) => {
+      el.setAttribute("aria-label", t(el.dataset.i18nAria));
+    });
+  }
+
+  function applyLanguage() {
+    document.documentElement.lang = state.lang;
+    applyStaticI18n();
+    if (els.langLabel) els.langLabel.textContent = state.lang === "en" ? "한국어" : "English";
+    renderAll();
+  }
+
+  function toggleLanguage() {
+    state.lang = state.lang === "en" ? "ko" : "en";
+    localStorage.setItem(STORAGE_LANG, state.lang);
+    applyLanguage();
+  }
   const TREE_SPECIES = [
     { id: "canopy", label: "canopy tree" },
     { id: "palm", label: "palm tree" },
@@ -102,6 +290,8 @@
     volumeLabel: document.getElementById("volumeLabel"),
     themeToggleButton: document.getElementById("themeToggleButton"),
     themeColorMeta: document.getElementById("themeColorMeta"),
+    langToggleButton: document.getElementById("langToggleButton"),
+    langLabel: document.getElementById("langLabel"),
   };
 
   const state = {
@@ -116,6 +306,7 @@
     masterGainNode: null,
     timerMode: loadTimerMode(),
     theme: loadTheme(),
+    lang: loadLang(),
     selectedTreeId: "pine",
     notes: [],
     audioContext: null,
@@ -139,6 +330,10 @@
 
   async function init() {
     bindEvents();
+    // Translate static text up front (English by default, Korean if saved).
+    document.documentElement.lang = state.lang;
+    applyStaticI18n();
+    if (els.langLabel) els.langLabel.textContent = state.lang === "en" ? "한국어" : "English";
     // Phase 1: paint visuals from local storage immediately so nothing is stuck
     // on "Loading" while the Supabase library downloads from its CDN. The live
     // timer is hydrated later (phase 2) so an expired timer is reconciled and
@@ -218,6 +413,7 @@
     els.modeStopwatchButton.addEventListener("click", () => setTimerMode("stopwatch"));
     els.deleteAllDataButton.addEventListener("click", deleteAllData);
     els.themeToggleButton.addEventListener("click", toggleTheme);
+    els.langToggleButton.addEventListener("click", toggleLanguage);
 
     els.volumeSlider.addEventListener("input", () => {
       state.soundVolume = clamp(Number(els.volumeSlider.value) / 100, 0, 2);
@@ -335,7 +531,7 @@
       state.supabase = null;
       state.supabaseConfigured = false;
       state.dataMode = "local";
-      showToast("Cloud sync could not load. Local records are still available.");
+      showToast(t("toast.cloud_load_fail"));
       console.warn(error);
       renderAccount();
     }
@@ -355,7 +551,7 @@
       }
 
       state.dataMode = "local";
-      showToast("Cloud table is not ready. Using local records.");
+      showToast(t("toast.cloud_not_ready"));
       console.warn(error);
     }
 
@@ -464,7 +660,7 @@
     if (!ordered.length) {
       const empty = document.createElement("li");
       empty.className = "notes-empty";
-      empty.textContent = "No tasks yet.";
+      empty.textContent = t("notes.empty");
       els.notesList.appendChild(empty);
       return;
     }
@@ -490,7 +686,7 @@
     checkbox.type = "checkbox";
     checkbox.className = "note-checkbox";
     checkbox.checked = note.done;
-    checkbox.setAttribute("aria-label", note.done ? "Mark incomplete" : "Mark complete");
+    checkbox.setAttribute("aria-label", note.done ? t("notes.mark_incomplete") : t("notes.mark_complete"));
     checkbox.addEventListener("change", () => toggleNote(note.id));
 
     const textEl = document.createElement("span");
@@ -500,7 +696,7 @@
     const delBtn = document.createElement("button");
     delBtn.type = "button";
     delBtn.className = "note-delete";
-    delBtn.title = "Delete task";
+    delBtn.title = t("notes.delete");
     delBtn.innerHTML = '<i data-lucide="x"></i>';
     delBtn.addEventListener("click", () => deleteNote(note.id));
 
@@ -566,7 +762,7 @@
         .single();
 
       if (error) {
-        showToast("Cloud save failed. Saved locally.");
+        showToast(t("toast.cloud_save_fail"));
         console.warn(error);
         addLocalRecord(normalized);
         state.sessions = loadLocalSessions();
@@ -602,7 +798,7 @@
         .single();
 
       if (error) {
-        showToast("Cloud update failed.");
+        showToast(t("toast.cloud_update_fail"));
         console.warn(error);
         return;
       }
@@ -619,13 +815,13 @@
   }
 
   async function deleteRecord(record) {
-    const confirmed = window.confirm(`Delete "${record.title}"?`);
+    const confirmed = window.confirm(t("confirm.delete_record", { title: record.title }));
     if (!confirmed) return;
 
     if (canUseCloud()) {
       const { error } = await state.supabase.from("focus_sessions").delete().eq("id", record.id);
       if (error) {
-        showToast("Cloud delete failed.");
+        showToast(t("toast.cloud_delete_fail"));
         console.warn(error);
         return;
       }
@@ -635,7 +831,7 @@
 
     state.sessions = state.sessions.filter((item) => item.id !== record.id);
     renderAll();
-    showToast("Record deleted.");
+    showToast(t("toast.record_deleted"));
   }
 
   async function startOrResumeTimer() {
@@ -670,7 +866,7 @@
     if (!isStopwatch) primeCompletionSound();
     renderTimer();
     renderTimerModeToggle();
-    showToast(isStopwatch ? "Stopwatch started." : "Session started.");
+    showToast(isStopwatch ? t("toast.stopwatch_started") : t("toast.session_started"));
     await saveActiveTimerToCloud();
   }
 
@@ -688,7 +884,7 @@
         persistTimer();
         await loadSessions();
         renderAll();
-        showToast("Timer already finished on another device.");
+        showToast(t("toast.timer_finished_elsewhere"));
         return;
       }
 
@@ -727,7 +923,7 @@
       persistTimer();
       await createRecord(record);
       renderTimer();
-      showToast(status === "completed" ? "Session planted." : "Session recorded as abandoned.");
+      showToast(status === "completed" ? t("toast.session_planted") : t("toast.session_abandoned"));
     } finally {
       state.timerCompleting = false;
     }
@@ -885,7 +1081,7 @@
       updateTimerDisplay(elapsedSeconds, 0);
       const elapsedMin = Math.floor(elapsedSeconds / 60);
       els.timerProgressLabel.textContent = `${elapsedMin}m`;
-      els.timerState.textContent = "Growing";
+      els.timerState.textContent = t("timer.growing");
       els.startButton.disabled = true;
       els.finishButton.disabled = false;
       setFormDisabled(true);
@@ -900,7 +1096,7 @@
 
     if (!timer) {
       const isStopwatch = state.timerMode === "stopwatch";
-      els.timerState.textContent = "Ready";
+      els.timerState.textContent = t("timer.ready");
       els.timerDisplay.textContent = isStopwatch ? "00:00" : formatClock(state.selectedDuration * 60);
       els.startButton.disabled = false;
       els.finishButton.disabled = true;
@@ -908,7 +1104,7 @@
       return;
     }
 
-    els.timerState.textContent = "Growing";
+    els.timerState.textContent = t("timer.growing");
     els.startButton.disabled = true;
     els.finishButton.disabled = false;
     setFormDisabled(true);
@@ -933,12 +1129,12 @@
   }
 
   function renderSoundToggle() {
-    const label = state.soundEnabled ? "Sound on" : "Sound off";
+    const label = state.soundEnabled ? t("sound.on") : t("sound.off");
     const emoji = state.soundEnabled ? "🔊" : "🔇";
     els.soundToggleButton.innerHTML =
       `<span class="btn-emoji" aria-hidden="true">${emoji}</span><span>${label}</span>`;
     els.soundToggleButton.setAttribute("aria-pressed", String(state.soundEnabled));
-    els.soundToggleButton.title = `Timer ${label.toLowerCase()}`;
+    els.soundToggleButton.title = label;
   }
 
   function renderRestTimer() {
@@ -946,8 +1142,8 @@
     const isRunning = Boolean(state.restTimer);
 
     els.restDisplay.textContent = formatClock(elapsedSeconds);
-    els.restState.textContent = isRunning ? "Resting" : "Rest stopwatch";
-    els.restModeLabel.textContent = "Elapsed";
+    els.restState.textContent = isRunning ? t("rest.resting") : t("rest.title");
+    els.restModeLabel.textContent = t("rest.elapsed");
     els.restStartButton.disabled = isRunning;
     els.restResetButton.disabled = !isRunning;
     updateDocumentTitle();
@@ -957,17 +1153,17 @@
     if (state.timer) {
       // Countdown shows its remaining time in the tab; the stopwatch does not.
       document.title = state.timer.mode === "stopwatch"
-        ? `Focus running | ${APP_TITLE}`
-        : `${formatClock(getRemainingSeconds())} Focus | ${APP_TITLE}`;
+        ? `${t("title.focus_running")} | ${APP_TITLE}`
+        : `${formatClock(getRemainingSeconds())} ${t("title.focus")} | ${APP_TITLE}`;
       return;
     }
 
     if (state.restTimer) {
-      document.title = `${formatClock(getRestElapsedSeconds())} Rest | ${APP_TITLE}`;
+      document.title = `${formatClock(getRestElapsedSeconds())} ${t("title.rest")} | ${APP_TITLE}`;
       return;
     }
 
-    document.title = `Ready | ${APP_TITLE}`;
+    document.title = `${t("title.ready")} | ${APP_TITLE}`;
   }
 
   const RING_CIRCUMFERENCE = 2 * Math.PI * 86;
@@ -1048,7 +1244,7 @@
 
     const status = document.createElement("span");
     status.className = `record-status ${record.status}`;
-    status.textContent = record.status === "completed" ? "Planted" : "Abandoned";
+    status.textContent = record.status === "completed" ? t("record.planted") : t("record.abandoned");
 
     titleRow.append(title, status);
 
@@ -1059,9 +1255,9 @@
     const metrics = document.createElement("div");
     metrics.className = "record-metrics";
     metrics.append(
-      createMetric(`${record.actual_minutes}m focused`),
-      createMetric(`${record.duration_minutes}m goal`),
-      createMetric(record.tree_kind)
+      createMetric(t("metric.focused", { n: record.actual_minutes })),
+      createMetric(t("metric.goal", { n: record.duration_minutes })),
+      createMetric(treeDisplayFromKind(record.tree_kind))
     );
 
     main.append(titleRow, date, metrics);
@@ -1069,8 +1265,8 @@
     const actions = document.createElement("div");
     actions.className = "record-actions";
     actions.append(
-      createActionButton("edit", record.id, "Edit", "✏️"),
-      createActionButton("delete", record.id, "Delete", "🗑️")
+      createActionButton("edit", record.id, t("action.edit"), "✏️"),
+      createActionButton("delete", record.id, t("action.delete"), "🗑️")
     );
 
     item.append(main, actions);
@@ -1117,21 +1313,21 @@
       today.setHours(0, 0, 0, 0);
       start = today;
       end = addDays(today, 1);
-      rangeText = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(today);
-      emptyText = "No trees planted today.";
-      kicker = "Today's forest";
+      rangeText = new Intl.DateTimeFormat(localeTag(), { weekday: "long", month: "long", day: "numeric" }).format(today);
+      emptyText = t("grove.empty_today");
+      kicker = t("grove.today");
     } else if (view === "month") {
       start = new Date(state.monthStart);
       end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
       rangeText = formatMonthRange(start);
-      emptyText = "No trees planted this month.";
-      kicker = "Monthly forest";
+      emptyText = t("grove.empty_month");
+      kicker = t("grove.monthly");
     } else {
       start = new Date(state.weekStart);
       end = addDays(start, 7);
       rangeText = formatWeekRange(start);
-      emptyText = "No trees planted this week.";
-      kicker = "Weekly forest";
+      emptyText = t("grove.empty_week");
+      kicker = t("grove.weekly");
     }
 
     const completed = state.sessions
@@ -1144,8 +1340,8 @@
 
     els.grovePanelKicker.textContent = kicker;
     els.weekRange.textContent = rangeText;
-    els.weekTreeCount.textContent = `${completed.length} ${completed.length === 1 ? "tree" : "trees"}`;
-    els.weekFocusTime.textContent = `${formatMinutes(totalMinutes)} focused`;
+    els.weekTreeCount.textContent = t(completed.length === 1 ? "grove.tree_one" : "grove.trees", { n: completed.length });
+    els.weekFocusTime.textContent = t("grove.focused", { time: formatMinutes(totalMinutes) });
 
     els.groveTodayButton.classList.toggle("is-selected", view === "today");
     els.groveWeekButton.classList.toggle("is-selected", view === "week");
@@ -1266,27 +1462,27 @@
     els.signedInActions.hidden = !state.user;
 
     if (!state.supabaseConfigured) {
-      els.syncBadge.textContent = "Local";
-      els.modeLabel.textContent = "Local garden";
-      els.navAuthStatus.textContent = "Local";
-      els.accountButton.title = "Account: local only";
-      setAccountStatus("hard-drive", "Records are saved in this browser.");
+      els.syncBadge.textContent = t("badge.local");
+      els.modeLabel.textContent = t("brand.local_garden");
+      els.navAuthStatus.textContent = t("nav.local");
+      els.accountButton.title = t("nav.account");
+      setAccountStatus("hard-drive", t("account.status_local"));
       return;
     }
 
     if (!state.user) {
-      els.syncBadge.textContent = "Local";
-      els.modeLabel.textContent = "Local garden";
-      els.navAuthStatus.textContent = "Sign in";
-      els.accountButton.title = "Sign in with Google";
-      setAccountStatus("cloud", "Use Google to sync records across devices.");
+      els.syncBadge.textContent = t("badge.local");
+      els.modeLabel.textContent = t("brand.local_garden");
+      els.navAuthStatus.textContent = t("nav.sign_in");
+      els.accountButton.title = t("account.continue_google");
+      setAccountStatus("cloud", t("account.status_cloud"));
       return;
     }
 
-    els.syncBadge.textContent = "Synced";
-    els.modeLabel.textContent = "Cloud garden";
-    els.navAuthStatus.textContent = "Signed in";
-    els.accountButton.title = `Signed in as ${getUserDisplayName(state.user)}`;
+    els.syncBadge.textContent = t("badge.synced");
+    els.modeLabel.textContent = t("brand.cloud_garden");
+    els.navAuthStatus.textContent = t("nav.signed_in");
+    els.accountButton.title = getUserDisplayName(state.user);
     setAccountStatus("badge-check", getUserDisplayName(state.user));
   }
 
@@ -1464,7 +1660,7 @@
     console.warn(error);
     if (silent || state.activeTimerSyncWarningShown) return;
     state.activeTimerSyncWarningShown = true;
-    showToast("Cloud timer sync needs the updated Supabase SQL.");
+    showToast(t("toast.cloud_timer_sql"));
   }
 
   function openAccountDialog() {
@@ -1501,12 +1697,14 @@
       TREE_SPECIES.forEach((species) => {
         const opt = document.createElement("option");
         opt.value = species.id;
-        opt.textContent = species.label.charAt(0).toUpperCase() + species.label.slice(1);
         els.recordTreeInput.appendChild(opt);
       });
     }
+    Array.from(els.recordTreeInput.options).forEach((opt) => {
+      opt.textContent = t("tree." + opt.value);
+    });
 
-    els.dialogTitle.textContent = record ? "Edit session" : "Add session";
+    els.dialogTitle.textContent = record ? t("dialog.edit_session") : t("dialog.add_session");
     els.recordIdInput.value = value.id;
     els.recordTitleInput.value = value.title;
     els.recordStartedInput.value = toDatetimeLocal(value.started_at);
@@ -1562,7 +1760,7 @@
 
     rememberSessionName(changes.title);
     closeDialog();
-    showToast("Record saved.");
+    showToast(t("toast.record_saved"));
   }
 
   async function signInWithGoogle() {
@@ -1583,7 +1781,7 @@
   async function signOut() {
     if (!state.supabase) return;
     await state.supabase.auth.signOut();
-    showToast("Signed out.");
+    showToast(t("toast.signed_out"));
   }
 
   function canUseCloud() {
@@ -1644,10 +1842,13 @@
       TREE_SPECIES.forEach((species) => {
         const opt = document.createElement("option");
         opt.value = species.id;
-        opt.textContent = species.label.charAt(0).toUpperCase() + species.label.slice(1);
         els.treePicker.appendChild(opt);
       });
     }
+    // Keep labels in sync with the current language.
+    Array.from(els.treePicker.options).forEach((opt) => {
+      opt.textContent = t("tree." + opt.value);
+    });
     els.treePicker.value = state.selectedTreeId;
     els.treePicker.disabled = !!state.timer;
   }
@@ -1835,7 +2036,7 @@
       stopActiveTimerSounds();
     }
 
-    showToast(`Timer sound ${state.soundEnabled ? "on" : "off"}.`);
+    showToast(t(state.soundEnabled ? "toast.sound_on" : "toast.sound_off"));
   }
 
   function loadSoundPreference() {
@@ -1916,10 +2117,8 @@
   }
 
   async function deleteAllData() {
-    const mode = canUseCloud() ? "cloud" : "local";
-    const label = mode === "cloud" ? "cloud records" : "local records";
     const confirmed = window.confirm(
-      `Delete all ${label}? This cannot be undone.`
+      t(canUseCloud() ? "confirm.delete_all_cloud" : "confirm.delete_all_local")
     );
     if (!confirmed) return;
 
@@ -1930,7 +2129,7 @@
         .eq("user_id", state.user.id);
 
       if (error) {
-        showToast("Failed to delete cloud records.");
+        showToast(t("toast.cloud_delete_all_fail"));
         console.warn(error);
         return;
       }
@@ -1940,7 +2139,7 @@
 
     state.sessions = [];
     renderAll();
-    showToast("All records deleted.");
+    showToast(t("toast.all_deleted"));
   }
 
   function getAudioContext() {
@@ -2405,15 +2604,17 @@
   }
 
   function formatMinutes(minutes) {
+    const m = t("unit.m");
+    const h = t("unit.h");
     const rounded = Math.max(0, Math.round(minutes));
-    if (rounded < 60) return `${rounded}m`;
+    if (rounded < 60) return `${rounded}${m}`;
     const hours = Math.floor(rounded / 60);
     const leftover = rounded % 60;
-    return leftover ? `${hours}h ${leftover}m` : `${hours}h`;
+    return leftover ? `${hours}${h} ${leftover}${m}` : `${hours}${h}`;
   }
 
   function formatRecordDate(value) {
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(localeTag(), {
       dateStyle: "medium",
       timeStyle: "short",
     }).format(new Date(value));
@@ -2442,7 +2643,7 @@
   }
 
   function formatMonthRange(date) {
-    return new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(date);
+    return new Intl.DateTimeFormat(localeTag(), { month: "long", year: "numeric" }).format(date);
   }
 
   function addDays(value, days) {
@@ -2453,7 +2654,7 @@
 
   function formatWeekRange(start) {
     const end = addDays(start, 6);
-    const formatter = new Intl.DateTimeFormat(undefined, {
+    const formatter = new Intl.DateTimeFormat(localeTag(), {
       month: "short",
       day: "numeric",
     });

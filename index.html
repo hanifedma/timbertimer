@@ -99,13 +99,17 @@
       </a>
 
       <nav class="top-actions" aria-label="Primary">
-        <button class="icon-button" type="button" data-panel-jump="records" title="Records">
+        <button class="icon-button" type="button" data-panel-jump="records" data-i18n-title="nav.records">
           <span class="btn-emoji" aria-hidden="true">🌲</span>
-          <span>Record</span>
+          <span data-i18n="nav.record">Record</span>
         </button>
-        <button id="themeToggleButton" class="icon-only emoji-btn" type="button" title="Switch appearance"
-          aria-label="Switch appearance">☀️</button>
-        <button id="accountButton" class="icon-button account-button" type="button" title="Account">
+        <button id="langToggleButton" class="icon-button" type="button" data-i18n-title="lang.switch">
+          <span class="btn-emoji" aria-hidden="true">🌐</span>
+          <span id="langLabel">한국어</span>
+        </button>
+        <button id="themeToggleButton" class="icon-only emoji-btn" type="button" data-i18n-title="theme.switch"
+          data-i18n-aria="theme.switch">☀️</button>
+        <button id="accountButton" class="icon-button account-button" type="button" data-i18n-title="nav.account">
           <span class="btn-emoji" aria-hidden="true">👤</span>
           <span id="navAuthStatus">Local</span>
         </button>
@@ -114,29 +118,29 @@
 
     <main class="workspace" id="main">
       <section class="focus-panel" aria-labelledby="focusTitle">
-        <h1 id="focusTitle">Forget all else, feel the timber grow.</h1>
+        <h1 id="focusTitle" data-i18n="app.slogan">Forget all else, feel the timber grow.</h1>
 
         <div class="timer-mode-toggle" role="group" aria-label="Timer mode">
           <button class="pill-button is-selected" id="modeCountdownButton" type="button">
             <span class="btn-emoji" aria-hidden="true">⏳</span>
-            Countdown
+            <span data-i18n="mode.countdown">Countdown</span>
           </button>
           <button class="pill-button" id="modeStopwatchButton" type="button">
             <span class="btn-emoji" aria-hidden="true">⏱️</span>
-            Stopwatch
+            <span data-i18n="mode.stopwatch">Stopwatch</span>
           </button>
         </div>
 
         <form id="focusForm" class="focus-form">
           <label class="field">
-            <span>Session</span>
+            <span data-i18n="field.session">Session</span>
             <input id="sessionTitle" name="sessionTitle" type="text" maxlength="80" value="Deep focus"
               list="sessionTitleSuggestions" autocomplete="off" />
           </label>
           <datalist id="sessionTitleSuggestions"></datalist>
 
           <div id="durationField" class="field">
-            <span>Duration</span>
+            <span data-i18n="field.duration">Duration</span>
             <div class="duration-row" role="group" aria-label="Duration presets">
               <button class="pill-button is-selected" type="button" data-duration="25">
                 25m
@@ -144,14 +148,14 @@
               <button class="pill-button" type="button" data-duration="120">120m</button>
               <button class="pill-button" type="button" data-duration="60">60m</button>
               <label class="custom-duration">
-                <span>Custom</span>
+                <span data-i18n="field.custom">Custom</span>
                 <input id="durationInput" type="number" min="1" max="240" step="1" value="25" />
               </label>
             </div>
           </div>
 
           <div class="field">
-            <span>Tree</span>
+            <span data-i18n="field.tree">Tree</span>
             <select id="treePicker" aria-label="Tree type"></select>
           </div>
 
@@ -180,11 +184,11 @@
             <div class="timer-primary-actions">
               <button id="startButton" class="primary-button" type="button">
                 <span class="btn-emoji" aria-hidden="true">▶️</span>
-                <span>Start</span>
+                <span data-i18n="btn.start">Start</span>
               </button>
               <button id="finishButton" class="secondary-button" type="button" disabled>
                 <span class="btn-emoji" aria-hidden="true">✅</span>
-                <span>Finish</span>
+                <span data-i18n="btn.finish">Finish</span>
               </button>
             </div>
             <div class="sound-group">
@@ -211,11 +215,11 @@
           <div class="timer-actions">
             <button id="restStartButton" class="secondary-button" type="button">
               <span class="btn-emoji" aria-hidden="true">▶️</span>
-              <span>Start rest</span>
+              <span data-i18n="rest.start">Start rest</span>
             </button>
             <button id="restResetButton" class="ghost-button" type="button" disabled>
               <span class="btn-emoji" aria-hidden="true">🔄</span>
-              <span>Reset</span>
+              <span data-i18n="rest.reset">Reset</span>
             </button>
           </div>
         </div>
@@ -226,14 +230,15 @@
       <section class="notes-panel" aria-labelledby="notesTitle">
         <div class="section-head">
           <div>
-            <div class="panel-kicker">Tasks</div>
-            <h2 id="notesTitle">To-Do</h2>
+            <div class="panel-kicker" data-i18n="notes.kicker">Tasks</div>
+            <h2 id="notesTitle" data-i18n="notes.title">To-Do</h2>
           </div>
         </div>
         <ul id="notesList" class="notes-list" aria-live="polite" aria-label="Task list"></ul>
         <form id="notesForm" class="notes-form">
-          <input id="notesInput" type="text" maxlength="500" placeholder="Add a task…" autocomplete="off" />
-          <button class="icon-only" type="submit" title="Add task">
+          <input id="notesInput" type="text" maxlength="500" data-i18n-ph="notes.placeholder"
+            placeholder="Add a task…" autocomplete="off" />
+          <button class="icon-only" type="submit" data-i18n-title="notes.add">
             <i data-lucide="corner-down-left"></i>
           </button>
         </form>
@@ -242,21 +247,21 @@
       <section id="recordsPanel" class="records-panel" aria-labelledby="recordsTitle">
         <div class="section-head">
           <div>
-            <div class="panel-kicker">Forest record</div>
-            <h2 id="recordsTitle">Focus history</h2>
+            <div class="panel-kicker" data-i18n="records.kicker">Forest record</div>
+            <h2 id="recordsTitle" data-i18n="records.title">Focus history</h2>
           </div>
-          <button id="addRecordButton" class="secondary-button" type="button" title="Add session">
-            <i data-lucide="plus"></i>Add session
+          <button id="addRecordButton" class="secondary-button" type="button" data-i18n-title="records.add">
+            <i data-lucide="plus"></i><span data-i18n="records.add">Add session</span>
           </button>
         </div>
 
         <div class="stats-grid" aria-label="Focus stats">
           <article class="stat">
-            <span>Today</span>
+            <span data-i18n="stats.today">Today</span>
             <strong id="todayStat">0m</strong>
           </article>
           <article class="stat">
-            <span>Total</span>
+            <span data-i18n="stats.total">Total</span>
             <strong id="totalStat">0h</strong>
           </article>
         </div>
@@ -273,16 +278,15 @@
                 <button id="nextWeekButton" class="icon-only range-nav-btn" type="button" title="Next">
                   <i data-lucide="chevron-right"></i>
                 </button>
-                <button id="thisWeekButton" class="secondary-button week-today" type="button">
-                  Current
-                </button>
+                <button id="thisWeekButton" class="secondary-button week-today" type="button"
+                  data-i18n="grove.current">Current</button>
               </div>
             </div>
             <div class="grove-controls-row">
               <div class="grove-view-toggle" role="group" aria-label="Forest view">
-                <button class="pill-button" id="groveTodayButton" type="button">Today</button>
-                <button class="pill-button is-selected" id="groveWeekButton" type="button">Week</button>
-                <button class="pill-button" id="groveMonthButton" type="button">Month</button>
+                <button class="pill-button" id="groveTodayButton" type="button" data-i18n="grove.view_today">Today</button>
+                <button class="pill-button is-selected" id="groveWeekButton" type="button" data-i18n="grove.view_week">Week</button>
+                <button class="pill-button" id="groveMonthButton" type="button" data-i18n="grove.view_month">Month</button>
               </div>
             </div>
           </div>
@@ -296,18 +300,19 @@
         <div class="record-tools">
           <label class="search-field">
             <i data-lucide="search"></i>
-            <input id="searchInput" type="search" list="sessionTitleSuggestions" placeholder="Search records" />
+            <input id="searchInput" type="search" list="sessionTitleSuggestions"
+              data-i18n-ph="records.search" placeholder="Search records" />
           </label>
           <select id="statusFilter" aria-label="Filter records">
-            <option value="all">All</option>
-            <option value="completed">Completed</option>
-            <option value="abandoned">Abandoned</option>
+            <option value="all" data-i18n="filter.all">All</option>
+            <option value="completed" data-i18n="filter.completed">Completed</option>
+            <option value="abandoned" data-i18n="filter.abandoned">Abandoned</option>
           </select>
         </div>
 
         <div id="emptyState" class="empty-state" hidden>
           <i data-lucide="tree-palm"></i>
-          <strong>No records yet.</strong>
+          <strong data-i18n="records.empty">No records yet.</strong>
         </div>
 
         <div id="recordsList" class="records-list" aria-live="polite"></div>
@@ -318,8 +323,8 @@
     </main>
 
     <footer class="site-footer">
-      <p>🌲 <strong>TimberTimer</strong> — grow a forest while you focus.</p>
-      <p class="footer-meta">Your records stay in this browser, or sync privately with Google.</p>
+      <p data-i18n-html="footer.tagline">🌲 <strong>TimberTimer</strong> — grow a forest while you focus.</p>
+      <p class="footer-meta" data-i18n="footer.meta">Your records stay in this browser, or sync privately with Google.</p>
     </footer>
   </div>
 
@@ -327,10 +332,10 @@
     <div class="account-dialog-body">
       <div class="section-head">
         <div>
-          <div class="panel-kicker">Accounts</div>
-          <h2 id="accountTitle">Google sync</h2>
+          <div class="panel-kicker" data-i18n="account.kicker">Accounts</div>
+          <h2 id="accountTitle" data-i18n="account.title">Google sync</h2>
         </div>
-        <button id="closeAccountDialogButton" class="icon-only" type="button" title="Close">
+        <button id="closeAccountDialogButton" class="icon-only" type="button" data-i18n-title="account.close">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -354,21 +359,21 @@
             <path fill="#34A853"
               d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
           </svg>
-          <span>Continue with Google</span>
+          <span data-i18n="account.continue_google">Continue with Google</span>
         </button>
       </div>
 
       <div id="signedInActions" class="signed-in-actions" hidden>
         <button id="signOutButton" class="ghost-button" type="button">
           <i data-lucide="log-out"></i>
-          <span>Sign out</span>
+          <span data-i18n="account.sign_out">Sign out</span>
         </button>
       </div>
 
       <div class="danger-zone">
         <button id="deleteAllDataButton" class="ghost-button danger-button" type="button">
           <i data-lucide="trash-2"></i>
-          <span>Delete all records</span>
+          <span data-i18n="account.delete_all">Delete all records</span>
         </button>
       </div>
     </div>
@@ -378,10 +383,10 @@
     <form id="recordForm" method="dialog">
       <div class="section-head">
         <div>
-          <div class="panel-kicker">Record</div>
+          <div class="panel-kicker" data-i18n="dialog.record">Record</div>
           <h2 id="dialogTitle">Edit session</h2>
         </div>
-        <button class="icon-only" value="cancel" type="submit" title="Close">
+        <button class="icon-only" value="cancel" type="submit" data-i18n-title="account.close">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -389,42 +394,42 @@
       <input id="recordIdInput" type="hidden" />
 
       <label class="field">
-        <span>Session</span>
+        <span data-i18n="field.session">Session</span>
         <input id="recordTitleInput" type="text" maxlength="80" list="sessionTitleSuggestions" required />
       </label>
 
       <div class="form-grid">
         <label class="field">
-          <span>Started</span>
+          <span data-i18n="field.started">Started</span>
           <input id="recordStartedInput" type="datetime-local" required />
         </label>
         <label class="field">
-          <span>Status</span>
+          <span data-i18n="field.status">Status</span>
           <select id="recordStatusInput">
-            <option value="completed">Completed</option>
-            <option value="abandoned">Abandoned</option>
+            <option value="completed" data-i18n="status.completed">Completed</option>
+            <option value="abandoned" data-i18n="status.abandoned">Abandoned</option>
           </select>
         </label>
         <label class="field">
-          <span>Goal minutes</span>
+          <span data-i18n="field.goal_minutes">Goal minutes</span>
           <input id="recordDurationInput" type="number" min="1" max="600" required />
         </label>
         <label class="field">
-          <span>Actual minutes</span>
+          <span data-i18n="field.actual_minutes">Actual minutes</span>
           <input id="recordActualInput" type="number" min="0" max="600" required />
         </label>
       </div>
 
       <label class="field">
-        <span>Tree</span>
+        <span data-i18n="field.tree">Tree</span>
         <select id="recordTreeInput" aria-label="Tree type"></select>
       </label>
 
       <menu class="dialog-actions">
-        <button class="ghost-button" value="cancel" type="submit">Cancel</button>
+        <button class="ghost-button" value="cancel" type="submit" data-i18n="btn.cancel">Cancel</button>
         <button id="saveRecordButton" class="primary-button" value="default" type="button">
           <i data-lucide="save"></i>
-          <span>Save</span>
+          <span data-i18n="btn.save">Save</span>
         </button>
       </menu>
     </form>
