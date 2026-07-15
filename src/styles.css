@@ -197,10 +197,11 @@ button:disabled {
   width: 44px;
   height: 44px;
   flex: 0 0 44px;
-  border: 1px solid var(--accent-line);
+  border: none;
   border-radius: var(--radius);
-  color: var(--accent-ink);
-  background: var(--accent);
+  /* Vibrant gradient app-icon look, white glyph, in both themes. */
+  color: #ffffff;
+  background: linear-gradient(135deg, #4ade80, #16a34a);
 }
 
 .brand strong,
