@@ -199,9 +199,10 @@ button:disabled {
   flex: 0 0 44px;
   border: none;
   border-radius: var(--radius);
-  /* Vibrant gradient app-icon look, white glyph, in both themes. */
-  color: #ffffff;
-  background: linear-gradient(135deg, #4ade80, #16a34a);
+  /* Emoji app-icon look on a soft light square, matching the favicon. */
+  background: #fbfaf6;
+  font-size: 26px;
+  line-height: 1;
 }
 
 .brand strong,
