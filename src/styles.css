@@ -79,6 +79,57 @@
   box-sizing: border-box;
 }
 
+/* Smoothly cross-fade colours when the appearance changes. */
+.topbar,
+.workspace > section,
+.notes-panel,
+.records-panel,
+.timer-card,
+.rest-card,
+.pill-button,
+.custom-duration,
+input,
+textarea,
+select,
+.secondary-button,
+.ghost-button,
+.icon-button,
+.icon-only,
+.metric,
+.note-item,
+.site-footer {
+  transition:
+    background-color 260ms ease,
+    border-color 260ms ease,
+    color 260ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  color: var(--accent-ink);
+  background: var(--accent);
+  font-weight: 800;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 160ms ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 html {
   min-height: 100%;
   background: var(--bg);
@@ -1552,4 +1603,26 @@ svg {
   font-weight: 700;
   text-align: right;
   white-space: nowrap;
+}
+.site-footer {
+  margin-top: 22px;
+  padding: 22px 8px 6px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  color: var(--muted);
+}
+
+.site-footer p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.site-footer strong {
+  color: var(--ink);
+}
+
+.site-footer .footer-meta {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--soft);
 }

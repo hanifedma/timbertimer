@@ -1,10 +1,15 @@
 {
-  "name": "TimberTimer",
+  "name": "TimberTimer — Grow a forest while you focus",
   "short_name": "TimberTimer",
-  "description": "A minimalist focus timer with editable focus records.",
+  "description": "A minimalist focus timer. Plant a tree for every focus session, grow a forest, keep a to-do list, and sync across devices.",
+  "id": "/timbertimer/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "orientation": "any",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities", "lifestyle"],
   "background_color": "#000000",
   "theme_color": "#000000",
   "icons": [

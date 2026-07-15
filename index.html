@@ -3,10 +3,38 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="A minimalist focus timer with editable focus records." />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+  <title>TimberTimer — Grow a forest while you focus</title>
+  <meta name="description"
+    content="TimberTimer is a free, minimalist focus timer. Plant a tree for every focus session, grow a forest, track your history, keep a to-do list, and sync across devices with Google." />
+  <meta name="keywords"
+    content="focus timer, pomodoro, productivity, focus app, forest timer, study timer, deep work, timeboxing" />
+  <meta name="author" content="hanifedma" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://hanifedma.github.io/timbertimer/" />
+  <meta name="color-scheme" content="dark light" />
   <meta id="themeColorMeta" name="theme-color" content="#000000" />
-  <title>TimberTimer</title>
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="TimberTimer" />
+  <meta property="og:title" content="TimberTimer — Grow a forest while you focus" />
+  <meta property="og:description"
+    content="A free, minimalist focus timer. Plant a tree for every session, grow a forest, and track your focus history." />
+  <meta property="og:url" content="https://hanifedma.github.io/timbertimer/" />
+  <meta property="og:image" content="https://hanifedma.github.io/timbertimer/assets/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="TimberTimer — a forest grown from focus sessions" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="TimberTimer — Grow a forest while you focus" />
+  <meta name="twitter:description"
+    content="A free, minimalist focus timer. Plant a tree for every session and grow a forest." />
+  <meta name="twitter:image" content="https://hanifedma.github.io/timbertimer/assets/og-image.png" />
+
   <script>
     // Apply the saved theme before first paint so there is no flash of the
     // wrong appearance. Dark is the default.
@@ -16,16 +44,39 @@
       document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
     })();
   </script>
+
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="assets/canopy-logo.svg" type="image/svg+xml" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/canopy-logo-192.png" />
   <link rel="apple-touch-icon" href="assets/canopy-logo-192.png" />
+
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+  <link rel="preconnect" href="https://esm.sh" crossorigin />
+
   <link rel="stylesheet" href="src/styles.css" />
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "TimberTimer",
+      "url": "https://hanifedma.github.io/timbertimer/",
+      "description": "A minimalist focus timer that grows a forest from your focus sessions, with a to-do list and optional Google sync.",
+      "applicationCategory": "ProductivityApplication",
+      "operatingSystem": "Any (modern web browser)",
+      "browserRequirements": "Requires JavaScript.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "author": { "@type": "Person", "name": "hanifedma" }
+    }
+  </script>
+
+  <script src="https://unpkg.com/lucide@1.24.0/dist/umd/lucide.min.js" defer></script>
   <script src="src/supabase-config.js" defer></script>
   <script src="src/app.js" defer></script>
 </head>
 
 <body>
+  <a class="skip-link" href="#main">Skip to content</a>
   <div class="app-backdrop" aria-hidden="true"></div>
   <div class="leaf-wash" aria-hidden="true"></div>
 
@@ -61,7 +112,7 @@
       </nav>
     </header>
 
-    <main class="workspace">
+    <main class="workspace" id="main">
       <section class="focus-panel" aria-labelledby="focusTitle">
         <h1 id="focusTitle">Forget all else, feel the timber grow.</h1>
 
@@ -265,6 +316,11 @@
       </div>
 
     </main>
+
+    <footer class="site-footer">
+      <p>🌲 <strong>TimberTimer</strong> — grow a forest while you focus.</p>
+      <p class="footer-meta">Your records stay in this browser, or sync privately with Google.</p>
+    </footer>
   </div>
 
   <dialog id="accountDialog" class="account-dialog" aria-labelledby="accountTitle">
