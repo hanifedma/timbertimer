@@ -694,9 +694,16 @@ button:focus-visible {
   background: var(--fill-2);
 }
 
+/* Lowest-emphasis button, but still clearly interactive: full-contrast label
+   (a faint one reads as disabled) with a light fill. The disabled state is
+   handled by the shared button:disabled rule. */
 .ghost-button {
-  color: var(--soft);
-  background: var(--fill-1);
+  color: var(--ink);
+  background: var(--fill-2);
+}
+
+.ghost-button:hover:not(:disabled) {
+  background: var(--fill-3);
 }
 
 .icon-button {
