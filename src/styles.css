@@ -120,7 +120,7 @@ select,
   border-radius: var(--radius);
   color: var(--accent-ink);
   background: var(--accent);
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: none;
   transform: translateY(-160%);
   transition: transform 160ms ease;
@@ -316,7 +316,8 @@ button:disabled {
   text-transform: uppercase;
 }
 
-/* Restrained weight scale: 400 body, 500 meta, 600 emphasis/UI, 700 numerals.
+/* Restrained weight scale: 400 body, 500 UI text and labels, 600 for real
+   hierarchy only (headings, <strong>, kickers), 700 for the big numerals.
    Headings and <strong> would otherwise inherit the browser's heavier bold. */
 h1,
 h2,
@@ -415,7 +416,7 @@ button:focus-visible {
 
 .pill-button {
   padding: 0 10px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .pill-button.is-selected {
@@ -439,7 +440,7 @@ button:focus-visible {
   overflow: visible;
   color: var(--muted);
   font-size: 0.74rem;
-  font-weight: 600;
+  font-weight: 500;
   text-overflow: clip;
   white-space: nowrap;
 }
@@ -496,7 +497,7 @@ button:focus-visible {
 .timer-meta {
   color: var(--soft);
   font-size: 0.84rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .growth-stage {
@@ -651,7 +652,7 @@ button:focus-visible {
   min-height: var(--control);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .primary-button,
@@ -683,7 +684,7 @@ button:focus-visible {
   border-radius: var(--radius);
   color: #1f1f1f;
   background: #ffffff;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .google-g {
@@ -990,7 +991,7 @@ svg {
   color: var(--ink);
   background: var(--fill-2);
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .week-forest {
@@ -1019,7 +1020,7 @@ svg {
   min-height: 108px;
   color: var(--muted);
   font-size: 0.84rem;
-  font-weight: 600;
+  font-weight: 500;
   text-align: center;
 }
 
@@ -1086,7 +1087,7 @@ svg {
   color: var(--ink);
   background: var(--surface-2);
   font-size: 0.68rem;
-  font-weight: 600;
+  font-weight: 500;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1228,7 +1229,7 @@ svg {
   color: var(--ink);
   background: var(--fill-2);
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .record-actions {
@@ -1273,7 +1274,7 @@ svg {
   color: var(--accent);
   background: var(--fill-1);
   font-size: 0.76rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .account-status {

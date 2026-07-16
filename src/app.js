@@ -2523,7 +2523,9 @@
     },
     canopy(p) {
       return (
-        svgTrunk(86, 12, 8, p.barkA, p.barkB) +
+        // Run the trunk up into the crown (the circles paint over it) so no
+        // bare gap shows between trunk and leaves.
+        svgTrunk(68, 12, 8, p.barkA, p.barkB) +
         svgCircle(50, 52, 28, p.leafA) +
         svgCircle(30, 62, 19, p.leafA) +
         svgCircle(70, 62, 19, p.leafA) +
