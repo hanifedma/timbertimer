@@ -1208,6 +1208,12 @@ svg {
   background: var(--danger-soft);
 }
 
+/* A rest counts, but it isn't a focus win — keep it neutral. */
+.record-status.rested {
+  color: var(--muted);
+  background: var(--fill-2);
+}
+
 .record-metrics {
   display: flex;
   flex-wrap: wrap;

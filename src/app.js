@@ -48,7 +48,11 @@
     "rest.resting": { en: "Resting", ko: "휴식 중" },
     "rest.elapsed": { en: "Elapsed", ko: "경과" },
     "rest.start": { en: "Start rest", ko: "휴식 시작" },
-    "rest.reset": { en: "Reset", ko: "초기화" },
+    "rest.finish": { en: "Finish rest", ko: "휴식 완료" },
+    "rest.record_title": { en: "Rest", ko: "휴식" },
+    "record.rested": { en: "Rested", ko: "휴식함" },
+    "toast.rest_planted": { en: "Rest planted a wilted tree.", ko: "휴식이 시든 나무를 심었어요." },
+    "toast.rest_discarded": { en: "Rest was too short to plant.", ko: "휴식이 너무 짧아 심지 않았어요." },
     "notes.kicker": { en: "Tasks", ko: "할 일" },
     "notes.title": { en: "To-Do", ko: "투두" },
     "notes.placeholder": { en: "Add a task…", ko: "할 일 추가…" },
@@ -211,6 +215,9 @@
     { id: "mangrove", label: "mangrove tree" },
   ];
   const WILTED_TREE = { id: "wilted", label: "wilted sprout" };
+  // Stored untranslated so a record means the same in every language; the list
+  // shows a translated label instead.
+  const REST_RECORD_TITLE = "Rest";
 
   let dragNoteId = null;
 
@@ -434,7 +441,7 @@
     els.finishButton.addEventListener("click", finishCurrentSession);
     els.soundToggleButton.addEventListener("click", toggleTimerSound);
     els.restStartButton.addEventListener("click", startRestTimer);
-    els.restResetButton.addEventListener("click", resetRestTimer);
+    els.restResetButton.addEventListener("click", finishRestTimer);
 
     els.prevWeekButton.addEventListener("click", () => changeWeek(-1));
     els.nextWeekButton.addEventListener("click", () => changeWeek(1));
@@ -949,10 +956,37 @@
     await saveRestTimerToCloud();
   }
 
-  async function resetRestTimer() {
+  // Ending a rest plants the wilted tree it grew, and its minutes count toward
+  // the totals. Very short rests are dropped so a stray tap leaves no litter.
+  async function finishRestTimer() {
+    if (!state.restTimer) return;
+
+    const elapsedSeconds = getRestElapsedSeconds();
+    const startedAt = new Date(state.restTimer.startedAt).toISOString();
     state.restTimer = null;
     renderRestTimer();
     await deleteRestTimerFromCloud();
+
+    const minutes = Math.round(elapsedSeconds / 60);
+    if (minutes < 1) {
+      showToast(t("toast.rest_discarded"));
+      return;
+    }
+
+    const endedAt = new Date().toISOString();
+    await createRecord({
+      id: createId(),
+      title: REST_RECORD_TITLE,
+      duration_minutes: minutes,
+      actual_minutes: minutes,
+      status: "completed",
+      started_at: startedAt,
+      ended_at: endedAt,
+      tree_kind: WILTED_TREE.label,
+      created_at: endedAt,
+      updated_at: endedAt,
+    });
+    showToast(t("toast.rest_planted"));
   }
 
   async function hydrateTimer() {
@@ -1117,6 +1151,7 @@
     const seen = new Set();
 
     sortedSessions().forEach((record) => {
+      if (isRestRecord(record)) return; // not a session name you'd reuse
       const title = (record.title || "").trim();
       const key = title.toLowerCase();
       if (!title || seen.has(key)) return;
@@ -1253,13 +1288,17 @@
     const titleRow = document.createElement("div");
     titleRow.className = "record-title-row";
 
+    const rest = isRestRecord(record);
+
     const title = document.createElement("h3");
     title.className = "record-title";
-    title.textContent = record.title;
+    title.textContent = rest ? t("rest.record_title") : record.title;
 
     const status = document.createElement("span");
-    status.className = `record-status ${record.status}`;
-    status.textContent = record.status === "completed" ? t("record.planted") : t("record.abandoned");
+    status.className = `record-status ${rest ? "rested" : record.status}`;
+    status.textContent = rest
+      ? t("record.rested")
+      : (record.status === "completed" ? t("record.planted") : t("record.abandoned"));
 
     titleRow.append(title, status);
 
@@ -1416,7 +1455,7 @@
   }
 
   function createGroveTree(record, index) {
-    const species = record.status === "abandoned"
+    const species = (record.status === "abandoned" || record.tree_kind === WILTED_TREE.label)
       ? WILTED_TREE
       : (TREE_SPECIES.find((s) => s.label === record.tree_kind)
          || TREE_SPECIES.find((s) => s.id === record.tree_kind)
@@ -1956,8 +1995,16 @@
   function resolveTreeKind(record, title, status) {
     if (status === "abandoned") return WILTED_TREE.label;
     const stored = record.tree_kind;
+    // A rest plants a wilted tree even though it completes, and WILTED_TREE is
+    // not part of TREE_SPECIES — keep it rather than re-deriving a healthy one.
+    if (stored === WILTED_TREE.label) return stored;
     if (stored && TREE_SPECIES.some((s) => s.label === stored)) return stored;
     return pickTreeKind(title, status);
+  }
+
+  // Rests are stored as completed records carrying the wilted tree.
+  function isRestRecord(record) {
+    return record.status === "completed" && record.tree_kind === WILTED_TREE.label;
   }
 
   function toCloudRecord(record, forUpdate) {
