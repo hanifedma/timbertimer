@@ -243,6 +243,8 @@
     restDisplay: document.getElementById("restDisplay"),
     restStartButton: document.getElementById("restStartButton"),
     restResetButton: document.getElementById("restResetButton"),
+    restStage: document.getElementById("restStage"),
+    restPlant: document.getElementById("restPlant"),
     weekRange: document.getElementById("weekRange"),
     weekTreeCount: document.getElementById("weekTreeCount"),
     weekFocusTime: document.getElementById("weekFocusTime"),
@@ -1146,7 +1148,20 @@
     els.restModeLabel.textContent = t("rest.elapsed");
     els.restStartButton.disabled = isRunning;
     els.restResetButton.disabled = !isRunning;
+    renderRestTree(elapsedSeconds);
     updateDocumentTitle();
+  }
+
+  // Resting grows a wilted tree instead of a healthy one — it starts as a small
+  // sprout and creeps up over the first half hour of rest.
+  function renderRestTree(elapsedSeconds) {
+    if (els.restPlant.dataset.treeKey !== "wilted") {
+      els.restPlant.innerHTML = buildTreeSVG("wilted", getTreePalette("rest"));
+      els.restPlant.dataset.treeKey = "wilted";
+    }
+    const growth = clamp(elapsedSeconds / 1800, 0, 1);
+    // 0.46 keeps the idle sprout readable; 0.86 fills the shorter rest stage.
+    els.restStage.style.setProperty("--active-scale", (0.46 + growth * 0.4).toFixed(3));
   }
 
   function updateDocumentTitle() {
@@ -2548,14 +2563,24 @@
         svgCircle(44, 62, 11, p.leafB, 0.22);
       return roots + trunk + crown;
     },
+    // A sad, bare tree: leaning trunk, dead branches, a few drooping leaves.
     wilted() {
-      const stem = `<path d="M 50 116 Q 47 96 52 80 Q 55 70 60 66" stroke="#6f5f45" stroke-width="5" fill="none" stroke-linecap="round"/>`;
-      return (
-        stem +
-        svgBlade(58, 68, 30, 16, 5, 10, "#7c6a49") +
-        svgBlade(52, 82, 150, 15, 5, 9, "#5f5238") +
-        svgBlade(50, 98, 40, 14, 5, 9, "#6d5c40")
-      );
+      const bark = "#7a6a4e";
+      const barkDark = "#5d5039";
+      const leafA = "#8a7550";
+      const leafB = "#6a5940";
+      const trunk =
+        `<path d="M 50 116 Q 45 92 54 70 Q 60 50 51 32" stroke="${bark}" stroke-width="9" fill="none" stroke-linecap="round"/>`;
+      const branches =
+        `<path d="M 53 72 Q 38 66 28 52" stroke="${barkDark}" stroke-width="5.5" fill="none" stroke-linecap="round"/>` +
+        `<path d="M 57 56 Q 72 52 80 39" stroke="${barkDark}" stroke-width="5.5" fill="none" stroke-linecap="round"/>` +
+        `<path d="M 52 90 Q 66 86 73 76" stroke="${barkDark}" stroke-width="4.5" fill="none" stroke-linecap="round"/>`;
+      const leaves =
+        svgBlade(28, 52, 105, 19, 6.5, 13, leafA) +
+        svgBlade(80, 39, 72, 19, 6.5, 13, leafB) +
+        svgBlade(73, 76, 84, 16, 5.5, 11, leafA) +
+        svgBlade(51, 32, 96, 17, 6, 11, leafB);
+      return trunk + branches + leaves;
     },
   };
 

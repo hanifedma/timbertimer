@@ -120,7 +120,7 @@ select,
   border-radius: var(--radius);
   color: var(--accent-ink);
   background: var(--accent);
-  font-weight: 800;
+  font-weight: 600;
   text-decoration: none;
   transform: translateY(-160%);
   transition: transform 160ms ease;
@@ -311,17 +311,24 @@ button:disabled {
 .panel-kicker {
   color: var(--muted);
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
+/* Restrained weight scale: 400 body, 500 meta, 600 emphasis/UI, 700 numerals.
+   Headings and <strong> would otherwise inherit the browser's heavier bold. */
 h1,
 h2,
 h3 {
   margin: 6px 0 0;
   letter-spacing: 0;
   line-height: 1.04;
+  font-weight: 600;
+}
+
+strong {
+  font-weight: 600;
 }
 
 h1 {
@@ -353,7 +360,7 @@ h3 {
 .search-field>span {
   color: var(--muted);
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 input,
@@ -408,7 +415,7 @@ button:focus-visible {
 
 .pill-button {
   padding: 0 10px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .pill-button.is-selected {
@@ -432,7 +439,7 @@ button:focus-visible {
   overflow: visible;
   color: var(--muted);
   font-size: 0.74rem;
-  font-weight: 800;
+  font-weight: 600;
   text-overflow: clip;
   white-space: nowrap;
 }
@@ -489,7 +496,7 @@ button:focus-visible {
 .timer-meta {
   color: var(--soft);
   font-size: 0.84rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .growth-stage {
@@ -502,6 +509,11 @@ button:focus-visible {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface-2);
+}
+
+/* Rest gets a shorter stage — the wilted tree that creeps up while you idle. */
+.rest-stage {
+  min-height: 132px;
 }
 
 /* Gentle neutral terrain — suggestion of ground, not a colour block. */
@@ -602,7 +614,7 @@ button:focus-visible {
   position: relative;
   font-variant-numeric: tabular-nums;
   font-size: 5.6rem;
-  font-weight: 850;
+  font-weight: 700;
   line-height: 0.96;
   text-align: center;
   z-index: 1;
@@ -627,7 +639,7 @@ button:focus-visible {
   margin-top: 8px;
   font-variant-numeric: tabular-nums;
   font-size: 2.8rem;
-  font-weight: 850;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -639,7 +651,7 @@ button:focus-visible {
   min-height: var(--control);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .primary-button,
@@ -671,7 +683,7 @@ button:focus-visible {
   border-radius: var(--radius);
   color: #1f1f1f;
   background: #ffffff;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .google-g {
@@ -784,7 +796,7 @@ svg {
   text-align: center;
   color: var(--muted);
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .note-item {
@@ -912,7 +924,7 @@ svg {
   margin: 5px 0 0;
   color: var(--muted);
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 
@@ -978,7 +990,7 @@ svg {
   color: var(--ink);
   background: var(--fill-2);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .week-forest {
@@ -1007,7 +1019,7 @@ svg {
   min-height: 108px;
   color: var(--muted);
   font-size: 0.84rem;
-  font-weight: 800;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -1074,7 +1086,7 @@ svg {
   color: var(--ink);
   background: var(--surface-2);
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 600;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1210,7 +1222,7 @@ svg {
   color: var(--ink);
   background: var(--fill-2);
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .record-actions {
@@ -1255,7 +1267,7 @@ svg {
   color: var(--accent);
   background: var(--fill-1);
   font-size: 0.76rem;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .account-status {
@@ -1607,7 +1619,7 @@ svg {
   width: 34px;
   color: var(--soft);
   font-size: 0.78rem;
-  font-weight: 700;
+  font-weight: 500;
   text-align: right;
   white-space: nowrap;
 }
