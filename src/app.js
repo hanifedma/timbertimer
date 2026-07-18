@@ -82,6 +82,7 @@
     "grove.tree_one": { en: "1 tree", ko: "1그루" },
     "grove.trees": { en: "{n} trees", ko: "{n}그루" },
     "grove.focused": { en: "{time} focused", ko: "{time} 집중" },
+    "grove.rested": { en: "{time} rested", ko: "{time} 휴식" },
     "filter.all": { en: "All", ko: "전체" },
     "filter.completed": { en: "Completed", ko: "완료" },
     "filter.abandoned": { en: "Abandoned", ko: "중단" },
@@ -255,6 +256,7 @@
     weekRange: document.getElementById("weekRange"),
     weekTreeCount: document.getElementById("weekTreeCount"),
     weekFocusTime: document.getElementById("weekFocusTime"),
+    weekRestTime: document.getElementById("weekRestTime"),
     weekForest: document.getElementById("weekForest"),
     treePicker: document.getElementById("treePicker"),
     notesList: document.getElementById("notesList"),
@@ -1347,12 +1349,15 @@
   }
 
   function renderStats() {
-    const completed = state.sessions.filter((record) => record.status === "completed");
+    // Focus stats count focus sessions only — rests are excluded.
+    const focus = state.sessions.filter(
+      (record) => record.status === "completed" && !isRestRecord(record)
+    );
     const today = localDateKey(new Date());
-    const todayMinutes = completed
+    const todayMinutes = focus
       .filter((record) => localDateKey(record.ended_at || record.started_at) === today)
       .reduce((sum, record) => sum + Number(record.actual_minutes || 0), 0);
-    const totalMinutes = completed.reduce((sum, record) => sum + Number(record.actual_minutes || 0), 0);
+    const totalMinutes = focus.reduce((sum, record) => sum + Number(record.actual_minutes || 0), 0);
 
     els.todayStat.textContent = formatMinutes(todayMinutes);
     els.totalStat.textContent = formatMinutes(totalMinutes);
@@ -1390,12 +1395,17 @@
         return record.status === "completed" && plantedAt >= start && plantedAt < end;
       })
       .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime());
-    const totalMinutes = completed.reduce((sum, record) => sum + Number(record.actual_minutes || 0), 0);
+    const minutesOf = (records) =>
+      records.reduce((sum, record) => sum + Number(record.actual_minutes || 0), 0);
+    const focusMinutes = minutesOf(completed.filter((r) => !isRestRecord(r)));
+    const restMinutes = minutesOf(completed.filter(isRestRecord));
 
     els.grovePanelKicker.textContent = kicker;
     els.weekRange.textContent = rangeText;
     els.weekTreeCount.textContent = t(completed.length === 1 ? "grove.tree_one" : "grove.trees", { n: completed.length });
-    els.weekFocusTime.textContent = t("grove.focused", { time: formatMinutes(totalMinutes) });
+    els.weekFocusTime.textContent = t("grove.focused", { time: formatMinutes(focusMinutes) });
+    els.weekRestTime.textContent = t("grove.rested", { time: formatMinutes(restMinutes) });
+    els.weekRestTime.hidden = restMinutes === 0;
 
     els.groveTodayButton.classList.toggle("is-selected", view === "today");
     els.groveWeekButton.classList.toggle("is-selected", view === "week");
