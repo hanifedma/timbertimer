@@ -1873,7 +1873,9 @@
 
   function hydrateSessionName() {
     const savedTitle = localStorage.getItem(STORAGE_SESSION_NAME);
-    const latestTitle = sortedSessions()[0] ? sortedSessions()[0].title : "Deep focus";
+    // Skip rests: "Rest" is a record but never a session name you'd focus under.
+    const latestFocus = sortedSessions().find((record) => !isRestRecord(record));
+    const latestTitle = latestFocus ? latestFocus.title : "Deep focus";
     els.sessionTitle.value = savedTitle || latestTitle;
     rememberSessionName(els.sessionTitle.value);
     state.selectedTreeId = resolveTreeForName(els.sessionTitle.value);
