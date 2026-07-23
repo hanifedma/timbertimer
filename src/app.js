@@ -771,13 +771,17 @@
     if (event.button > 0) return; // primary button / touch / pen only
     event.preventDefault();       // suppress text selection and the native menu
 
-    const handle = event.currentTarget;
     const list = els.notesList;
-    handle.setPointerCapture(event.pointerId);
+    const orderBefore = noteOrderFromDom();
     li.classList.add("is-dragging");
     document.body.classList.add("is-reordering");
 
+    // Listeners go on the document, not the handle: reordering moves the row
+    // (and the handle inside it) in the DOM, which drops pointer capture, so a
+    // handle-bound listener would stop receiving moves after the first step.
     const onMove = (moveEvent) => {
+      if (moveEvent.pointerId !== event.pointerId) return;
+      moveEvent.preventDefault();
       const others = Array.from(list.querySelectorAll(".note-item")).filter((el) => el !== li);
       const after = others.find((el) => {
         const rect = el.getBoundingClientRect();
@@ -788,27 +792,30 @@
       else list.appendChild(li);
     };
 
-    const onEnd = () => {
-      handle.removeEventListener("pointermove", onMove);
-      handle.removeEventListener("pointerup", onEnd);
-      handle.removeEventListener("pointercancel", onEnd);
-      if (handle.hasPointerCapture(event.pointerId)) {
-        handle.releasePointerCapture(event.pointerId);
-      }
+    const onEnd = (endEvent) => {
+      if (endEvent && endEvent.pointerId !== event.pointerId) return;
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onEnd);
+      document.removeEventListener("pointercancel", onEnd);
       li.classList.remove("is-dragging");
       document.body.classList.remove("is-reordering");
-      commitNoteOrderFromDom();
+      // Clicking the handle without moving is not a reorder; skip the write.
+      if (noteOrderFromDom().join() !== orderBefore.join()) commitNoteOrderFromDom();
     };
 
-    handle.addEventListener("pointermove", onMove);
-    handle.addEventListener("pointerup", onEnd);
-    handle.addEventListener("pointercancel", onEnd);
+    document.addEventListener("pointermove", onMove, { passive: false });
+    document.addEventListener("pointerup", onEnd);
+    document.addEventListener("pointercancel", onEnd);
+  }
+
+  function noteOrderFromDom() {
+    return Array.from(els.notesList.querySelectorAll(".note-item"))
+      .map((el) => el.dataset.noteId);
   }
 
   // Read the order back off the DOM, then store and repaint.
   function commitNoteOrderFromDom() {
-    const ids = Array.from(els.notesList.querySelectorAll(".note-item"))
-      .map((el) => el.dataset.noteId);
+    const ids = noteOrderFromDom();
     const byId = new Map(state.notes.map((n) => [n.id, n]));
     const seen = new Set(ids);
     state.notes = [
