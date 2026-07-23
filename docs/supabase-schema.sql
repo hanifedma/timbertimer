@@ -193,6 +193,14 @@ create table if not exists public.notes (
   updated_at timestamptz not null default now()
 );
 
+-- Migration: manual to-do ordering, synced across devices.
+-- Safe to re-run; run this if the notes table already exists.
+alter table public.notes
+  add column if not exists sort_order integer not null default 0;
+
+create index if not exists notes_user_sort_idx
+  on public.notes (user_id, sort_order);
+
 create index if not exists notes_user_created_idx
   on public.notes (user_id, created_at desc);
 

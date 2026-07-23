@@ -220,8 +220,6 @@
   // shows a translated label instead.
   const REST_RECORD_TITLE = "Rest";
 
-  let dragNoteId = null;
-
   const els = {
     modeLabel: document.getElementById("modeLabel"),
     focusForm: document.getElementById("focusForm"),
@@ -332,6 +330,9 @@
     toastId: null,
     lastCloudTimerSyncAt: 0,
     lastCloudNotesSyncAt: 0,
+    // Set if the notes table predates the sort_order column, so ordering
+    // gracefully falls back to this device's saved order.
+    notesSortColumnMissing: false,
     cloudTimerSyncing: false,
     timerCompleting: false,
     activeTimerSyncWarningShown: false,
@@ -571,14 +572,18 @@
 
   async function loadNotes() {
     if (canUseCloud()) {
-      const { data, error } = await state.supabase
-        .from("notes")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (!error) { state.notes = applyStoredNotesOrder(data || []); return; }
+      const { data, error } = await fetchCloudNotes();
+      if (!error) {
+        // The cloud order is authoritative when signed in; only fall back to
+        // this device's saved order if the sort column isn't there yet.
+        state.notes = state.notesSortColumnMissing
+          ? applyStoredNotesOrder(data || [])
+          : (data || []);
+        return;
+      }
       console.warn(error);
     }
-    state.notes = loadLocalNotes();
+    state.notes = applyStoredNotesOrder(loadLocalNotes());
   }
 
   function loadLocalNotes() {
@@ -608,16 +613,59 @@
     }
   }
 
+  // Fetch notes in their saved order. `sort_order` is a newer column, so fall
+  // back to created_at if the project's SQL hasn't been migrated yet.
+  async function fetchCloudNotes() {
+    let result = await state.supabase
+      .from("notes")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false });
+
+    if (result.error) {
+      state.notesSortColumnMissing = true;
+      result = await state.supabase
+        .from("notes")
+        .select("*")
+        .order("created_at", { ascending: false });
+    }
+    return result;
+  }
+
+  // Write the whole list back with its position, so every signed-in device
+  // shows the same order. Upsert also inserts notes that aren't saved yet.
+  async function syncCloudNotes() {
+    if (!canUseCloud()) return;
+
+    const base = state.notes.map((note) => ({
+      id: note.id,
+      user_id: state.user.id,
+      text: note.text,
+      done: note.done,
+      created_at: note.created_at,
+      updated_at: note.updated_at || new Date().toISOString(),
+    }));
+    const withOrder = base.map((row, index) => ({ ...row, sort_order: index }));
+
+    let { error } = await state.supabase.from("notes").upsert(withOrder);
+    if (error) {
+      // Most likely the sort_order column is missing; still save the notes.
+      state.notesSortColumnMissing = true;
+      ({ error } = await state.supabase.from("notes").upsert(base));
+    }
+    if (error) console.warn(error);
+  }
+
   async function addNote(text) {
     const now = new Date().toISOString();
     const note = { id: createId(), text, done: false, created_at: now, updated_at: now };
     state.notes.unshift(note);
     if (canUseCloud()) {
-      const { error } = await state.supabase.from("notes").insert({ ...note, user_id: state.user.id });
-      if (error) console.warn(error);
+      await syncCloudNotes(); // inserts the note and renumbers positions
     } else {
       saveLocalNotes();
     }
+    saveNotesOrder();
     renderNotes();
   }
 
@@ -649,15 +697,14 @@
   async function refreshCloudNotes() {
     if (!canUseCloud()) return;
     state.lastCloudNotesSyncAt = Date.now();
-    const { data, error } = await state.supabase
-      .from("notes")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const { data, error } = await fetchCloudNotes();
     if (error || !data) return;
-    const reordered = applyStoredNotesOrder(data);
-    const sig = (notes) => JSON.stringify(notes.map((n) => ({ id: n.id, text: n.text, done: n.done, updated_at: n.updated_at })));
-    if (sig(reordered) !== sig(state.notes)) {
-      state.notes = reordered;
+    const incoming = state.notesSortColumnMissing ? applyStoredNotesOrder(data) : data;
+    // Compare ids in order too, so a reorder made on another device lands here.
+    const sig = (notes) =>
+      JSON.stringify(notes.map((n) => ({ id: n.id, text: n.text, done: n.done, updated_at: n.updated_at })));
+    if (sig(incoming) !== sig(state.notes)) {
+      state.notes = incoming;
       renderNotes();
     }
   }
@@ -685,7 +732,6 @@
   function createNoteEl(note) {
     const li = document.createElement("li");
     li.className = "note-item" + (note.done ? " is-done" : "");
-    li.draggable = true;
     li.dataset.noteId = note.id;
 
     const handle = document.createElement("span");
@@ -711,55 +757,75 @@
     delBtn.innerHTML = '<i data-lucide="x"></i>';
     delBtn.addEventListener("click", () => deleteNote(note.id));
 
-    li.addEventListener("dragstart", (e) => {
-      dragNoteId = note.id;
-      e.dataTransfer.effectAllowed = "move";
-      requestAnimationFrame(() => li.classList.add("is-dragging"));
-    });
-
-    li.addEventListener("dragend", () => {
-      dragNoteId = null;
-      li.classList.remove("is-dragging");
-      els.notesList.querySelectorAll(".note-item").forEach((el) => {
-        el.classList.remove("drag-over-top", "drag-over-bottom");
-      });
-    });
-
-    li.addEventListener("dragover", (e) => {
-      if (!dragNoteId || dragNoteId === note.id) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      const mid = li.getBoundingClientRect().top + li.offsetHeight / 2;
-      els.notesList.querySelectorAll(".note-item").forEach((el) => {
-        el.classList.remove("drag-over-top", "drag-over-bottom");
-      });
-      li.classList.add(e.clientY < mid ? "drag-over-top" : "drag-over-bottom");
-    });
-
-    li.addEventListener("dragleave", (e) => {
-      if (!li.contains(e.relatedTarget)) {
-        li.classList.remove("drag-over-top", "drag-over-bottom");
-      }
-    });
-
-    li.addEventListener("drop", (e) => {
-      if (!dragNoteId || dragNoteId === note.id) return;
-      e.preventDefault();
-      li.classList.remove("drag-over-top", "drag-over-bottom");
-      const fromIdx = state.notes.findIndex((n) => n.id === dragNoteId);
-      const toIdx = state.notes.findIndex((n) => n.id === note.id);
-      if (fromIdx === -1 || toIdx === -1) return;
-      const mid = li.getBoundingClientRect().top + li.offsetHeight / 2;
-      const insertBefore = e.clientY < mid;
-      const [moved] = state.notes.splice(fromIdx, 1);
-      const newTo = state.notes.findIndex((n) => n.id === note.id);
-      state.notes.splice(insertBefore ? newTo : newTo + 1, 0, moved);
-      saveNotesOrder();
-      renderNotes();
-    });
+    // Pointer events rather than HTML5 drag-and-drop: on Android (notably
+    // tablets) a long press on a draggable element opens the text
+    // selection / "copy" menu instead of starting a drag.
+    handle.addEventListener("pointerdown", (event) => startNoteDrag(event, li));
+    handle.addEventListener("contextmenu", (event) => event.preventDefault());
 
     li.append(handle, checkbox, textEl, delBtn);
     return li;
+  }
+
+  function startNoteDrag(event, li) {
+    if (event.button > 0) return; // primary button / touch / pen only
+    event.preventDefault();       // suppress text selection and the native menu
+
+    const handle = event.currentTarget;
+    const list = els.notesList;
+    handle.setPointerCapture(event.pointerId);
+    li.classList.add("is-dragging");
+    document.body.classList.add("is-reordering");
+
+    const onMove = (moveEvent) => {
+      const others = Array.from(list.querySelectorAll(".note-item")).filter((el) => el !== li);
+      const after = others.find((el) => {
+        const rect = el.getBoundingClientRect();
+        return moveEvent.clientY < rect.top + rect.height / 2;
+      });
+      // Reorder live so the row follows the finger/cursor.
+      if (after) list.insertBefore(li, after);
+      else list.appendChild(li);
+    };
+
+    const onEnd = () => {
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onEnd);
+      handle.removeEventListener("pointercancel", onEnd);
+      if (handle.hasPointerCapture(event.pointerId)) {
+        handle.releasePointerCapture(event.pointerId);
+      }
+      li.classList.remove("is-dragging");
+      document.body.classList.remove("is-reordering");
+      commitNoteOrderFromDom();
+    };
+
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onEnd);
+    handle.addEventListener("pointercancel", onEnd);
+  }
+
+  // Read the order back off the DOM, then store and repaint.
+  function commitNoteOrderFromDom() {
+    const ids = Array.from(els.notesList.querySelectorAll(".note-item"))
+      .map((el) => el.dataset.noteId);
+    const byId = new Map(state.notes.map((n) => [n.id, n]));
+    const seen = new Set(ids);
+    state.notes = [
+      ...ids.map((id) => byId.get(id)).filter(Boolean),
+      ...state.notes.filter((n) => !seen.has(n.id)),
+    ];
+    persistNotesOrder();
+    renderNotes();
+  }
+
+  function persistNotesOrder() {
+    saveNotesOrder(); // per-device fallback, also used when signed out
+    // Local notes live in their own array, so the new order must be written
+    // there too or it is lost on reload. Signed in, the order goes to the
+    // cloud so other devices pick it up.
+    if (canUseCloud()) syncCloudNotes();
+    else saveLocalNotes();
   }
 
   async function createRecord(record) {

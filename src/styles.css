@@ -880,20 +880,35 @@ svg {
   color: var(--danger);
 }
 
+/* touch-action/user-select/touch-callout together stop Android from turning a
+   long press on the handle into text selection or a "copy" menu, so the
+   pointer drag can start instead. */
 .drag-handle {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
+  width: 26px;
+  align-self: stretch;
   color: var(--muted);
   opacity: 0.35;
   cursor: grab;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .drag-handle:active {
   cursor: grabbing;
+  opacity: 0.8;
+}
+
+/* While reordering, keep the whole page from selecting text under the finger. */
+body.is-reordering,
+body.is-reordering .note-item {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .note-item:hover .drag-handle {
@@ -903,14 +918,6 @@ svg {
 .note-item.is-dragging {
   opacity: 0.35;
   border-style: dashed;
-}
-
-.note-item.drag-over-top {
-  border-top: 2px solid var(--accent);
-}
-
-.note-item.drag-over-bottom {
-  border-bottom: 2px solid var(--accent);
 }
 
 .notes-form {
