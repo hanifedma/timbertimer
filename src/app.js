@@ -336,6 +336,12 @@
     cloudTimerSyncing: false,
     timerCompleting: false,
     activeTimerSyncWarningShown: false,
+    // Realtime subscription. `realtimeLive` gates how hard the poll below has
+    // to work: with a live socket it becomes a safety net rather than the
+    // mechanism, but a project whose tables are not published for replication
+    // never gets one, so polling must keep working untouched.
+    realtimeChannel: null,
+    realtimeLive: false,
   };
 
   init();
@@ -530,6 +536,7 @@
       const { data } = await state.supabase.auth.getSession();
       state.user = data.session ? data.session.user : null;
       state.dataMode = state.user ? "cloud" : "local";
+      syncRealtime();
 
       state.supabase.auth.onAuthStateChange(async (event, session) => {
         // init() already handles the very first load; only react to real
@@ -537,6 +544,7 @@
         if (event === "INITIAL_SESSION") return;
         state.user = session ? session.user : null;
         state.dataMode = state.user ? "cloud" : "local";
+        syncRealtime();
         await reloadState();
       });
     } catch (error) {
@@ -546,6 +554,83 @@
       showToast(t("toast.cloud_load_fail"));
       console.warn(error);
       renderAccount();
+    }
+  }
+
+  // --- Realtime ------------------------------------------------------------
+  // Postgres pushes each change straight to the browser, so a timer started on
+  // the phone appears here at once instead of at the next poll. Nothing else
+  // changes: a message only decides *when* the existing reload paths run, never
+  // what they do, so there is still one way for data to reach the UI.
+
+  function syncRealtime() {
+    if (state.user) subscribeRealtime();
+    else unsubscribeRealtime();
+  }
+
+  function subscribeRealtime() {
+    if (!state.supabase || !state.user || state.realtimeChannel) return;
+
+    const userFilter = `user_id=eq.${state.user.id}`;
+    // Realtime applies row level security using the socket's own token, so it
+    // has to be handed the signed-in session or every change is filtered out.
+    try {
+      state.supabase.realtime.setAuth();
+    } catch (error) {
+      console.warn(error);
+    }
+
+    const channel = state.supabase.channel("timbertimer-sync");
+    const onTable = (table, handler) => {
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table, filter: userFilter },
+        handler
+      );
+    };
+
+    // Each table reloads only what it affects, rather than everything.
+    onTable("focus_sessions", async () => {
+      await loadSessions();
+      renderAll();
+    });
+    onTable("active_focus_timers", () => refreshCloudActiveTimer());
+    onTable("active_rest_timers", () => refreshCloudRestTimer());
+    onTable("notes", () => refreshCloudNotes());
+
+    state.realtimeChannel = channel;
+
+    channel.subscribe((status) => {
+      const live = status === "SUBSCRIBED";
+      const wasLive = state.realtimeLive;
+      state.realtimeLive = live;
+
+      if (live && !wasLive) {
+        // Anything that changed while the socket was down was never delivered,
+        // so a fresh subscription reconciles once instead of waiting for the
+        // next edit to notice.
+        reloadState();
+        return;
+      }
+
+      // CHANNEL_ERROR is what a project whose tables are not in the
+      // supabase_realtime publication reports. That is a supported setup, not a
+      // failure — the poll below simply stays at its normal interval.
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        state.realtimeLive = false;
+      }
+    });
+  }
+
+  function unsubscribeRealtime() {
+    state.realtimeLive = false;
+    const channel = state.realtimeChannel;
+    if (!channel) return;
+    state.realtimeChannel = null;
+    try {
+      state.supabase.removeChannel(channel);
+    } catch (error) {
+      console.warn(error);
     }
   }
 
@@ -1137,12 +1222,16 @@
         }
       }
 
-      if (canUseCloud() && Date.now() - state.lastCloudTimerSyncAt > 15000) {
+      // With Realtime connected this poll is only a backstop for a socket that
+      // died without saying so, so it can run far less often.
+      const syncInterval = state.realtimeLive ? 60000 : 15000;
+
+      if (canUseCloud() && Date.now() - state.lastCloudTimerSyncAt > syncInterval) {
         refreshCloudActiveTimer();
         refreshCloudRestTimer();
       }
 
-      if (canUseCloud() && Date.now() - state.lastCloudNotesSyncAt > 15000) {
+      if (canUseCloud() && Date.now() - state.lastCloudNotesSyncAt > syncInterval) {
         refreshCloudNotes();
       }
 

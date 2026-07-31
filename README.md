@@ -17,6 +17,7 @@ No build step — it's a static site (HTML/CSS/vanilla JS) that also works offli
 - **Sound cues** with an adjustable volume, and remaining time shown in the browser tab.
 - **Light / dark themes** (dark by default), remembered per device.
 - **Works offline**, installable, cross‑device active‑timer + records sync for signed‑in users.
+- **Live sync** over Supabase Realtime — a session started on another device shows up here at once, with polling kept as a fallback.
 
 ## Run locally
 
@@ -46,6 +47,19 @@ window.TIMBERTIMER_SUPABASE = {
 ```
 
 The anon/publishable key is safe in a browser app: the SQL policies check `auth.uid() = user_id`, so each signed‑in user can only read and write their own rows.
+
+### Live updates (optional, recommended)
+
+Supabase only streams changes for tables that are published for replication, and none are by default. In the **SQL Editor**, run:
+
+```sql
+alter publication supabase_realtime add table public.focus_sessions;
+alter publication supabase_realtime add table public.active_focus_timers;
+alter publication supabase_realtime add table public.active_rest_timers;
+alter publication supabase_realtime add table public.notes;
+```
+
+With this, changes made on another device arrive immediately. Without it everything still syncs — the app falls back to polling every 15 seconds — so this is safe to skip and safe to add later.
 
 ## Google login
 
