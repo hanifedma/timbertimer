@@ -1441,18 +1441,18 @@ body.is-reordering .note-item {
     gap: 6px;
   }
 
+  /* Compact, icon-only nav on phones. With labels the buttons refuse to
+     shrink and the row overflows, leaving ugly "En…" / "로…" fragments, so
+     show just the emoji as equal square buttons that always fit one row. */
   .top-actions .icon-button {
-    width: auto;
-    min-width: 84px;
-    padding: 0 9px;
+    width: var(--control);
+    min-width: 0;
+    padding: 0;
+    gap: 0;
   }
 
-  .top-actions span {
-    display: inline;
-    overflow: hidden;
-    max-width: 62px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .top-actions .icon-button > :not(.btn-emoji) {
+    display: none;
   }
 
   .workspace {
@@ -1522,26 +1522,6 @@ body.is-reordering .note-item {
 }
 
 @media (max-width: 430px) {
-  .topbar-inner {
-    align-items: stretch;
-    flex-direction: column;
-    padding-top: 12px;
-    padding-bottom: 12px;
-  }
-
-  .top-actions {
-    width: 100%;
-  }
-
-  .top-actions .icon-button {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-  .top-actions span {
-    max-width: none;
-  }
-
   .brand strong {
     max-width: 190px;
   }
