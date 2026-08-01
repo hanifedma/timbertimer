@@ -330,6 +330,10 @@
     toastId: null,
     lastCloudTimerSyncAt: 0,
     lastCloudNotesSyncAt: 0,
+    lastCloudSessionsSyncAt: 0,
+    // Signature of the last records fetch, so the poll re-renders only on a
+    // real change (a delete on another device included) instead of every tick.
+    lastSessionsSig: null,
     // Set if the notes table predates the sort_order column, so ordering
     // gracefully falls back to this device's saved order.
     notesSortColumnMissing: false,
@@ -643,6 +647,7 @@
 
       if (!error) {
         state.sessions = data.map(normalizeRecord);
+        state.lastSessionsSig = sessionsSig(data);
         state.dataMode = "cloud";
         return;
       }
@@ -653,6 +658,32 @@
     }
 
     state.sessions = loadLocalSessions();
+  }
+
+  // Cheap fingerprint of a records fetch: ids plus their update times, so any
+  // insert, edit or delete on another device changes it.
+  function sessionsSig(rows) {
+    return rows.map((r) => `${r.id}:${r.updated_at}`).join("|");
+  }
+
+  // Poll backstop for records. Realtime pushes inserts and updates, but a
+  // DELETE on another device is dropped unless the table uses REPLICA IDENTITY
+  // FULL (its payload otherwise lacks user_id, so the row filter never matches).
+  // Re-fetching here keeps deletes in sync even when that push never arrives.
+  async function refreshCloudSessions() {
+    if (!canUseCloud()) return;
+    state.lastCloudSessionsSyncAt = Date.now();
+    const { data, error } = await state.supabase
+      .from("focus_sessions")
+      .select("*")
+      .order("started_at", { ascending: false });
+    if (error || !data) return;
+    const sig = sessionsSig(data);
+    if (sig === state.lastSessionsSig) return;
+    state.lastSessionsSig = sig;
+    state.sessions = data.map(normalizeRecord);
+    state.dataMode = "cloud";
+    renderAll();
   }
 
   async function loadNotes() {
@@ -1233,6 +1264,10 @@
 
       if (canUseCloud() && Date.now() - state.lastCloudNotesSyncAt > syncInterval) {
         refreshCloudNotes();
+      }
+
+      if (canUseCloud() && Date.now() - state.lastCloudSessionsSyncAt > syncInterval) {
+        refreshCloudSessions();
       }
 
       if (state.timer) {

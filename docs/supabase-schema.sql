@@ -233,3 +233,12 @@ create trigger notes_set_updated_at
   before update on public.notes
   for each row
   execute function public.set_updated_at();
+
+-- Realtime delete sync.
+-- A DELETE event only carries the row's primary key by default, so a Realtime
+-- subscription filtered by user_id never matches it and the delete is dropped
+-- (a record removed on one device would not disappear on the others until a
+-- refresh). REPLICA IDENTITY FULL includes the whole old row, so the filter
+-- matches and deletes propagate immediately. Safe to re-run.
+alter table public.focus_sessions replica identity full;
+alter table public.notes replica identity full;
