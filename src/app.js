@@ -13,7 +13,50 @@
   const STORAGE_THEME = "timbertimer:theme:v1";
   const THEME_COLORS = { dark: "#000000", light: "#f2f2f7" };
   const STORAGE_LANG = "timbertimer:lang:v1";
+  const STORAGE_PROJECTS = "timbertimer:projects:v1";
+  const STORAGE_SELECTED_PROJECT = "timbertimer:project:v1";
+  const STORAGE_TASK_PROJECT = "timbertimer:task-project:v1";
+  const STORAGE_CAL_DAYS = "timbertimer:cal-days:v1";
+  const STORAGE_CAL_ZOOM = "timbertimer:cal-zoom:v1";
   const DEFAULT_DURATION = 25;
+  // A record can now span at most one day: the calendar edits real start/end
+  // times, and the database check constraints allow the same ceiling.
+  const MAX_RECORD_MINUTES = 1440;
+
+  // --- Projects ------------------------------------------------------------
+  // Every record belongs to a project, and the project owns both the colour and
+  // the tree species its records are drawn with. Two projects exist from the
+  // start and cannot be deleted: the default focus project, and Rest.
+  const DEFAULT_PROJECT_ID = "focus";
+  const REST_PROJECT_ID = "rest";
+  const BUILTIN_PROJECT_IDS = [DEFAULT_PROJECT_ID, REST_PROJECT_ID];
+  // Records made before projects existed are mapped to a project derived from
+  // their title, using this id prefix, so history keeps working untouched.
+  const LEGACY_PROJECT_PREFIX = "t:";
+
+  // A Toggl-like picker: distinct at a glance, and readable on both themes.
+  const PROJECT_COLORS = [
+    "#9e5bd9", "#0b83d9", "#d94182", "#e36a00",
+    "#2da608", "#06a893", "#465bb3", "#c9806b",
+    "#bf7000", "#c7af14", "#566614", "#d92b2b",
+    "#e57cd8", "#3866a3", "#a5449e", "#525266",
+  ];
+  const REST_PROJECT_COLOR = "#a1866f";
+  const MISSING_PROJECT_COLOR = "#8e8e93";
+
+  // Calendar zoom is stored in pixels per hour.
+  const CAL_MIN_ZOOM = 26;
+  const CAL_MAX_ZOOM = 240;
+  const CAL_DEFAULT_ZOOM = 64;
+  const CAL_ZOOM_STEP = 1.3;
+  const CAL_DEFAULT_DAYS = 3;
+  // Dragging on the grid snaps to five minutes, fine enough to place a record
+  // exactly without having to fight the pointer.
+  const CAL_SNAP_MINUTES = 5;
+  const CAL_MIN_MINUTES = 5;
+  const CAL_DRAG_THRESHOLD = 4;
+  // A finger has to rest briefly before it drags, so a swipe still scrolls.
+  const CAL_LONG_PRESS_MS = 320;
 
   // --- i18n (English default, Korean opt-in) ------------------------------
   const TR = {
@@ -28,7 +71,7 @@
     "app.slogan": { en: "Forget all else, feel the timber grow.", ko: "모든 걸 잊고, 나무가 자라는 걸 느껴보세요." },
     "mode.countdown": { en: "Countdown", ko: "카운트다운" },
     "mode.stopwatch": { en: "Stopwatch", ko: "스톱워치" },
-    "field.session": { en: "Session", ko: "세션" },
+    "field.session": { en: "Task", ko: "작업" },
     "field.duration": { en: "Duration", ko: "시간" },
     "field.custom": { en: "Custom", ko: "직접 입력" },
     "field.tree": { en: "Tree", ko: "나무" },
@@ -110,6 +153,7 @@
     "dialog.record": { en: "Record", ko: "기록" },
     "dialog.edit_session": { en: "Edit session", ko: "세션 편집" },
     "dialog.add_session": { en: "Add session", ko: "세션 추가" },
+    "dialog.end_before_start": { en: "The end time is before the start time.", ko: "종료 시각이 시작 시각보다 빨라요." },
     "footer.tagline": { en: "🌲 <strong>TimberTimer</strong> — grow a forest while you focus.", ko: "🌲 <strong>TimberTimer</strong> — 집중하며 숲을 키워요." },
     "footer.meta": { en: "Your records stay in this browser, or sync privately with Google.", ko: "기록은 이 브라우저에 저장되거나 Google로 비공개 동기화됩니다." },
     "toast.session_started": { en: "Session started.", ko: "세션을 시작했어요." },
@@ -120,6 +164,10 @@
     "toast.record_saved": { en: "Record saved.", ko: "기록을 저장했어요." },
     "toast.record_deleted": { en: "Record deleted.", ko: "기록을 삭제했어요." },
     "toast.signed_out": { en: "Signed out.", ko: "로그아웃했어요." },
+    "toast.google_id_failed": {
+      en: "Google sign-in didn't complete. Try the button below.",
+      ko: "Google 로그인을 마치지 못했어요. 아래 버튼을 사용해 보세요.",
+    },
     "toast.sound_on": { en: "Timer sound on.", ko: "타이머 소리를 켰어요." },
     "toast.sound_off": { en: "Timer sound off.", ko: "타이머 소리를 껐어요." },
     "toast.all_deleted": { en: "All records deleted.", ko: "모든 기록을 삭제했어요." },
@@ -147,6 +195,73 @@
     "tree.kapok": { en: "Kapok tree", ko: "케이폭 나무" },
     "tree.mangrove": { en: "Mangrove tree", ko: "맹그로브 나무" },
     "tree.wilted": { en: "Wilted sprout", ko: "시든 새싹" },
+
+    // Views
+    "view.focus": { en: "Focus", ko: "집중" },
+    "view.calendar": { en: "Calendar", ko: "캘린더" },
+
+    // Projects
+    "field.project": { en: "Project", ko: "프로젝트" },
+    "field.tree_project": { en: "Tree (per project)", ko: "나무 (프로젝트별)" },
+    "field.task_placeholder": { en: "Task name (optional)", ko: "작업 이름 (선택)" },
+    "field.ended": { en: "Ended", ko: "종료 시각" },
+    "project.kicker": { en: "Projects", ko: "프로젝트" },
+    "project.manage": { en: "Manage projects", ko: "프로젝트 관리" },
+    "project.new": { en: "New project", ko: "새 프로젝트" },
+    "project.edit": { en: "Edit project", ko: "프로젝트 편집" },
+    "project.name": { en: "Project name", ko: "프로젝트 이름" },
+    "project.color": { en: "Color", ko: "색상" },
+    "project.delete": { en: "Delete project", ko: "프로젝트 삭제" },
+    "project.default_name": { en: "Focus", ko: "집중" },
+    "project.rest_name": { en: "Rest", ko: "휴식" },
+    "project.none": { en: "No project", ko: "프로젝트 없음" },
+    "project.builtin": { en: "Built-in", ko: "기본" },
+    "project.records": { en: "{n} records", ko: "기록 {n}개" },
+    "project.record_one": { en: "1 record", ko: "기록 1개" },
+    "project.name_taken": { en: "A project with that name already exists.", ko: "같은 이름의 프로젝트가 이미 있어요." },
+    "toast.project_saved": { en: "Project saved.", ko: "프로젝트를 저장했어요." },
+    "toast.project_deleted": { en: "Project deleted.", ko: "프로젝트를 삭제했어요." },
+    "toast.project_builtin": { en: "Built-in projects cannot be deleted.", ko: "기본 프로젝트는 삭제할 수 없어요." },
+    "toast.cloud_projects_fail": { en: "Cloud project sync failed. Saved on this device.", ko: "프로젝트 동기화에 실패했어요. 이 기기에 저장했어요." },
+    "confirm.move_record": {
+      en: 'Move "{title}" here?\n\n{from}\n→  {to}',
+      ko: '"{title}"을(를) 여기로 옮길까요?\n\n{from}\n→  {to}',
+    },
+    "confirm.resize_record": {
+      en: 'Change the time of "{title}"?\n\n{from}\n→  {to}',
+      ko: '"{title}"의 시간을 바꿀까요?\n\n{from}\n→  {to}',
+    },
+    "confirm.delete_project": {
+      en: 'Delete "{name}"? Its {n} records move to "{target}".',
+      ko: '"{name}"을(를) 삭제할까요? 기록 {n}개가 "{target}"(으)로 옮겨져요.',
+    },
+
+    // Project summary
+    "summary.kicker": { en: "Projects", ko: "프로젝트" },
+    "summary.title": { en: "Time by project", ko: "프로젝트별 시간" },
+    "summary.chart_label": { en: "Time by project", ko: "프로젝트별 시간" },
+    "summary.empty": { en: "No time tracked in this period.", ko: "이 기간에 기록된 시간이 없어요." },
+    "summary.projects": { en: "{n} projects", ko: "프로젝트 {n}개" },
+    "summary.project_one": { en: "1 project", ko: "프로젝트 1개" },
+
+    // Calendar
+    "calendar.kicker": { en: "Timeline", ko: "타임라인" },
+    "calendar.title": { en: "Calendar", ko: "캘린더" },
+    "calendar.today": { en: "Today", ko: "오늘" },
+    "calendar.prev": { en: "Previous", ko: "이전" },
+    "calendar.next": { en: "Next", ko: "다음" },
+    "calendar.days_label": { en: "Days", ko: "일수" },
+    "calendar.zoom": { en: "Zoom", ko: "확대/축소" },
+    "calendar.zoom_in": { en: "Zoom in", ko: "확대" },
+    "calendar.zoom_out": { en: "Zoom out", ko: "축소" },
+    "calendar.running": { en: "Running", ko: "진행 중" },
+    "calendar.hint": {
+      en: "Drag empty space to add a record, drag a block to move it, or its edges to change the time. Tap to edit.",
+      ko: "빈 곳을 드래그해 기록을 추가하고, 블록을 드래그해 옮기거나 가장자리로 시간을 바꾸세요. 누르면 편집돼요.",
+    },
+    "grove.prev": { en: "Previous", ko: "이전" },
+    "grove.next": { en: "Next", ko: "다음" },
+    "record.in_progress": { en: "In progress", ko: "진행 중" },
   };
 
   function loadLang() {
@@ -276,6 +391,7 @@
     accountStatus: document.getElementById("accountStatus"),
     authActions: document.getElementById("authActions"),
     googleSignInButton: document.getElementById("googleSignInButton"),
+    googleButtonHolder: document.getElementById("googleButtonHolder"),
     signedInActions: document.getElementById("signedInActions"),
     signOutButton: document.getElementById("signOutButton"),
     recordDialog: document.getElementById("recordDialog"),
@@ -286,10 +402,58 @@
     recordStartedInput: document.getElementById("recordStartedInput"),
     recordStatusInput: document.getElementById("recordStatusInput"),
     recordDurationInput: document.getElementById("recordDurationInput"),
-    recordActualInput: document.getElementById("recordActualInput"),
+    recordEndedInput: document.getElementById("recordEndedInput"),
+    recordProjectInput: document.getElementById("recordProjectInput"),
+    recordProjectDot: document.getElementById("recordProjectDot"),
+    recordDurationHint: document.getElementById("recordDurationHint"),
+    deleteRecordButton: document.getElementById("deleteRecordButton"),
     saveRecordButton: document.getElementById("saveRecordButton"),
-    recordTreeInput: document.getElementById("recordTreeInput"),
     toast: document.getElementById("toast"),
+
+    // Projects
+    projectPicker: document.getElementById("projectPicker"),
+    projectDot: document.getElementById("projectDot"),
+    manageProjectsButton: document.getElementById("manageProjectsButton"),
+    projectsDialog: document.getElementById("projectsDialog"),
+    projectsList: document.getElementById("projectsList"),
+    closeProjectsDialogButton: document.getElementById("closeProjectsDialogButton"),
+    newProjectButton: document.getElementById("newProjectButton"),
+    projectDialog: document.getElementById("projectDialog"),
+    projectForm: document.getElementById("projectForm"),
+    projectDialogTitle: document.getElementById("projectDialogTitle"),
+    projectIdInput: document.getElementById("projectIdInput"),
+    projectNameInput: document.getElementById("projectNameInput"),
+    projectColorGrid: document.getElementById("projectColorGrid"),
+    projectTreeInput: document.getElementById("projectTreeInput"),
+    projectPreviewPlant: document.getElementById("projectPreviewPlant"),
+    projectPreviewName: document.getElementById("projectPreviewName"),
+    saveProjectButton: document.getElementById("saveProjectButton"),
+    deleteProjectButton: document.getElementById("deleteProjectButton"),
+
+    // Project summary
+    summaryTotal: document.getElementById("summaryTotal"),
+    summaryEmpty: document.getElementById("summaryEmpty"),
+    summaryBody: document.querySelector(".summary-body"),
+    projectDonut: document.getElementById("projectDonut"),
+    donutTotal: document.getElementById("donutTotal"),
+    donutCount: document.getElementById("donutCount"),
+    projectLegend: document.getElementById("projectLegend"),
+
+    // Views + calendar
+    viewFocusTab: document.getElementById("viewFocusTab"),
+    viewCalendarTab: document.getElementById("viewCalendarTab"),
+    workspace: document.getElementById("main"),
+    calendarView: document.getElementById("calendarView"),
+    calScroll: document.getElementById("calScroll"),
+    calGrid: document.getElementById("calGrid"),
+    calRange: document.getElementById("calRange"),
+    calPrevButton: document.getElementById("calPrevButton"),
+    calNextButton: document.getElementById("calNextButton"),
+    calTodayButton: document.getElementById("calTodayButton"),
+    calDaysSelect: document.getElementById("calDaysSelect"),
+    calZoomInButton: document.getElementById("calZoomInButton"),
+    calZoomOutButton: document.getElementById("calZoomOutButton"),
+    calAddButton: document.getElementById("calAddButton"),
     modeCountdownButton: document.getElementById("modeCountdownButton"),
     modeStopwatchButton: document.getElementById("modeStopwatchButton"),
     durationField: document.getElementById("durationField"),
@@ -317,12 +481,31 @@
     theme: loadTheme(),
     lang: loadLang(),
     selectedTreeId: "pine",
+    projects: [],
+    selectedProjectId: loadSelectedProjectId(),
+    // Which view is on screen ("timer" or "calendar"), mirrored in the hash.
+    view: "timer",
+    calDays: loadCalDays(),
+    calZoom: loadCalZoom(),
+    calAnchor: startOfDay(new Date()),
+    calMinuteStamp: 0,
+    // Live calendar drag (create / move / resize), and the click it must eat.
+    calDrag: null,
+    calSuppressClick: false,
+    projectsCloudMissing: false,
+    // Google Identity Services: loaded on demand, with the nonce that ties the
+    // token Google hands back to this particular sign-in.
+    gsiPromise: null,
+    googleNonce: null,
+    activeTimerProjectMissing: false,
+    sessionsProjectColumnMissing: false,
     notes: [],
     audioContext: null,
     activeSoundMasters: [],
     finishSoonSoundTimerId: null,
     weekStart: startOfWeek(new Date()),
-    groveView: "week",
+    // Today is the default period for the forest and the project summary.
+    groveView: "today",
     monthStart: startOfMonth(new Date()),
     timer: null,
     restTimer: null,
@@ -360,9 +543,12 @@
     // on "Loading" while the Supabase library downloads from its CDN. The live
     // timer is hydrated later (phase 2) so an expired timer is reconciled and
     // completed exactly once, with the correct local/cloud context.
+    await loadProjects();
     await loadSessions();
+    await reconcileProjects();
     hydrateSessionName();
     await loadNotes();
+    applyRoute();
     renderAll();
     startTicker();
     registerServiceWorker();
@@ -370,15 +556,16 @@
     // Phase 2: bring up cloud, reload from it if signed in, then hydrate timers.
     await initSupabase();
     if (state.user) {
+      await loadProjects();
       await loadSessions();
+      await reconcileProjects();
       await loadNotes();
     }
     await hydrateTimer();
-    if (state.timer?.selectedTreeId) {
-      state.selectedTreeId = state.timer.selectedTreeId;
-    } else {
-      state.selectedTreeId = resolveTreeForName(els.sessionTitle.value);
-    }
+    // The active timer fixes the project (and therefore the tree); otherwise the
+    // picker follows whichever project is selected.
+    if (state.timer?.projectId) state.selectedProjectId = state.timer.projectId;
+    syncSelectedTree();
     await hydrateRestTimer();
     renderAll();
   }
@@ -386,16 +573,17 @@
   // Load every piece of remote/local state and repaint. Shared by startup and
   // by auth changes; only startup also seeds the session-name field.
   async function reloadState({ hydrateName = false } = {}) {
+    await loadProjects();
     await loadSessions();
+    await reconcileProjects();
     if (hydrateName) hydrateSessionName();
     await hydrateTimer();
     // A running timer fixes the species; otherwise re-resolve from the current
     // name so a freshly-loaded (e.g. just-signed-in) history takes effect.
-    if (state.timer?.selectedTreeId) {
-      state.selectedTreeId = state.timer.selectedTreeId;
-    } else {
-      state.selectedTreeId = resolveTreeForName(els.sessionTitle.value);
-    }
+    // The active timer fixes the project (and therefore the tree); otherwise the
+    // picker follows whichever project is selected.
+    if (state.timer?.projectId) state.selectedProjectId = state.timer.projectId;
+    syncSelectedTree();
     await hydrateRestTimer();
     await loadNotes();
     renderAll();
@@ -411,15 +599,35 @@
 
     els.sessionTitle.addEventListener("input", () => {
       rememberSessionName();
-      state.selectedTreeId = resolveTreeForName(els.sessionTitle.value.trim());
-      renderTreePicker();
-      renderTimer();
+      applyProjectForTitle(els.sessionTitle.value);
     });
 
-    els.treePicker.addEventListener("change", () => {
+    // The tree belongs to the project now, so picking one here re-plants every
+    // record of that project.
+    els.treePicker.addEventListener("change", async () => {
       state.selectedTreeId = els.treePicker.value;
-      saveTreePref(els.sessionTitle.value.trim() || "deep focus", state.selectedTreeId);
-      renderTimer();
+      const project = getProject(state.selectedProjectId);
+      if (project.missing) return;
+      await saveProject({ ...project, tree: state.selectedTreeId });
+      renderAll();
+    });
+
+    els.projectPicker.addEventListener("change", () => {
+      setSelectedProject(els.projectPicker.value);
+    });
+
+    els.manageProjectsButton.addEventListener("click", openProjectsDialog);
+    els.closeProjectsDialogButton.addEventListener("click", closeProjectsDialog);
+    els.newProjectButton.addEventListener("click", () => openProjectDialog());
+    els.saveProjectButton.addEventListener("click", saveProjectDialog);
+    els.deleteProjectButton.addEventListener("click", deleteProjectFromDialog);
+    els.projectNameInput.addEventListener("input", onProjectNameInput);
+    els.projectTreeInput.addEventListener("change", () => {
+      state.projectDialogAutoTree = false;
+      renderProjectPreview();
+    });
+    els.projectsDialog.addEventListener("click", (event) => {
+      if (event.target === els.projectsDialog) closeProjectsDialog();
     });
 
     els.durationInput.addEventListener("input", () => {
@@ -464,7 +672,7 @@
       } else {
         state.weekStart = startOfWeek(new Date());
       }
-      renderWeekGrove();
+      renderPeriod();
     });
     els.notesForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -497,9 +705,75 @@
     });
 
     els.addRecordButton.addEventListener("click", () => openRecordDialog());
+    els.calAddButton.addEventListener("click", () => openRecordDialog());
     els.saveRecordButton.addEventListener("click", saveDialogRecord);
+    els.deleteRecordButton.addEventListener("click", deleteDialogRecord);
+    els.recordProjectInput.addEventListener("change", renderRecordDialogProject);
     els.recordTitleInput.addEventListener("input", () => {
-      els.recordTreeInput.value = resolveTreeForName(els.recordTitleInput.value.trim());
+      const id = projectForTitle(els.recordTitleInput.value);
+      if (!id || id === els.recordProjectInput.value) return;
+      els.recordProjectInput.value = id;
+      renderRecordDialogProject();
+    });
+    els.recordStartedInput.addEventListener("change", () => renderRecordDurationHint());
+    els.recordEndedInput.addEventListener("change", () => renderRecordDurationHint());
+
+    // --- Views ---------------------------------------------------------
+    els.viewFocusTab.addEventListener("click", () => setView("timer"));
+    els.viewCalendarTab.addEventListener("click", () => setView("calendar"));
+    window.addEventListener("hashchange", applyRoute);
+
+    // --- Calendar ------------------------------------------------------
+    els.calPrevButton.addEventListener("click", () => shiftCalendar(-1));
+    els.calNextButton.addEventListener("click", () => shiftCalendar(1));
+    els.calTodayButton.addEventListener("click", () => {
+      state.calAnchor = defaultCalendarAnchor();
+      renderCalendar();
+      scrollCalendarToNow();
+    });
+    els.calDaysSelect.addEventListener("change", () => {
+      setCalendarDays(Number(els.calDaysSelect.value));
+    });
+    els.calZoomInButton.addEventListener("click", () => setCalendarZoom(state.calZoom * CAL_ZOOM_STEP));
+    els.calZoomOutButton.addEventListener("click", () => setCalendarZoom(state.calZoom / CAL_ZOOM_STEP));
+
+    // Ctrl/⌘ + wheel zooms, like a desktop calendar; a plain wheel still scrolls.
+    els.calScroll.addEventListener("wheel", (event) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      setCalendarZoom(state.calZoom * (event.deltaY < 0 ? 1.1 : 1 / 1.1));
+    }, { passive: false });
+
+    els.calGrid.addEventListener("pointerdown", onCalendarPointerDown);
+
+    // Non-passive: while a drag is live this is what stops the day from
+    // scrolling out from under the finger.
+    els.calScroll.addEventListener("touchmove", (event) => {
+      if (state.calDrag && state.calDrag.active) event.preventDefault();
+    }, { passive: false });
+
+    els.calGrid.addEventListener("click", (event) => {
+      // The click that ends a drag isn't a click on anything.
+      if (state.calSuppressClick) {
+        state.calSuppressClick = false;
+        return;
+      }
+      const eventNode = event.target.closest(".cal-event");
+      if (eventNode) {
+        // The block for the timer that is still running isn't a record yet, so
+        // it sends you to the timer instead of an editor.
+        if (eventNode.dataset.running === "true") {
+          setView("timer");
+          return;
+        }
+        const record = state.sessions.find((item) => item.id === eventNode.dataset.id);
+        if (record) openRecordDialog(record);
+        return;
+      }
+
+      const dayNode = event.target.closest(".cal-day");
+      if (!dayNode) return;
+      openRecordDialogAtSlot(dayNode, event);
     });
 
     els.googleSignInButton.addEventListener("click", signInWithGoogle);
@@ -512,9 +786,13 @@
 
     document.querySelectorAll("[data-panel-jump]").forEach((button) => {
       button.addEventListener("click", () => {
-        if (button.dataset.panelJump === "records") {
+        if (button.dataset.panelJump !== "records") return;
+        // The history lives on the focus view, so come back to it first and let
+        // the browser lay the panel out before scrolling to it.
+        setView("timer");
+        requestAnimationFrame(() => {
           els.recordsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+        });
       });
     });
   }
@@ -596,11 +874,13 @@
     // Each table reloads only what it affects, rather than everything.
     onTable("focus_sessions", async () => {
       await loadSessions();
+      await reconcileProjects();
       renderAll();
     });
     onTable("active_focus_timers", () => refreshCloudActiveTimer());
     onTable("active_rest_timers", () => refreshCloudRestTimer());
     onTable("notes", () => refreshCloudNotes());
+    onTable("projects", () => refreshCloudProjects());
 
     state.realtimeChannel = channel;
 
@@ -683,6 +963,19 @@
     state.lastSessionsSig = sig;
     state.sessions = data.map(normalizeRecord);
     state.dataMode = "cloud";
+    await reconcileProjects();
+    renderAll();
+  }
+
+  // Projects change rarely, so the poll only repaints when something actually
+  // differs — a colour picked on the phone lands here without a refresh.
+  async function refreshCloudProjects() {
+    if (!canUseCloud() || state.projectsCloudMissing) return;
+    const before = JSON.stringify(state.projects);
+    await loadProjects();
+    await reconcileProjects();
+    if (JSON.stringify(state.projects) === before) return;
+    syncSelectedTree();
     renderAll();
   }
 
@@ -951,15 +1244,612 @@
     else saveLocalNotes();
   }
 
+  // --- Projects ------------------------------------------------------------
+  // A project owns a name, a colour and a tree species; records point at one by
+  // id. Ids are plain strings so built-ins ("rest") and records migrated from
+  // the pre-project versions ("t:deep focus") keep stable, meaningful keys.
+
+  function normalizeProject(project) {
+    const now = new Date().toISOString();
+    const id = String(project.id || createId());
+    const name = String(project.name || "Project").trim().slice(0, 60) || "Project";
+    return {
+      id,
+      name,
+      color: normalizeColor(project.color) || (id === REST_PROJECT_ID ? REST_PROJECT_COLOR : colorForProjectName(name)),
+      tree: TREE_SPECIES.some((s) => s.id === project.tree) || project.tree === WILTED_TREE.id
+        ? project.tree
+        : defaultTreeForName(name),
+      sort_order: Number.isFinite(Number(project.sort_order)) ? Number(project.sort_order) : 0,
+      created_at: project.created_at || now,
+      updated_at: project.updated_at || now,
+    };
+  }
+
+  function normalizeColor(value) {
+    const hex = String(value || "").trim();
+    return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toLowerCase() : null;
+  }
+
+  // A new project's colour and tree both come from its name, so naming it is
+  // enough — and the same name always looks the same, on every device, without
+  // needing anything to be written down first.
+  function colorForProjectName(name) {
+    return PROJECT_COLORS[mixedHash(`${getTreeSeed(name)}:color`) % PROJECT_COLORS.length];
+  }
+
+  // Walk on from the name's own colour until one is free, so two projects don't
+  // end up sharing a colour in the chart and the forest.
+  function freeColorForProjectName(name, skipId) {
+    const used = new Set(
+      state.projects.filter((project) => project.id !== skipId).map((project) => project.color)
+    );
+    const start = PROJECT_COLORS.indexOf(colorForProjectName(name));
+    for (let step = 0; step < PROJECT_COLORS.length; step += 1) {
+      const color = PROJECT_COLORS[(start + step) % PROJECT_COLORS.length];
+      if (!used.has(color)) return color;
+    }
+    return colorForProjectName(name);
+  }
+
+  // Small-modulo selection needs the bits mixed, or the low ones dominate.
+  function mixedHash(value) {
+    let seed = hashString(value);
+    seed ^= seed >>> 13;
+    seed = (seed * 0x5bd1e995) >>> 0;
+    return (seed ^ (seed >>> 15)) >>> 0;
+  }
+
+  function loadLocalProjects() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_PROJECTS) || "[]");
+      return Array.isArray(data) ? data.map(normalizeProject) : [];
+    } catch (error) {
+      console.warn(error);
+      return [];
+    }
+  }
+
+  function saveLocalProjects() {
+    localStorage.setItem(STORAGE_PROJECTS, JSON.stringify(state.projects));
+  }
+
+  async function loadProjects() {
+    if (canUseCloud() && !state.projectsCloudMissing) {
+      const { data, error } = await state.supabase
+        .from("projects")
+        .select("*")
+        .order("sort_order", { ascending: true });
+
+      if (!error) {
+        state.projects = (data || []).map(normalizeProject);
+        return;
+      }
+
+      // The table only exists once the updated SQL has been run; until then the
+      // app keeps working from this device's projects.
+      state.projectsCloudMissing = true;
+      console.warn(error);
+    }
+
+    state.projects = loadLocalProjects();
+  }
+
+  function sortProjects() {
+    state.projects.sort((a, b) => {
+      const rank = (p) => (p.id === DEFAULT_PROJECT_ID ? 0 : p.id === REST_PROJECT_ID ? 2 : 1);
+      if (rank(a) !== rank(b)) return rank(a) - rank(b);
+      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  // Make sure every project a record points at exists, seeding the built-ins on
+  // a fresh install and rebuilding projects for records made before projects
+  // existed. Deterministic ids and colours mean two devices converge on the
+  // same result without coordinating.
+  async function reconcileProjects() {
+    const before = state.projects.length;
+    const byId = new Map(state.projects.map((p) => [p.id, p]));
+    const created = [];
+
+    const ensure = (project) => {
+      if (byId.has(project.id)) return;
+      const normalized = normalizeProject(project);
+      byId.set(normalized.id, normalized);
+      state.projects.push(normalized);
+      created.push(normalized);
+    };
+
+    ensure({
+      id: DEFAULT_PROJECT_ID,
+      name: "Focus",
+      color: PROJECT_COLORS[0],
+      tree: "pine",
+      sort_order: 0,
+    });
+    ensure({
+      id: REST_PROJECT_ID,
+      name: "Rest",
+      color: REST_PROJECT_COLOR,
+      tree: WILTED_TREE.id,
+      sort_order: 900,
+    });
+
+    // Legacy records: one project per distinct session title, carrying the tree
+    // that title already grew so the existing forest looks unchanged.
+    state.sessions.forEach((record) => {
+      const id = resolveProjectId(record);
+      if (byId.has(id) || !id.startsWith(LEGACY_PROJECT_PREFIX)) return;
+      const title = (record.title || "").trim() || "Deep focus";
+      ensure({
+        id,
+        name: title,
+        color: colorForProjectName(title),
+        tree: legacyTreeForTitle(title, record),
+        sort_order: 100,
+      });
+    });
+
+    if (!created.length && before === state.projects.length) return;
+
+    sortProjects();
+    saveLocalProjects();
+    await pushProjects(created);
+  }
+
+  // The species a migrated project should keep: an explicit per-name choice from
+  // the old tree picker first, then whatever that title last grew.
+  function legacyTreeForTitle(title, record) {
+    const prefId = getTreePrefForName(title);
+    if (prefId && TREE_SPECIES.some((s) => s.id === prefId)) return prefId;
+    const species = TREE_SPECIES.find((s) => s.label === record.tree_kind);
+    return species ? species.id : defaultTreeForName(title);
+  }
+
+  async function pushProjects(projects) {
+    if (!projects.length || !canUseCloud() || state.projectsCloudMissing) return;
+    const rows = projects.map((project) => toCloudProject(project));
+    const { error } = await state.supabase.from("projects").upsert(rows, { onConflict: "user_id,id" });
+    if (error) {
+      state.projectsCloudMissing = true;
+      console.warn(error);
+    }
+  }
+
+  function toCloudProject(project) {
+    return {
+      user_id: state.user.id,
+      id: project.id,
+      name: project.name,
+      color: project.color,
+      tree: project.tree,
+      sort_order: project.sort_order,
+      created_at: project.created_at,
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  async function saveProject(project) {
+    const normalized = normalizeProject({ ...project, updated_at: new Date().toISOString() });
+    const index = state.projects.findIndex((p) => p.id === normalized.id);
+    if (index >= 0) state.projects[index] = normalized;
+    else state.projects.push(normalized);
+
+    sortProjects();
+    saveLocalProjects();
+
+    if (canUseCloud() && !state.projectsCloudMissing) {
+      const { error } = await state.supabase
+        .from("projects")
+        .upsert(toCloudProject(normalized), { onConflict: "user_id,id" });
+      if (error) {
+        state.projectsCloudMissing = true;
+        console.warn(error);
+        showToast(t("toast.cloud_projects_fail"));
+      }
+    }
+
+    return normalized;
+  }
+
+  // Deleting a project moves its records to the default project rather than
+  // orphaning them, so nothing silently disappears from the history.
+  async function removeProject(id) {
+    if (BUILTIN_PROJECT_IDS.includes(id)) return false;
+
+    const target = DEFAULT_PROJECT_ID;
+    const affected = state.sessions.filter((record) => resolveProjectId(record) === id);
+
+    if (affected.length) {
+      const affectedIds = new Set(affected.map((record) => record.id));
+      state.sessions = state.sessions.map((record) =>
+        affectedIds.has(record.id) ? { ...record, project_id: target } : record
+      );
+
+      if (canUseCloud() && !state.sessionsProjectColumnMissing) {
+        const { error } = await state.supabase
+          .from("focus_sessions")
+          .update({ project_id: target, updated_at: new Date().toISOString() })
+          .eq("user_id", state.user.id)
+          .in("id", affected.map((record) => record.id));
+        if (error) {
+          state.sessionsProjectColumnMissing = true;
+          console.warn(error);
+        }
+      } else if (!canUseCloud()) {
+        saveLocalSessions(
+          loadLocalSessions().map((record) =>
+            affectedIds.has(record.id) ? { ...record, project_id: target } : record
+          )
+        );
+      }
+    }
+
+    state.projects = state.projects.filter((project) => project.id !== id);
+    saveLocalProjects();
+
+    if (canUseCloud() && !state.projectsCloudMissing) {
+      const { error } = await state.supabase
+        .from("projects")
+        .delete()
+        .eq("user_id", state.user.id)
+        .eq("id", id);
+      if (error) console.warn(error);
+    }
+
+    if (state.selectedProjectId === id) setSelectedProject(target, { silent: true });
+    return true;
+  }
+
+  // Resolve which project a record belongs to. Records written since projects
+  // exist carry the id; older ones are mapped by their shape: a completed
+  // wilted tree was a rest, anything else keys off its title.
+  function resolveProjectId(record) {
+    if (record.project_id) return String(record.project_id);
+    if (record.status === "completed" && record.tree_kind === WILTED_TREE.label) return REST_PROJECT_ID;
+    return legacyProjectIdForTitle(record.title);
+  }
+
+  function legacyProjectIdForTitle(title) {
+    return LEGACY_PROJECT_PREFIX + (String(title || "").trim().toLowerCase() || "deep focus");
+  }
+
+  // Never returns null: a record pointing at a project that was deleted
+  // elsewhere still renders, in a neutral grey.
+  function getProject(id) {
+    const found = state.projects.find((project) => project.id === id);
+    if (found) return found;
+    return {
+      id: id || DEFAULT_PROJECT_ID,
+      name: t("project.none"),
+      color: MISSING_PROJECT_COLOR,
+      tree: "pine",
+      sort_order: 999,
+      missing: true,
+    };
+  }
+
+  function getRecordProject(record) {
+    return getProject(resolveProjectId(record));
+  }
+
+  // Built-in names are stored in English so a record means the same thing in
+  // every language; only the untouched defaults are shown translated.
+  function projectDisplayName(project) {
+    if (project.id === REST_PROJECT_ID && project.name === "Rest") return t("project.rest_name");
+    if (project.id === DEFAULT_PROJECT_ID && project.name === "Focus") return t("project.default_name");
+    return project.name;
+  }
+
+  // Empty when nothing has been chosen yet, so startup can pick up the project
+  // of the most recent session instead of forcing the default one.
+  // --- Task ↔ project ------------------------------------------------------
+  // A task name belongs to a project: track "wash dishes" under Errands once,
+  // and choosing that task picks Errands again by itself. What you last chose
+  // on this device wins; otherwise the answer comes from your history, which
+  // syncs, so the pairing follows you across devices.
+
+  function taskKey(title) {
+    return String(title || "").trim().toLowerCase();
+  }
+
+  function loadTaskProjects() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_TASK_PROJECT) || "{}"); }
+    catch { return {}; }
+  }
+
+  function rememberTaskProject(title, projectId) {
+    const key = taskKey(title);
+    if (!key || !projectId) return;
+    const map = loadTaskProjects();
+    if (map[key] === projectId) return;
+    map[key] = projectId;
+    localStorage.setItem(STORAGE_TASK_PROJECT, JSON.stringify(map));
+  }
+
+  function projectForTitle(title) {
+    const key = taskKey(title);
+    if (!key) return null;
+
+    const saved = loadTaskProjects()[key];
+    if (saved && state.projects.some((project) => project.id === saved)) return saved;
+
+    let match = null;
+    state.sessions.forEach((record) => {
+      if (taskKey(record.title) !== key) return;
+      if (!match || new Date(record.started_at) > new Date(match.started_at)) match = record;
+    });
+    if (!match) return null;
+    const id = resolveProjectId(match);
+    return state.projects.some((project) => project.id === id) ? id : null;
+  }
+
+  // Follow the task name that was just typed or picked, if it has a project.
+  function applyProjectForTitle(title) {
+    const id = projectForTitle(title);
+    if (!id || id === state.selectedProjectId) return;
+    setSelectedProject(id);
+  }
+
+  function loadSelectedProjectId() {
+    try { return localStorage.getItem(STORAGE_SELECTED_PROJECT) || ""; }
+    catch { return ""; }
+  }
+
+  function setSelectedProject(id, { silent = false } = {}) {
+    state.selectedProjectId = id;
+    localStorage.setItem(STORAGE_SELECTED_PROJECT, id);
+    syncSelectedTree();
+    if (silent) return;
+    renderProjectPickers();
+    renderTreePicker();
+    renderTimer();
+  }
+
+  function syncSelectedTree() {
+    const project = getProject(state.timer?.projectId || state.selectedProjectId);
+    state.selectedTreeId = project.tree;
+  }
+
+  function projectRecordCount(id) {
+    return state.sessions.filter((record) => resolveProjectId(record) === id).length;
+  }
+
+  function projectRecordCountLabel(id) {
+    const count = projectRecordCount(id);
+    return t(count === 1 ? "project.record_one" : "project.records", { n: count });
+  }
+
+  // --- Project pickers and dialogs -----------------------------------------
+
+  function renderProjectPickers() {
+    if (!state.projects.some((project) => project.id === state.selectedProjectId)) {
+      state.selectedProjectId = DEFAULT_PROJECT_ID;
+    }
+    fillProjectSelect(els.projectPicker, state.selectedProjectId);
+    els.projectPicker.disabled = Boolean(state.timer);
+    applyProjectVars(els.projectDot, getProject(state.selectedProjectId));
+  }
+
+  function fillProjectSelect(select, selectedId) {
+    const fragment = document.createDocumentFragment();
+    state.projects.forEach((project) => {
+      const option = document.createElement("option");
+      option.value = project.id;
+      option.textContent = projectDisplayName(project);
+      fragment.appendChild(option);
+    });
+    select.replaceChildren(fragment);
+
+    // A record can still point at a project that no longer exists; keep it
+    // selectable so editing it doesn't silently move it.
+    if (selectedId && !state.projects.some((project) => project.id === selectedId)) {
+      const option = document.createElement("option");
+      option.value = selectedId;
+      option.textContent = t("project.none");
+      select.appendChild(option);
+    }
+    select.value = selectedId;
+  }
+
+  function openProjectsDialog() {
+    renderProjectsList();
+    showDialog(els.projectsDialog);
+  }
+
+  function closeProjectsDialog() {
+    hideDialog(els.projectsDialog);
+  }
+
+  function renderProjectsList() {
+    const fragment = document.createDocumentFragment();
+
+    state.projects.forEach((project) => {
+      const li = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "project-row-item";
+      applyProjectVars(button, project);
+
+      const dot = document.createElement("span");
+      dot.className = "legend-dot";
+
+      const name = document.createElement("span");
+      name.className = "project-row-name";
+      name.textContent = projectDisplayName(project);
+
+      const meta = document.createElement("span");
+      meta.className = "project-row-meta";
+      meta.textContent = projectRecordCountLabel(project.id);
+
+      button.append(dot, name, meta);
+      button.addEventListener("click", () => openProjectDialog(project));
+      li.appendChild(button);
+      fragment.appendChild(li);
+    });
+
+    els.projectsList.replaceChildren(fragment);
+  }
+
+  function openProjectDialog(project) {
+    const editing = Boolean(project);
+    const value = project || {
+      id: "",
+      name: "",
+      color: colorForProjectName(""),
+      tree: defaultTreeForName(""),
+    };
+
+    els.projectDialogTitle.textContent = editing ? t("project.edit") : t("project.new");
+    els.projectIdInput.value = value.id;
+    els.projectNameInput.value = editing ? projectDisplayName(value) : "";
+    fillTreeSelect(els.projectTreeInput, { includeWilted: true });
+    els.projectTreeInput.value = value.tree;
+    renderColorGrid(value.color);
+    els.deleteProjectButton.hidden = !editing || BUILTIN_PROJECT_IDS.includes(value.id);
+    // A project being created follows its name until the colour or the tree is
+    // chosen by hand; an existing one keeps what it already has.
+    state.projectDialogAutoColor = !editing;
+    state.projectDialogAutoTree = !editing;
+    renderProjectPreview();
+    showDialog(els.projectDialog);
+    refreshIcons();
+  }
+
+  // Typing a name re-rolls the look, so "Reading" always arrives as the same
+  // colour and species without anyone having to choose.
+  function onProjectNameInput() {
+    const name = els.projectNameInput.value.trim();
+    if (state.projectDialogAutoColor) {
+      renderColorGrid(freeColorForProjectName(name, els.projectIdInput.value));
+    }
+    if (state.projectDialogAutoTree) {
+      els.projectTreeInput.value = defaultTreeForName(name);
+    }
+    renderProjectPreview();
+  }
+
+  function renderColorGrid(selected) {
+    const fragment = document.createDocumentFragment();
+    PROJECT_COLORS.forEach((color) => {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "color-swatch";
+      swatch.style.setProperty("--swatch", color);
+      swatch.dataset.color = color;
+      swatch.setAttribute("role", "radio");
+      swatch.setAttribute("aria-checked", String(color === selected));
+      swatch.setAttribute("aria-label", color);
+      swatch.addEventListener("click", () => {
+        Array.from(els.projectColorGrid.children).forEach((node) => {
+          node.setAttribute("aria-checked", String(node.dataset.color === color));
+        });
+        state.projectDialogAutoColor = false;
+        renderProjectPreview();
+      });
+      fragment.appendChild(swatch);
+    });
+    els.projectColorGrid.replaceChildren(fragment);
+  }
+
+  function selectedSwatchColor() {
+    const checked = els.projectColorGrid.querySelector('[aria-checked="true"]');
+    return checked ? checked.dataset.color : PROJECT_COLORS[0];
+  }
+
+  function renderProjectPreview() {
+    const color = selectedSwatchColor();
+    const tree = els.projectTreeInput.value;
+    const name = els.projectNameInput.value.trim() || t("project.new");
+    els.projectPreviewPlant.innerHTML = buildTreeSVG(tree, paletteFromColor(color));
+    els.projectPreviewName.textContent = name;
+    applyProjectVars(els.projectPreviewName, { color });
+  }
+
+  async function saveProjectDialog() {
+    if (!els.projectForm.reportValidity()) return;
+
+    const id = els.projectIdInput.value;
+    const name = els.projectNameInput.value.trim().slice(0, 60);
+    if (!name) return;
+
+    const clash = state.projects.some(
+      (project) => project.id !== id && projectDisplayName(project).toLowerCase() === name.toLowerCase()
+    );
+    if (clash) {
+      showToast(t("project.name_taken"));
+      return;
+    }
+
+    const existing = id ? state.projects.find((project) => project.id === id) : null;
+    const saved = await saveProject({
+      ...(existing || {}),
+      id: id || createId(),
+      name,
+      color: selectedSwatchColor(),
+      tree: els.projectTreeInput.value,
+      sort_order: existing ? existing.sort_order : state.projects.length,
+    });
+
+    // Saving re-sorts the list, so track the project by id rather than position.
+    if (!id) setSelectedProject(saved.id, { silent: true });
+
+    hideDialog(els.projectDialog);
+    if (els.projectsDialog.open) renderProjectsList();
+    syncSelectedTree();
+    renderAll();
+    showToast(t("toast.project_saved"));
+  }
+
+  async function deleteProjectFromDialog() {
+    const id = els.projectIdInput.value;
+    const project = state.projects.find((item) => item.id === id);
+    if (!project) return;
+
+    if (BUILTIN_PROJECT_IDS.includes(id)) {
+      showToast(t("toast.project_builtin"));
+      return;
+    }
+
+    const confirmed = window.confirm(
+      t("confirm.delete_project", {
+        name: projectDisplayName(project),
+        n: projectRecordCount(id),
+        target: projectDisplayName(getProject(DEFAULT_PROJECT_ID)),
+      })
+    );
+    if (!confirmed) return;
+
+    await removeProject(id);
+    hideDialog(els.projectDialog);
+    if (els.projectsDialog.open) renderProjectsList();
+    syncSelectedTree();
+    renderAll();
+    showToast(t("toast.project_deleted"));
+  }
+
   async function createRecord(record) {
     const normalized = normalizeRecord(record);
+    rememberTaskProject(normalized.title, normalized.project_id);
 
     if (canUseCloud()) {
-      const { data, error } = await state.supabase
+      let { data, error } = await state.supabase
         .from("focus_sessions")
         .insert(toCloudRecord(normalized))
         .select()
         .single();
+
+      // Retry once without project_id, in case this database hasn't had the
+      // projects migration run against it yet.
+      if (error && !state.sessionsProjectColumnMissing) {
+        state.sessionsProjectColumnMissing = true;
+        ({ data, error } = await state.supabase
+          .from("focus_sessions")
+          .insert(toCloudRecord(normalized))
+          .select()
+          .single());
+      }
 
       if (error) {
         showToast(t("toast.cloud_save_fail"));
@@ -988,14 +1878,25 @@
       ...changes,
       updated_at: new Date().toISOString(),
     });
+    rememberTaskProject(next.title, next.project_id);
 
     if (canUseCloud()) {
-      const { data, error } = await state.supabase
+      let { data, error } = await state.supabase
         .from("focus_sessions")
         .update(toCloudRecord(next, true))
         .eq("id", id)
         .select()
         .single();
+
+      if (error && !state.sessionsProjectColumnMissing) {
+        state.sessionsProjectColumnMissing = true;
+        ({ data, error } = await state.supabase
+          .from("focus_sessions")
+          .update(toCloudRecord(next, true))
+          .eq("id", id)
+          .select()
+          .single());
+      }
 
       if (error) {
         showToast(t("toast.cloud_update_fail"));
@@ -1037,7 +1938,10 @@
   async function startOrResumeTimer() {
     if (state.timer) return;
 
-    const title = els.sessionTitle.value.trim() || "Deep focus";
+    const project = getProject(state.selectedProjectId);
+    // An empty task name falls back to the project's, so picking a project and
+    // pressing start is enough.
+    const title = els.sessionTitle.value.trim() || projectDisplayName(project);
     rememberSessionName(title);
     state.finishSoonSoundTimerId = null;
 
@@ -1053,7 +1957,8 @@
       mode: isStopwatch ? "stopwatch" : "countdown",
       status: "running",
       title,
-      selectedTreeId: state.selectedTreeId,
+      projectId: project.id,
+      selectedTreeId: project.tree,
       durationMinutes: minutes,
       durationSeconds: isStopwatch ? 0 : durationSeconds,
       startedAt: new Date(now).toISOString(),
@@ -1062,6 +1967,7 @@
       cloudSynced: false,
     };
 
+    rememberTaskProject(title, project.id);
     persistTimer();
     if (!isStopwatch) primeCompletionSound();
     renderTimer();
@@ -1095,9 +2001,11 @@
           ? Math.max(1, Math.round(elapsedSeconds / 60))
           : Math.max(0, Math.round(elapsedSeconds / 60));
       const endedAt = new Date().toISOString();
+      const projectId = timer.projectId || DEFAULT_PROJECT_ID;
       const record = {
         id: createId(),
         title: timer.title,
+        project_id: projectId,
         duration_minutes: isStopwatch ? actualMinutes : timer.durationMinutes,
         actual_minutes: isStopwatch
           ? actualMinutes
@@ -1107,7 +2015,7 @@
         status,
         started_at: timer.startedAt,
         ended_at: endedAt,
-        tree_kind: pickTreeKind(timer.title, status, timer.selectedTreeId),
+        tree_kind: pickTreeKind(projectId, status),
         created_at: endedAt,
         updated_at: endedAt,
       };
@@ -1168,12 +2076,13 @@
     await createRecord({
       id: createId(),
       title: REST_RECORD_TITLE,
+      project_id: REST_PROJECT_ID,
       duration_minutes: minutes,
       actual_minutes: minutes,
       status: "completed",
       started_at: startedAt,
       ended_at: endedAt,
-      tree_kind: WILTED_TREE.label,
+      tree_kind: pickTreeKind(REST_PROJECT_ID, "completed"),
       created_at: endedAt,
       updated_at: endedAt,
     });
@@ -1268,12 +2177,20 @@
 
       if (canUseCloud() && Date.now() - state.lastCloudSessionsSyncAt > syncInterval) {
         refreshCloudSessions();
+        refreshCloudProjects();
       }
 
       if (state.timer) {
         renderTimer();
       }
       renderRestTimer();
+
+      // The calendar only needs redrawing when the minute changes (the now-line
+      // and any running block), and only while it is actually on screen.
+      const minuteStamp = Math.floor(Date.now() / 60000);
+      if (state.view === "calendar" && minuteStamp !== state.calMinuteStamp) {
+        renderCalendar();
+      }
     }, 1000);
   }
 
@@ -1281,8 +2198,9 @@
     renderTheme();
     renderAccount();
     renderSessionSuggestions();
+    renderProjectPickers();
     renderStats();
-    renderWeekGrove();
+    renderPeriod();
     renderRecords();
     renderTimer();
     renderRestTimer();
@@ -1291,6 +2209,7 @@
     renderTimerModeToggle();
     renderTreePicker();
     renderNotes();
+    renderCalendar();
     refreshIcons();
   }
 
@@ -1304,6 +2223,14 @@
       if (els.sessionTitle.value !== timer.title) {
         els.sessionTitle.value = timer.title;
         rememberSessionName(timer.title);
+      }
+      // A timer adopted from another device brings its project with it. Only
+      // repaint the pickers when it actually differs — this runs every second.
+      if (timer.projectId && state.selectedProjectId !== timer.projectId) {
+        state.selectedProjectId = timer.projectId;
+        localStorage.setItem(STORAGE_SELECTED_PROJECT, timer.projectId);
+        renderProjectPickers();
+        renderTreePicker();
       }
       if (timer.selectedTreeId) state.selectedTreeId = timer.selectedTreeId;
     }
@@ -1389,9 +2316,11 @@
   // Resting grows a wilted tree instead of a healthy one — it starts as a small
   // sprout and creeps up over the first half hour of rest.
   function renderRestTree(elapsedSeconds) {
-    if (els.restPlant.dataset.treeKey !== "wilted") {
-      els.restPlant.innerHTML = buildTreeSVG("wilted", getTreePalette("rest"));
-      els.restPlant.dataset.treeKey = "wilted";
+    const restProject = getProject(REST_PROJECT_ID);
+    const treeKey = `wilted|${restProject.color}`;
+    if (els.restPlant.dataset.treeKey !== treeKey) {
+      els.restPlant.innerHTML = buildTreeSVG(WILTED_TREE.id, getTreePalette(restProject));
+      els.restPlant.dataset.treeKey = treeKey;
     }
     const growth = clamp(elapsedSeconds / 1800, 0, 1);
     // 0.46 keeps the idle sprout readable; 0.86 fills the shorter rest stage.
@@ -1439,14 +2368,20 @@
   }
 
   function renderActiveTree() {
-    const title = state.timer ? state.timer.title : els.sessionTitle.value;
     const elapsedMinutes = state.timer ? getElapsedSeconds() / 60 : 0;
     const growthStage = getFocusGrowthStage(elapsedMinutes);
     const activeStageScales = [0.84, 0.96, 1.08, 1.2];
     const progressScale = 0.25 + getActiveTreeGrowth() * 0.82;
+    const project = getProject(state.timer?.projectId || state.selectedProjectId);
     const speciesId = state.timer?.selectedTreeId || state.selectedTreeId;
-    const species = TREE_SPECIES.find((s) => s.id === speciesId) || TREE_SPECIES.find((s) => s.id === "pine");
-    const palette = getTreePalette(title);
+    const species =
+      [...TREE_SPECIES, WILTED_TREE].find((s) => s.id === speciesId) ||
+      TREE_SPECIES.find((s) => s.id === "pine");
+    const palette = getTreePalette(project);
+
+    // The progress ring picks up the project's colour, so the running session
+    // reads as that project at a glance.
+    els.progressRingFill.style.stroke = project.color;
 
     const treeKey = `${species.id}|${palette.leafA}|${palette.barkA}`;
     if (els.plant.dataset.treeKey !== treeKey) {
@@ -1464,7 +2399,8 @@
     const status = els.statusFilter.value;
     const records = sortedSessions().filter((record) => {
       const statusMatches = status === "all" || record.status === status;
-      const searchable = record.title.toLowerCase();
+      // Searching by project name as well, now that it is part of a record.
+      const searchable = `${record.title} ${projectDisplayName(getRecordProject(record))}`.toLowerCase();
       return statusMatches && (!query || searchable.includes(query));
     });
 
@@ -1488,10 +2424,11 @@
     titleRow.className = "record-title-row";
 
     const rest = isRestRecord(record);
+    const project = getRecordProject(record);
 
     const title = document.createElement("h3");
     title.className = "record-title";
-    title.textContent = rest ? t("rest.record_title") : record.title;
+    title.textContent = recordDisplayTitle(record);
 
     const status = document.createElement("span");
     status.className = `record-status ${rest ? "rested" : record.status}`;
@@ -1501,19 +2438,24 @@
 
     titleRow.append(title, status);
 
+    const projectChip = document.createElement("span");
+    projectChip.className = "project-chip";
+    projectChip.textContent = projectDisplayName(project);
+    applyProjectVars(projectChip, project);
+
     const date = document.createElement("div");
     date.className = "record-date";
-    date.textContent = formatRecordDate(record.started_at);
+    date.textContent = formatRecordRange(record);
 
     const metrics = document.createElement("div");
     metrics.className = "record-metrics";
     metrics.append(
       createMetric(t("metric.focused", { n: record.actual_minutes })),
       createMetric(t("metric.goal", { n: record.duration_minutes })),
-      createMetric(treeDisplayFromKind(record.tree_kind))
+      createMetric(treeDisplayFromKind(speciesForRecord(record).label))
     );
 
-    main.append(titleRow, date, metrics);
+    main.append(titleRow, projectChip, date, metrics);
 
     const actions = document.createElement("div");
     actions.className = "record-actions";
@@ -1546,10 +2488,9 @@
   }
 
   function renderStats() {
-    // Focus stats count focus sessions only — rests are excluded.
-    const focus = state.sessions.filter(
-      (record) => record.status === "completed" && !isRestRecord(record)
-    );
+    // Focus stats count time spent focusing, whether or not the session was
+    // seen through; rests have their own project and are excluded.
+    const focus = state.sessions.filter((record) => !isRestRecord(record));
     const today = localDateKey(new Date());
     const todayMinutes = focus
       .filter((record) => localDateKey(record.ended_at || record.started_at) === today)
@@ -1560,42 +2501,77 @@
     els.totalStat.textContent = formatMinutes(totalMinutes);
   }
 
-  function renderWeekGrove() {
+  // The period chosen here drives both the forest and the project summary, so
+  // there is one place to look at "how did this day / week / month go".
+  function getPeriodRange() {
     const view = state.groveView;
-    let start, end, rangeText, emptyText, kicker;
 
-    if (view === "today") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      start = today;
-      end = addDays(today, 1);
-      rangeText = new Intl.DateTimeFormat(localeTag(), { weekday: "long", month: "long", day: "numeric" }).format(today);
-      emptyText = t("grove.empty_today");
-      kicker = t("grove.today");
-    } else if (view === "month") {
-      start = new Date(state.monthStart);
-      end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
-      rangeText = formatMonthRange(start);
-      emptyText = t("grove.empty_month");
-      kicker = t("grove.monthly");
-    } else {
-      start = new Date(state.weekStart);
-      end = addDays(start, 7);
-      rangeText = formatWeekRange(start);
-      emptyText = t("grove.empty_week");
-      kicker = t("grove.weekly");
+    if (view === "month") {
+      const start = new Date(state.monthStart);
+      return {
+        view,
+        start,
+        end: new Date(start.getFullYear(), start.getMonth() + 1, 1),
+        rangeText: formatMonthRange(start),
+        emptyText: t("grove.empty_month"),
+        kicker: t("grove.monthly"),
+      };
     }
 
-    const completed = state.sessions
+    if (view === "week") {
+      const start = new Date(state.weekStart);
+      return {
+        view,
+        start,
+        end: addDays(start, 7),
+        rangeText: formatWeekRange(start),
+        emptyText: t("grove.empty_week"),
+        kicker: t("grove.weekly"),
+      };
+    }
+
+    const today = startOfDay(new Date());
+    return {
+      view: "today",
+      start: today,
+      end: addDays(today, 1),
+      rangeText: new Intl.DateTimeFormat(localeTag(), {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }).format(today),
+      emptyText: t("grove.empty_today"),
+      kicker: t("grove.today"),
+    };
+  }
+
+  function recordsInRange(start, end, { completedOnly = true } = {}) {
+    return state.sessions
       .filter((record) => {
         const plantedAt = new Date(record.ended_at || record.started_at);
-        return record.status === "completed" && plantedAt >= start && plantedAt < end;
+        if (completedOnly && record.status !== "completed") return false;
+        return plantedAt >= start && plantedAt < end;
       })
       .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime());
+  }
+
+  function renderPeriod() {
+    const range = getPeriodRange();
+    renderWeekGrove(range);
+    renderProjectSummary(range);
+  }
+
+  function renderWeekGrove(range = getPeriodRange()) {
+    const { view, start, end, rangeText, emptyText, kicker } = range;
+
+    // Trees come from completed sessions — an abandoned one grows nothing — but
+    // the time it took still counts toward the totals.
+    const completed = recordsInRange(start, end);
+    const tracked = recordsInRange(start, end, { completedOnly: false });
     const minutesOf = (records) =>
       records.reduce((sum, record) => sum + Number(record.actual_minutes || 0), 0);
-    const focusMinutes = minutesOf(completed.filter((r) => !isRestRecord(r)));
-    const restMinutes = minutesOf(completed.filter(isRestRecord));
+    const focusMinutes = minutesOf(tracked.filter((r) => !isRestRecord(r)));
+    const restMinutes = minutesOf(tracked.filter(isRestRecord));
 
     els.grovePanelKicker.textContent = kicker;
     els.weekRange.textContent = rangeText;
@@ -1647,7 +2623,7 @@
     state.groveView = view;
     if (view === "week") state.weekStart = startOfWeek(new Date());
     if (view === "month") state.monthStart = startOfMonth(new Date());
-    renderWeekGrove();
+    renderPeriod();
   }
 
   function changeWeek(direction) {
@@ -1658,17 +2634,117 @@
     } else {
       state.weekStart = addDays(state.weekStart, direction * 7);
     }
-    renderWeekGrove();
+    renderPeriod();
+  }
+
+  // --- Time by project (donut + legend) ------------------------------------
+
+  function projectTotals(records) {
+    const totals = new Map();
+    records.forEach((record) => {
+      const project = getRecordProject(record);
+      const minutes = Number(record.actual_minutes || 0);
+      if (minutes <= 0) return;
+      const entry = totals.get(project.id) || { project, minutes: 0, count: 0 };
+      entry.minutes += minutes;
+      entry.count += 1;
+      totals.set(project.id, entry);
+    });
+    return [...totals.values()].sort((a, b) => b.minutes - a.minutes);
+  }
+
+  // Time tracked, not trees earned: an abandoned session still cost you the
+  // time, it just never grew anything, so it counts here.
+  function renderProjectSummary(range = getPeriodRange()) {
+    const rows = projectTotals(recordsInRange(range.start, range.end, { completedOnly: false }));
+    const totalMinutes = rows.reduce((sum, row) => sum + row.minutes, 0);
+
+    els.summaryTotal.textContent = formatMinutes(totalMinutes);
+    els.donutTotal.textContent = formatMinutes(totalMinutes);
+    els.donutCount.textContent = t(rows.length === 1 ? "summary.project_one" : "summary.projects", { n: rows.length });
+    els.summaryBody.hidden = rows.length === 0;
+    els.summaryEmpty.hidden = rows.length > 0;
+
+    renderDonut(rows, totalMinutes);
+    renderProjectLegend(rows, totalMinutes);
+  }
+
+  // Plain SVG: one arc per project, drawn with stroke-dasharray on a circle
+  // whose circumference is exactly 100, so a percentage *is* the dash length.
+  const DONUT_RADIUS = 15.9154943;
+
+  function renderDonut(rows, totalMinutes) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    const fragment = document.createDocumentFragment();
+
+    const track = document.createElementNS(svgNS, "circle");
+    track.setAttribute("class", "donut-track");
+    track.setAttribute("cx", "21");
+    track.setAttribute("cy", "21");
+    track.setAttribute("r", String(DONUT_RADIUS));
+    fragment.appendChild(track);
+
+    let offset = 0;
+    rows.forEach((row) => {
+      const pct = totalMinutes ? (row.minutes / totalMinutes) * 100 : 0;
+      // Leave a hairline gap between arcs, but never on a single full ring.
+      const gap = rows.length > 1 ? Math.min(0.8, pct / 4) : 0;
+      const arc = document.createElementNS(svgNS, "circle");
+      arc.setAttribute("cx", "21");
+      arc.setAttribute("cy", "21");
+      arc.setAttribute("r", String(DONUT_RADIUS));
+      arc.setAttribute("stroke", row.project.color);
+      arc.setAttribute("stroke-dasharray", `${Math.max(0, pct - gap)} ${100 - Math.max(0, pct - gap)}`);
+      arc.setAttribute("stroke-dashoffset", String(-offset));
+      const label = document.createElementNS(svgNS, "title");
+      label.textContent = `${projectDisplayName(row.project)} — ${formatMinutes(row.minutes)} (${Math.round(pct)}%)`;
+      arc.appendChild(label);
+      fragment.appendChild(arc);
+      offset += pct;
+    });
+
+    els.projectDonut.replaceChildren(fragment);
+  }
+
+  function renderProjectLegend(rows, totalMinutes) {
+    const fragment = document.createDocumentFragment();
+
+    rows.forEach((row) => {
+      const item = document.createElement("li");
+      item.className = "legend-item";
+      applyProjectVars(item, row.project);
+
+      const dot = document.createElement("span");
+      dot.className = "legend-dot";
+
+      const name = document.createElement("span");
+      name.className = "legend-name";
+      name.textContent = projectDisplayName(row.project);
+
+      const time = document.createElement("span");
+      time.className = "legend-time";
+      time.textContent = formatMinutes(row.minutes);
+
+      const pct = document.createElement("span");
+      pct.className = "legend-pct";
+      pct.textContent = `${totalMinutes ? Math.round((row.minutes / totalMinutes) * 100) : 0}%`;
+
+      item.append(dot, name, time, pct);
+      item.title = t(row.count === 1 ? "project.record_one" : "project.records", { n: row.count });
+      fragment.appendChild(item);
+    });
+
+    els.projectLegend.replaceChildren(fragment);
   }
 
   function createGroveTree(record, index) {
-    const species = (record.status === "abandoned" || record.tree_kind === WILTED_TREE.label)
-      ? WILTED_TREE
-      : (TREE_SPECIES.find((s) => s.label === record.tree_kind)
-         || TREE_SPECIES.find((s) => s.id === record.tree_kind)
-         || getTreeForSession(record.title, record.status));
-    const seed = getTreeSeed(record.title);
-    const palette = getTreePalette(seed);
+    const project = getRecordProject(record);
+    const species = speciesForRecord(record);
+    // Abandoned sessions keep the project's colour, drained of life.
+    const palette = getTreePalette(project, { muted: record.status === "abandoned" });
+    // The jitter that keeps the forest from looking like a plantation stays
+    // per-record, so two trees of the same project still differ.
+    const seed = getTreeSeed(`${project.id}:${record.id}`);
     const shape = hashString(`${seed}:shape`) % 4;
     const tree = document.createElement("article");
     tree.className = `grove-tree shape-${shape}`;
@@ -1682,10 +2758,11 @@
     tree.style.setProperty("--tree-mound-width", `${seededRange(seed, "mound", 34, 54).toFixed(1)}px`);
     tree.style.setProperty("--grove-stretch-x", seededRange(seed, `shape-${shape}-x`, 0.96, 1.04).toFixed(2));
     tree.style.setProperty("--grove-stretch-y", seededRange(seed, `shape-${shape}-y`, 0.98, 1.06).toFixed(2));
-    tree.title = `${record.title}: ${species.label}, ${record.actual_minutes}m`;
+    const projectName = projectDisplayName(project);
+    tree.title = `${projectName} · ${record.title} — ${formatMinutes(record.actual_minutes)}`;
     tree.setAttribute(
       "aria-label",
-      `${record.title}, ${species.label}, ${record.actual_minutes} focused minutes`
+      `${projectName}, ${record.title}, ${species.label}, ${record.actual_minutes} minutes`
     );
 
     const visual = document.createElement("span");
@@ -1695,7 +2772,8 @@
 
     const label = document.createElement("span");
     label.className = "tree-label";
-    label.textContent = record.title;
+    label.textContent = projectName;
+    applyProjectVars(label, project);
 
     tree.append(visual, label);
     return tree;
@@ -1716,6 +2794,678 @@
     if (safeMinutes <= 30) return 1;
     if (safeMinutes <= 45) return 2;
     return 3;
+  }
+
+  // --- Views ---------------------------------------------------------------
+  // Two screens, one document: the calendar is a section that swaps in, so
+  // switching costs nothing and no state has to be rebuilt. The hash keeps the
+  // back button working.
+
+  function applyRoute() {
+    const hash = (window.location.hash || "").replace(/^#/, "");
+    setView(hash === "calendar" ? "calendar" : "timer", { fromRoute: true });
+  }
+
+  function setView(view, { fromRoute = false } = {}) {
+    const next = view === "calendar" ? "calendar" : "timer";
+    const changed = state.view !== next;
+    state.view = next;
+
+    els.workspace.hidden = next !== "timer";
+    els.calendarView.hidden = next !== "calendar";
+    els.viewFocusTab.classList.toggle("is-selected", next === "timer");
+    els.viewCalendarTab.classList.toggle("is-selected", next === "calendar");
+    els.viewFocusTab.setAttribute("aria-current", next === "timer" ? "page" : "false");
+    els.viewCalendarTab.setAttribute("aria-current", next === "calendar" ? "page" : "false");
+
+    if (!fromRoute) {
+      if (next === "calendar") {
+        if (window.location.hash !== "#calendar") window.location.hash = "calendar";
+      } else if (window.location.hash) {
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    }
+
+    if (next !== "calendar") return;
+
+    if (changed) state.calAnchor = defaultCalendarAnchor();
+    renderCalendar();
+    if (changed) scrollCalendarToNow();
+  }
+
+  // --- Calendar ------------------------------------------------------------
+  // A Toggl-style day grid: 1–7 days side by side, zoomable, every record a
+  // block coloured by its project. Blocks are laid out from CSS variables, so
+  // zooming only changes one custom property instead of re-measuring anything.
+
+  function loadCalDays() {
+    const saved = Number(localStorage.getItem(STORAGE_CAL_DAYS));
+    return Number.isFinite(saved) && saved >= 1 && saved <= 7 ? Math.round(saved) : CAL_DEFAULT_DAYS;
+  }
+
+  function loadCalZoom() {
+    const saved = Number(localStorage.getItem(STORAGE_CAL_ZOOM));
+    return Number.isFinite(saved) && saved > 0 ? clamp(saved, CAL_MIN_ZOOM, CAL_MAX_ZOOM) : CAL_DEFAULT_ZOOM;
+  }
+
+  // Today sits in the middle of the visible range, so yesterday's work and the
+  // rest of today are both one glance away.
+  function defaultCalendarAnchor() {
+    return addDays(startOfDay(new Date()), -Math.floor((state.calDays - 1) / 2));
+  }
+
+  function setCalendarDays(days) {
+    const next = clamp(Math.round(days) || CAL_DEFAULT_DAYS, 1, 7);
+    if (next === state.calDays) return;
+    const showedToday = calendarShowsToday();
+    state.calDays = next;
+    localStorage.setItem(STORAGE_CAL_DAYS, String(next));
+    // Keep today on screen if it already was, rather than drifting away as the
+    // range grows or shrinks.
+    if (showedToday) state.calAnchor = defaultCalendarAnchor();
+    renderCalendar();
+  }
+
+  function setCalendarZoom(zoom) {
+    const next = clamp(Math.round(zoom), CAL_MIN_ZOOM, CAL_MAX_ZOOM);
+    if (next === state.calZoom) return;
+    // Keep whatever hour is at the top of the viewport pinned while zooming.
+    const anchorHours = els.calScroll.scrollTop / state.calZoom;
+    state.calZoom = next;
+    localStorage.setItem(STORAGE_CAL_ZOOM, String(next));
+    renderCalendar();
+    els.calScroll.scrollTop = anchorHours * next;
+  }
+
+  function calendarShowsToday() {
+    const today = startOfDay(new Date()).getTime();
+    const start = startOfDay(state.calAnchor).getTime();
+    return today >= start && today < addDays(state.calAnchor, state.calDays).getTime();
+  }
+
+  function shiftCalendar(direction) {
+    state.calAnchor = addDays(state.calAnchor, direction * state.calDays);
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    if (state.view !== "calendar") return;
+    // Rebuilding the grid under a live drag would tear out the block being
+    // moved; every drag finishes with a render of its own.
+    if (state.calDrag && state.calDrag.active) return;
+
+    const days = state.calDays;
+    const start = startOfDay(state.calAnchor);
+    const dayDates = [];
+    for (let index = 0; index < days; index += 1) dayDates.push(addDays(start, index));
+
+    els.calDaysSelect.value = String(days);
+    els.calGrid.style.setProperty("--cal-days", String(days));
+    els.calGrid.style.setProperty("--cal-hour", `${state.calZoom}px`);
+    els.calRange.textContent = formatCalendarRange(dayDates);
+    els.calTodayButton.classList.toggle("is-current", calendarShowsToday());
+    els.calZoomInButton.disabled = state.calZoom >= CAL_MAX_ZOOM;
+    els.calZoomOutButton.disabled = state.calZoom <= CAL_MIN_ZOOM;
+
+    const segmentsByDay = buildCalendarSegments(dayDates);
+    const todayKey = localDateKey(new Date());
+    const fragment = document.createDocumentFragment();
+
+    const corner = document.createElement("div");
+    corner.className = "cal-corner";
+    fragment.appendChild(corner);
+
+    dayDates.forEach((date, index) => {
+      fragment.appendChild(createCalendarDayHead(date, segmentsByDay[index], todayKey));
+    });
+
+    fragment.appendChild(createCalendarGutter());
+
+    dayDates.forEach((date, index) => {
+      fragment.appendChild(createCalendarDayColumn(date, segmentsByDay[index], todayKey));
+    });
+
+    els.calGrid.replaceChildren(fragment);
+    state.calMinuteStamp = Math.floor(Date.now() / 60000);
+  }
+
+  // Records plus the timer that is running right now, so the calendar shows the
+  // block filling in live.
+  function calendarEntries() {
+    const entries = state.sessions.map((record) => {
+      const startTime = new Date(record.started_at).getTime();
+      const endTime = new Date(record.ended_at || record.started_at).getTime();
+      return { record, start: startTime, end: Math.max(startTime, endTime), running: false };
+    });
+
+    if (state.timer) {
+      const startTime = new Date(state.timer.startedAt).getTime();
+      entries.push({ record: null, timer: state.timer, start: startTime, end: Date.now(), running: true });
+    }
+
+    return entries;
+  }
+
+  // Split every entry into per-day pieces (a session across midnight shows in
+  // both columns), then lay overlapping pieces out side by side.
+  function buildCalendarSegments(dayDates) {
+    const rangeStart = dayDates[0].getTime();
+    const rangeEnd = addDays(dayDates[dayDates.length - 1], 1).getTime();
+    const entries = calendarEntries().filter(
+      (entry) => entry.end > rangeStart && entry.start < rangeEnd
+    );
+
+    const perDay = dayDates.map(() => []);
+
+    dayDates.forEach((date, index) => {
+      const dayStart = date.getTime();
+      const dayEnd = addDays(date, 1).getTime();
+
+      entries.forEach((entry) => {
+        const from = Math.max(entry.start, dayStart);
+        const to = Math.min(entry.end, dayEnd);
+        const startsHere = entry.start >= dayStart && entry.start < dayEnd;
+        if (to <= from && !startsHere) return;
+
+        const startMin = clamp((from - dayStart) / 60000, 0, 1440);
+        const endMin = clamp((to - dayStart) / 60000, startMin, 1440);
+        perDay[index].push({
+          entry,
+          // One piece of a record that runs past midnight: editable, but there
+          // is no single block here to drag.
+          partial: entry.start < dayStart || entry.end > dayEnd,
+          startMin,
+          // Very short records still need a tappable block.
+          endMin: Math.min(1440, Math.max(endMin, startMin + 5)),
+          minutes: Math.round((Math.min(entry.end, dayEnd) - from) / 60000),
+        });
+      });
+
+      packCalendarSegments(perDay[index]);
+    });
+
+    return perDay;
+  }
+
+  // Greedy column packing: within each run of overlapping blocks, each one takes
+  // the first column that is free, and they share the width of that run.
+  function packCalendarSegments(segments) {
+    segments.sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin);
+
+    let cluster = [];
+    let clusterEnd = -Infinity;
+
+    const flush = () => {
+      const columnEnds = [];
+      cluster.forEach((segment) => {
+        let column = columnEnds.findIndex((endMin) => endMin <= segment.startMin);
+        if (column === -1) {
+          columnEnds.push(segment.endMin);
+          column = columnEnds.length - 1;
+        } else {
+          columnEnds[column] = segment.endMin;
+        }
+        segment.column = column;
+      });
+      cluster.forEach((segment) => { segment.columns = columnEnds.length; });
+      cluster = [];
+      clusterEnd = -Infinity;
+    };
+
+    segments.forEach((segment) => {
+      if (cluster.length && segment.startMin >= clusterEnd) flush();
+      cluster.push(segment);
+      clusterEnd = Math.max(clusterEnd, segment.endMin);
+    });
+    if (cluster.length) flush();
+
+    return segments;
+  }
+
+  function createCalendarDayHead(date, segments, todayKey) {
+    const head = document.createElement("div");
+    head.className = "cal-dayhead";
+    if (localDateKey(date) === todayKey) head.classList.add("is-today");
+
+    const weekday = document.createElement("span");
+    weekday.className = "cal-weekday";
+    weekday.textContent = new Intl.DateTimeFormat(localeTag(), { weekday: "short" }).format(date);
+
+    const dayNumber = document.createElement("span");
+    dayNumber.className = "cal-daynum";
+    dayNumber.textContent = new Intl.DateTimeFormat(localeTag(), {
+      day: "2-digit",
+      month: "2-digit",
+    }).format(date);
+
+    // All the time tracked on this day, the same measure the project summary
+    // uses; only the timer still running is left out.
+    const total = segments.reduce(
+      (sum, segment) => sum + (segment.entry.record ? segment.minutes : 0),
+      0
+    );
+    const totalNode = document.createElement("span");
+    totalNode.className = "cal-daytotal";
+    totalNode.textContent = total > 0 ? formatMinutes(total) : "";
+
+    head.append(weekday, dayNumber, totalNode);
+    return head;
+  }
+
+  function createCalendarGutter() {
+    const gutter = document.createElement("div");
+    gutter.className = "cal-gutter";
+    const fragment = document.createDocumentFragment();
+
+    // From 1: a label at 0:00 would be clipped by the header above it.
+    for (let hour = 1; hour < 24; hour += 1) {
+      const label = document.createElement("span");
+      label.className = "cal-hour-label";
+      label.style.top = `calc(${hour} * var(--cal-hour))`;
+      label.textContent = formatHourLabel(hour);
+      fragment.appendChild(label);
+    }
+
+    gutter.appendChild(fragment);
+    return gutter;
+  }
+
+  function createCalendarDayColumn(date, segments, todayKey) {
+    const column = document.createElement("div");
+    column.className = "cal-day";
+    column.dataset.date = localDateKey(date);
+    const weekday = date.getDay();
+    if (weekday === 0 || weekday === 6) column.classList.add("is-weekend");
+
+    const fragment = document.createDocumentFragment();
+    segments.forEach((segment) => fragment.appendChild(createCalendarEvent(segment)));
+
+    if (localDateKey(date) === todayKey) {
+      const now = new Date();
+      const line = document.createElement("div");
+      line.className = "cal-now";
+      line.style.top = `calc(${((now.getHours() * 60 + now.getMinutes()) / 60).toFixed(4)} * var(--cal-hour))`;
+      fragment.appendChild(line);
+    }
+
+    column.appendChild(fragment);
+    return column;
+  }
+
+  function createCalendarEvent(segment) {
+    const { entry } = segment;
+    const record = entry.record;
+    const project = record ? getRecordProject(record) : getProject(entry.timer.projectId);
+    const spanHours = (segment.endMin - segment.startMin) / 60;
+    const pixelHeight = spanHours * state.calZoom;
+
+    const node = document.createElement("button");
+    node.type = "button";
+    node.className = "cal-event";
+    if (record) {
+      node.dataset.id = record.id;
+      if (record.status === "abandoned") node.classList.add("is-abandoned");
+    } else {
+      node.classList.add("is-running");
+      node.dataset.running = "true";
+    }
+    if (pixelHeight < 30) node.classList.add("is-short");
+    else if (pixelHeight < 52) node.classList.add("is-medium");
+
+    node.style.setProperty("--cal-start", (segment.startMin / 60).toFixed(4));
+    node.style.setProperty("--cal-span", spanHours.toFixed(4));
+    node.style.setProperty("--cal-left", (segment.column / segment.columns).toFixed(4));
+    node.style.setProperty("--cal-width", (1 / segment.columns).toFixed(4));
+    applyProjectVars(node, project, { alpha: state.theme === "dark" ? 0.24 : 0.16 });
+
+    const title = document.createElement("span");
+    title.className = "cal-event-title";
+    title.textContent = record ? recordDisplayTitle(record) : entry.timer.title;
+
+    const projectName = document.createElement("span");
+    projectName.className = "cal-event-project";
+    projectName.textContent = projectDisplayName(project);
+
+    const time = document.createElement("span");
+    time.className = "cal-event-time";
+    time.textContent = entry.running
+      ? `${formatTimeShort(entry.start)} · ${t("calendar.running")}`
+      : `${formatTimeShort(entry.start)} – ${formatTimeShort(entry.end)}`;
+
+    node.title = `${projectDisplayName(project)} · ${title.textContent} — ${formatMinutes(segment.minutes)}`;
+    node.append(title, projectName, time);
+
+    if (record && !segment.partial) {
+      ["start", "end"].forEach((edge) => {
+        const handle = document.createElement("span");
+        handle.className = `cal-resize is-${edge}`;
+        handle.dataset.edge = edge;
+        handle.setAttribute("aria-hidden", "true");
+        node.appendChild(handle);
+      });
+    } else if (segment.partial) {
+      node.dataset.partial = "true";
+    }
+
+    return node;
+  }
+
+  function openRecordDialogAtSlot(dayNode, event) {
+    const rect = dayNode.getBoundingClientRect();
+    const minutesFromTop = ((event.clientY - rect.top) / state.calZoom) * 60;
+    const slot = clamp(
+      Math.floor(minutesFromTop / CAL_SNAP_MINUTES) * CAL_SNAP_MINUTES,
+      0,
+      1440 - CAL_SNAP_MINUTES
+    );
+    // The column's date is a local calendar day, so build the time locally too.
+    const [year, month, day] = dayNode.dataset.date.split("-").map(Number);
+    const startedAt = new Date(year, month - 1, day, 0, slot);
+    openRecordDialog(null, { started_at: startedAt.toISOString(), minutes: 30 });
+  }
+
+  function scrollCalendarToNow() {
+    const now = new Date();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    els.calScroll.scrollTop = Math.max(0, ((minutes - 75) / 60) * state.calZoom);
+  }
+
+  // --- Calendar drag and drop ----------------------------------------------
+  // Drag empty space to block out a new record, drag a block to move it, or
+  // drag its top or bottom edge to change when it started or ended. Blocks are
+  // positioned from CSS variables, so dragging just rewrites two numbers.
+
+  function calendarDayBounds(column) {
+    const [year, month, day] = column.dataset.date.split("-").map(Number);
+    const start = new Date(year, month - 1, day);
+    return { start: start.getTime(), end: addDays(start, 1).getTime() };
+  }
+
+  // Where in the day a pointer is, snapped to the grid. `forcedColumn` keeps a
+  // gesture on the day it started on (only moving may cross days).
+  function calendarPointToTime(clientX, clientY, forcedColumn) {
+    const columns = Array.from(els.calGrid.querySelectorAll(".cal-day"));
+    if (!columns.length) return null;
+
+    let column = forcedColumn;
+    if (!column) {
+      column = columns.find((node) => {
+        const rect = node.getBoundingClientRect();
+        return clientX >= rect.left && clientX < rect.right;
+      });
+    }
+    if (!column) {
+      // Dragged off the side: stick to the nearest edge column.
+      const first = columns[0].getBoundingClientRect();
+      column = clientX < first.left ? columns[0] : columns[columns.length - 1];
+    }
+
+    const rect = column.getBoundingClientRect();
+    const minutes = ((clientY - rect.top) / state.calZoom) * 60;
+    const snapped = clamp(Math.round(minutes / CAL_SNAP_MINUTES) * CAL_SNAP_MINUTES, 0, 1440);
+    return { column, time: calendarDayBounds(column).start + snapped * 60000 };
+  }
+
+  function onCalendarPointerDown(event) {
+    if (event.button > 0 || state.calDrag) return;
+
+    const dayNode = event.target.closest(".cal-day");
+    if (!dayNode) return;
+
+    const eventNode = event.target.closest(".cal-event");
+    let mode = "create";
+    let record = null;
+
+    if (eventNode) {
+      // Neither the timer that is still running nor one piece of a record that
+      // crosses midnight is a whole block, so neither can be dragged.
+      if (eventNode.dataset.running === "true" || eventNode.dataset.partial === "true") return;
+      record = state.sessions.find((item) => item.id === eventNode.dataset.id);
+      if (!record) return;
+      const handle = event.target.closest(".cal-resize");
+      mode = handle ? (handle.dataset.edge === "start" ? "resize-start" : "resize-end") : "move";
+    }
+
+    const point = calendarPointToTime(event.clientX, event.clientY, eventNode ? dayNode : null);
+    if (!point) return;
+
+    const from = record ? new Date(record.started_at).getTime() : point.time;
+    const to = record ? new Date(record.ended_at || record.started_at).getTime() : point.time;
+
+    state.calDrag = {
+      pointerId: event.pointerId,
+      touch: event.pointerType === "touch",
+      mode,
+      record,
+      node: eventNode,
+      column: dayNode,
+      startX: event.clientX,
+      startY: event.clientY,
+      anchor: point.time,
+      from,
+      to,
+      active: false,
+      longPressId: null,
+      ghost: null,
+      current: { start: from, end: to, column: dayNode },
+    };
+
+    if (state.calDrag.touch) {
+      const drag = state.calDrag;
+      drag.longPressId = window.setTimeout(() => {
+        if (state.calDrag === drag) beginCalendarDrag();
+      }, CAL_LONG_PRESS_MS);
+    }
+
+    document.addEventListener("pointermove", onCalendarPointerMove, { passive: false });
+    document.addEventListener("pointerup", onCalendarPointerUp);
+    document.addEventListener("pointercancel", onCalendarPointerUp);
+  }
+
+  function beginCalendarDrag() {
+    const drag = state.calDrag;
+    if (!drag || drag.active) return;
+
+    drag.active = true;
+    document.body.classList.add("is-cal-dragging");
+
+    if (drag.mode === "create") {
+      drag.ghost = document.createElement("div");
+      drag.ghost.className = "cal-ghost";
+      drag.ghost.appendChild(document.createElement("span"));
+      drag.column.appendChild(drag.ghost);
+    } else {
+      drag.node.classList.add("is-dragging");
+      // Give the live time label room while it is being dragged.
+      drag.node.classList.remove("is-short", "is-medium");
+    }
+
+    paintCalendarDrag();
+  }
+
+  function onCalendarPointerMove(event) {
+    const drag = state.calDrag;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+
+    if (!drag.active) {
+      const dx = Math.abs(event.clientX - drag.startX);
+      const dy = Math.abs(event.clientY - drag.startY);
+      // A finger already moving before the press completes is scrolling.
+      if (drag.touch) {
+        if (dx > 10 || dy > 10) cancelCalendarDrag();
+        return;
+      }
+      if (dx < CAL_DRAG_THRESHOLD && dy < CAL_DRAG_THRESHOLD) return;
+      beginCalendarDrag();
+    }
+
+    event.preventDefault();
+
+    // Only a move may change day; creating and resizing stay where they began.
+    const point = calendarPointToTime(
+      event.clientX,
+      event.clientY,
+      drag.mode === "move" ? null : drag.column
+    );
+    if (point) updateCalendarDrag(point);
+    autoScrollCalendar(event.clientY);
+  }
+
+  function updateCalendarDrag(point) {
+    const drag = state.calDrag;
+    const bounds = calendarDayBounds(point.column);
+    const duration = drag.to - drag.from;
+
+    if (drag.mode === "create") {
+      drag.current = {
+        start: Math.min(drag.anchor, point.time),
+        end: Math.max(drag.anchor, point.time),
+        column: drag.column,
+      };
+    } else if (drag.mode === "move") {
+      // Records stay inside a single day, so a move that would spill over
+      // midnight stops at the edge instead.
+      let start = drag.from + (point.time - drag.anchor);
+      start = clamp(start, bounds.start, Math.max(bounds.start, bounds.end - duration));
+      drag.current = { start, end: start + duration, column: point.column };
+    } else if (drag.mode === "resize-start") {
+      const end = drag.current.end;
+      const start = clamp(point.time, bounds.start, end - CAL_MIN_MINUTES * 60000);
+      drag.current = { start, end, column: drag.column };
+    } else {
+      const start = drag.current.start;
+      const end = clamp(point.time, start + CAL_MIN_MINUTES * 60000, bounds.end);
+      drag.current = { start, end, column: drag.column };
+    }
+
+    paintCalendarDrag();
+  }
+
+  function paintCalendarDrag() {
+    const drag = state.calDrag;
+    const node = drag.mode === "create" ? drag.ghost : drag.node;
+    if (!node) return;
+
+    const column = drag.current.column;
+    const bounds = calendarDayBounds(column);
+    const startMin = clamp((drag.current.start - bounds.start) / 60000, 0, 1440);
+    const endMin = clamp((drag.current.end - bounds.start) / 60000, startMin, 1440);
+
+    if (node.parentElement !== column) column.appendChild(node);
+    node.style.setProperty("--cal-start", (startMin / 60).toFixed(4));
+    node.style.setProperty("--cal-span", Math.max(0.06, (endMin - startMin) / 60).toFixed(4));
+    // A block being dragged takes the whole column, so it can't hide behind the
+    // ones it is passing.
+    node.style.setProperty("--cal-left", "0");
+    node.style.setProperty("--cal-width", "1");
+
+    const minutes = Math.round((drag.current.end - drag.current.start) / 60000);
+    const label = `${formatTimeShort(drag.current.start)} – ${formatTimeShort(drag.current.end)} · ${formatMinutes(minutes)}`;
+    const labelNode = drag.mode === "create" ? node.firstChild : node.querySelector(".cal-event-time");
+    if (labelNode) labelNode.textContent = label;
+  }
+
+  // Nudge the day along when the pointer reaches the top or bottom of the
+  // viewport, so a block can be dragged somewhere that isn't on screen yet.
+  function autoScrollCalendar(clientY) {
+    const rect = els.calScroll.getBoundingClientRect();
+    const edge = 36;
+    let delta = 0;
+    if (clientY < rect.top + edge) delta = clientY - (rect.top + edge);
+    else if (clientY > rect.bottom - edge) delta = clientY - (rect.bottom - edge);
+    if (!delta) return;
+    els.calScroll.scrollTop += clamp(delta * 0.35, -18, 18);
+  }
+
+  function detachCalendarDragListeners() {
+    document.removeEventListener("pointermove", onCalendarPointerMove);
+    document.removeEventListener("pointerup", onCalendarPointerUp);
+    document.removeEventListener("pointercancel", onCalendarPointerUp);
+  }
+
+  function cancelCalendarDrag() {
+    const drag = state.calDrag;
+    if (!drag) return;
+    detachCalendarDragListeners();
+    window.clearTimeout(drag.longPressId);
+    state.calDrag = null;
+    document.body.classList.remove("is-cal-dragging");
+    if (drag.ghost) drag.ghost.remove();
+    if (drag.node) drag.node.classList.remove("is-dragging");
+    if (drag.active) renderCalendar();
+  }
+
+  function onCalendarPointerUp(event) {
+    const drag = state.calDrag;
+    if (!drag || (event && event.pointerId !== drag.pointerId)) return;
+
+    detachCalendarDragListeners();
+    window.clearTimeout(drag.longPressId);
+    state.calDrag = null;
+    document.body.classList.remove("is-cal-dragging");
+    if (drag.ghost) drag.ghost.remove();
+    if (drag.node) drag.node.classList.remove("is-dragging");
+
+    // Nothing moved: this was a tap, and the click handler will open the editor.
+    if (!drag.active) return;
+
+    // A finished drag must not also register as a click on what it landed on.
+    state.calSuppressClick = true;
+    window.setTimeout(() => { state.calSuppressClick = false; }, 400);
+
+    const minutes = Math.round((drag.current.end - drag.current.start) / 60000);
+
+    if (drag.mode === "create") {
+      renderCalendar();
+      if (minutes < CAL_MIN_MINUTES) return;
+      openRecordDialog(null, { started_at: new Date(drag.current.start).toISOString(), minutes });
+      return;
+    }
+
+    commitCalendarDrag(drag.record, drag.current.start, Math.max(CAL_MIN_MINUTES, minutes), drag.mode);
+  }
+
+  async function commitCalendarDrag(record, startTime, minutes, mode) {
+    // Land on whole minutes: a record made by the timer starts at some stray
+    // second, and carrying that through a drag makes the times read a minute
+    // out from the grid line it was dropped on.
+    const start = Math.floor(startTime / 60000) * 60000;
+    const started_at = new Date(start).toISOString();
+    const ended_at = new Date(start + minutes * 60000).toISOString();
+
+    if (record.started_at === started_at && Number(record.actual_minutes) === minutes) {
+      renderCalendar();
+      return;
+    }
+
+    // A block is easy to nudge by accident, so the new time is only written
+    // once it has been confirmed. The block stays where it was dropped while
+    // the question is on screen, and springs back if the answer is no.
+    const confirmed = window.confirm(
+      t(mode === "move" ? "confirm.move_record" : "confirm.resize_record", {
+        title: recordDisplayTitle(record),
+        from: formatDragSpan(record.started_at, record.ended_at || record.started_at),
+        to: formatDragSpan(started_at, ended_at),
+      })
+    );
+
+    if (!confirmed) {
+      renderCalendar();
+      return;
+    }
+
+    await updateRecord(record.id, { started_at, ended_at, actual_minutes: minutes });
+    showToast(t("toast.record_saved"));
+  }
+
+  // "Sat, Aug 8 · 09:00 – 10:45"
+  function formatDragSpan(start, end) {
+    const day = new Intl.DateTimeFormat(localeTag(), {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(start));
+    return `${day} · ${formatTimeShort(start)} – ${formatTimeShort(end)}`;
   }
 
   function renderAccount() {
@@ -1769,11 +3519,6 @@
     return url.href;
   }
 
-  async function loadActiveTimerFromCloud(options = {}) {
-    const activeTimerState = await fetchActiveTimerState(options);
-    return activeTimerState.timer;
-  }
-
   async function fetchActiveTimerState(options = {}) {
     if (!canUseCloud()) return { ok: false, timer: null };
 
@@ -1794,9 +3539,18 @@
   async function saveActiveTimerToCloud() {
     if (!canUseCloud() || !state.timer) return false;
 
-    const { error } = await state.supabase
+    let { error } = await state.supabase
       .from("active_focus_timers")
       .upsert(toCloudActiveTimer(state.timer), { onConflict: "user_id" });
+
+    // Most likely the project_id column hasn't been added yet; retry without it
+    // so cross-device timer sync keeps working on an older database.
+    if (error && !state.activeTimerProjectMissing) {
+      state.activeTimerProjectMissing = true;
+      ({ error } = await state.supabase
+        .from("active_focus_timers")
+        .upsert(toCloudActiveTimer(state.timer), { onConflict: "user_id" }));
+    }
 
     if (error) {
       warnActiveTimerSync(error);
@@ -1924,91 +3678,123 @@
     showToast(t("toast.cloud_timer_sql"));
   }
 
-  function openAccountDialog() {
-    if (typeof els.accountDialog.showModal === "function") {
-      els.accountDialog.showModal();
-    } else {
-      els.accountDialog.setAttribute("open", "");
-    }
-
+  // One way to open and close every dialog, with a fallback for browsers that
+  // never shipped showModal().
+  function showDialog(dialog) {
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
     refreshIcons();
   }
 
-  function closeAccountDialog() {
-    if (typeof els.accountDialog.close === "function") {
-      els.accountDialog.close();
-    } else {
-      els.accountDialog.removeAttribute("open");
-    }
+  function hideDialog(dialog) {
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.removeAttribute("open");
   }
 
-  function openRecordDialog(record) {
-    const now = new Date();
-    const defaults = {
-      id: "",
-      title: els.sessionTitle.value.trim() || "Deep focus",
-      started_at: now.toISOString(),
-      status: "completed",
-      duration_minutes: state.selectedDuration,
-      actual_minutes: state.selectedDuration,
-    };
-    const value = record || defaults;
+  function openAccountDialog() {
+    showDialog(els.accountDialog);
+    // Rendered here rather than at startup: the button is only ever seen in
+    // this dialog, and Google's script shouldn't cost anything until then.
+    renderGoogleSignIn();
+  }
 
-    if (els.recordTreeInput.options.length === 0) {
-      TREE_SPECIES.forEach((species) => {
-        const opt = document.createElement("option");
-        opt.value = species.id;
-        els.recordTreeInput.appendChild(opt);
-      });
-    }
-    Array.from(els.recordTreeInput.options).forEach((opt) => {
-      opt.textContent = t("tree." + opt.value);
-    });
+  function closeAccountDialog() {
+    hideDialog(els.accountDialog);
+  }
+
+  // `record` edits an existing one; `defaults` seeds a new one (the calendar
+  // passes the slot that was tapped).
+  function openRecordDialog(record, defaults = {}) {
+    const start = defaults.started_at ? new Date(defaults.started_at) : roundToQuarter(new Date());
+    const fallbackMinutes = defaults.minutes || state.selectedDuration;
+    const value = record || {
+      id: "",
+      title: "",
+      project_id: defaults.project_id || state.selectedProjectId,
+      started_at: start.toISOString(),
+      ended_at: new Date(start.getTime() + fallbackMinutes * 60000).toISOString(),
+      status: "completed",
+      duration_minutes: fallbackMinutes,
+      actual_minutes: fallbackMinutes,
+    };
 
     els.dialogTitle.textContent = record ? t("dialog.edit_session") : t("dialog.add_session");
     els.recordIdInput.value = value.id;
     els.recordTitleInput.value = value.title;
+    fillProjectSelect(els.recordProjectInput, resolveProjectId(value));
     els.recordStartedInput.value = toDatetimeLocal(value.started_at);
+    els.recordEndedInput.value = toDatetimeLocal(
+      value.ended_at || new Date(new Date(value.started_at).getTime() + value.actual_minutes * 60000)
+    );
     els.recordStatusInput.value = value.status;
     els.recordDurationInput.value = value.duration_minutes;
-    els.recordActualInput.value = value.actual_minutes;
-    els.recordTreeInput.value = record
-      ? (TREE_SPECIES.find((s) => s.label === record.tree_kind)?.id || resolveTreeForName(value.title))
-      : resolveTreeForName(value.title);
+    els.deleteRecordButton.hidden = !record;
 
-    if (typeof els.recordDialog.showModal === "function") {
-      els.recordDialog.showModal();
-    } else {
-      els.recordDialog.setAttribute("open", "");
-    }
-
+    renderRecordDialogProject();
+    renderRecordDurationHint();
+    showDialog(els.recordDialog);
     refreshIcons();
+  }
+
+  function renderRecordDialogProject() {
+    applyProjectVars(els.recordProjectDot, getProject(els.recordProjectInput.value));
+  }
+
+  // Live feedback while editing times: how long the record will be, and a
+  // warning when the end is before the start.
+  function renderRecordDurationHint() {
+    const minutes = dialogRecordMinutes();
+    els.recordDurationHint.textContent =
+      minutes == null
+        ? ""
+        : `${t("metric.focused", { n: minutes })}`;
+  }
+
+  function dialogRecordMinutes() {
+    const started = fromDatetimeLocal(els.recordStartedInput.value);
+    const ended = fromDatetimeLocal(els.recordEndedInput.value);
+    if (!started || !ended) return null;
+    return clamp(Math.round((ended.getTime() - started.getTime()) / 60000), 0, MAX_RECORD_MINUTES);
   }
 
   async function saveDialogRecord() {
     if (!els.recordForm.reportValidity()) return;
 
-    const id = els.recordIdInput.value || createId();
     const startedAt = fromDatetimeLocal(els.recordStartedInput.value);
-    const actualMinutes = cleanMinutes(els.recordActualInput.value, 0, 0);
+    const endedAtInput = fromDatetimeLocal(els.recordEndedInput.value);
+    if (!startedAt || !endedAtInput) return;
+
+    if (endedAtInput.getTime() < startedAt.getTime()) {
+      els.recordEndedInput.setCustomValidity(t("dialog.end_before_start"));
+      els.recordForm.reportValidity();
+      els.recordEndedInput.setCustomValidity("");
+      return;
+    }
+
+    const id = els.recordIdInput.value || createId();
+    const projectId = els.recordProjectInput.value || DEFAULT_PROJECT_ID;
+    const status = els.recordStatusInput.value;
+    const actualMinutes = clamp(
+      Math.round((endedAtInput.getTime() - startedAt.getTime()) / 60000),
+      0,
+      MAX_RECORD_MINUTES
+    );
     const durationMinutes = cleanMinutes(els.recordDurationInput.value, actualMinutes || 1, 1);
-    const endedAt = new Date(startedAt.getTime() + actualMinutes * 60000).toISOString();
-    const title = els.recordTitleInput.value.trim() || "Deep focus";
+    const title = els.recordTitleInput.value.trim() || projectDisplayName(getProject(projectId));
     const changes = {
       id,
       title,
+      project_id: projectId,
       started_at: startedAt.toISOString(),
-      ended_at: endedAt,
-      status: els.recordStatusInput.value,
+      // Store the end exactly as the minutes we keep, so the calendar block and
+      // the "focused" figure can never disagree.
+      ended_at: new Date(startedAt.getTime() + actualMinutes * 60000).toISOString(),
+      status,
       duration_minutes: durationMinutes,
       actual_minutes: actualMinutes,
-      tree_kind: pickTreeKind(title, els.recordStatusInput.value, els.recordTreeInput.value),
+      tree_kind: pickTreeKind(projectId, status),
       updated_at: new Date().toISOString(),
     };
-
-    // Remember the chosen species for this session name, just like the timer's
-    // tree picker does, so the next "eating ayam" session defaults to it.
-    saveTreePref(title, els.recordTreeInput.value);
 
     if (els.recordIdInput.value) {
       await updateRecord(id, changes);
@@ -2019,9 +3805,143 @@
       });
     }
 
-    rememberSessionName(changes.title);
+    if (!isRestRecord(changes)) rememberSessionName(changes.title);
     closeDialog();
     showToast(t("toast.record_saved"));
+  }
+
+  async function deleteDialogRecord() {
+    const record = state.sessions.find((item) => item.id === els.recordIdInput.value);
+    if (!record) return;
+    closeDialog();
+    await deleteRecord(record);
+  }
+
+  // --- Google sign-in ------------------------------------------------------
+  // There are two ways in, and the first is preferred:
+  //
+  //   1. Google Identity Services — Google's own button, handled in a popup on
+  //      this page. The prompt names *this site*, because the browser never
+  //      leaves it. Needs a Google client id in the config.
+  //   2. The redirect flow — the page hands off to Google and returns through
+  //      Supabase's callback, so Google's prompt names that callback URL
+  //      instead. This is the fallback, and what runs with no client id set.
+
+  const GOOGLE_GSI_SRC = "https://accounts.google.com/gsi/client";
+
+  function googleClientId() {
+    const config = window.TIMBERTIMER_SUPABASE || {};
+    return typeof config.googleClientId === "string" ? config.googleClientId.trim() : "";
+  }
+
+  // The in-page flow needs a client id, a signed-out session, and a secure
+  // context (it hashes the nonce with WebCrypto, which http:// doesn't offer).
+  function canUseGoogleIdentity() {
+    return Boolean(
+      googleClientId() &&
+      state.supabase &&
+      !state.user &&
+      window.isSecureContext &&
+      window.crypto &&
+      window.crypto.subtle
+    );
+  }
+
+  function loadGoogleIdentityScript() {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      return Promise.resolve(true);
+    }
+    if (state.gsiPromise) return state.gsiPromise;
+
+    // Loaded on demand, so opening the app never waits on Google's CDN.
+    state.gsiPromise = new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = GOOGLE_GSI_SRC;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve(Boolean(window.google && window.google.accounts && window.google.accounts.id));
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+    });
+    return state.gsiPromise;
+  }
+
+  // Google receives the hash and Supabase the original, which is how the token
+  // is proved to belong to this sign-in rather than a replayed one.
+  async function createGoogleNonce() {
+    const bytes = window.crypto.getRandomValues(new Uint8Array(32));
+    const raw = btoa(String.fromCharCode.apply(null, Array.from(bytes))).replace(/[^a-zA-Z0-9]/g, "");
+    const digest = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+    const hashed = Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+    return { raw, hashed };
+  }
+
+  async function renderGoogleSignIn() {
+    els.googleButtonHolder.replaceChildren();
+
+    if (!canUseGoogleIdentity()) {
+      els.googleSignInButton.hidden = false;
+      return;
+    }
+
+    const loaded = await loadGoogleIdentityScript();
+    // Blocked, offline, or an ad blocker ate it — the redirect still works.
+    if (!loaded) {
+      els.googleSignInButton.hidden = false;
+      return;
+    }
+
+    try {
+      const nonce = await createGoogleNonce();
+      state.googleNonce = nonce.raw;
+
+      window.google.accounts.id.initialize({
+        client_id: googleClientId(),
+        callback: onGoogleCredential,
+        nonce: nonce.hashed,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+
+      window.google.accounts.id.renderButton(els.googleButtonHolder, {
+        type: "standard",
+        theme: state.theme === "dark" ? "filled_black" : "outline",
+        size: "large",
+        text: "continue_with",
+        shape: "rectangular",
+        logo_alignment: "left",
+        // Follow the app's own language toggle rather than the browser's.
+        locale: localeTag(),
+        width: Math.round(clamp(els.googleButtonHolder.clientWidth || 320, 200, 400)),
+      });
+
+      els.googleSignInButton.hidden = true;
+    } catch (error) {
+      console.warn(error);
+      els.googleSignInButton.hidden = false;
+    }
+  }
+
+  async function onGoogleCredential(response) {
+    if (!response || !response.credential || !state.supabase) return;
+
+    const { error } = await state.supabase.auth.signInWithIdToken({
+      provider: "google",
+      token: response.credential,
+      nonce: state.googleNonce,
+    });
+
+    if (error) {
+      // Most likely this client id isn't listed on Supabase's Google provider.
+      console.warn(error);
+      els.googleSignInButton.hidden = false;
+      showToast(t("toast.google_id_failed"));
+      return;
+    }
+
+    closeAccountDialog();
   }
 
   async function signInWithGoogle() {
@@ -2075,7 +3995,15 @@
     const latestTitle = latestFocus ? latestFocus.title : "Deep focus";
     els.sessionTitle.value = savedTitle || latestTitle;
     rememberSessionName(els.sessionTitle.value);
-    state.selectedTreeId = resolveTreeForName(els.sessionTitle.value);
+    // The task name decides the project; failing that, pick up where the last
+    // session left off.
+    const paired = projectForTitle(els.sessionTitle.value);
+    if (paired) {
+      state.selectedProjectId = paired;
+    } else if (!state.projects.some((project) => project.id === state.selectedProjectId)) {
+      state.selectedProjectId = latestFocus ? resolveProjectId(latestFocus) : DEFAULT_PROJECT_ID;
+    }
+    syncSelectedTree();
   }
 
   function rememberSessionName(value) {
@@ -2083,6 +4011,8 @@
     localStorage.setItem(STORAGE_SESSION_NAME, title);
   }
 
+  // Only read now: the old per-title tree choices are folded into the projects
+  // they became, the first time this version runs.
   function loadTreePrefs() {
     try { return JSON.parse(localStorage.getItem(STORAGE_TREE_PREF) || "{}"); }
     catch { return {}; }
@@ -2093,27 +4023,28 @@
     return loadTreePrefs()[key] || null;
   }
 
-  function saveTreePref(name, speciesId) {
-    const key = (name || "").toLowerCase().trim() || "deep focus";
-    const prefs = loadTreePrefs();
-    prefs[key] = speciesId;
-    localStorage.setItem(STORAGE_TREE_PREF, JSON.stringify(prefs));
+  function fillTreeSelect(select, { includeWilted = false } = {}) {
+    const species = includeWilted ? [...TREE_SPECIES, WILTED_TREE] : TREE_SPECIES;
+    if (select.options.length !== species.length) {
+      const fragment = document.createDocumentFragment();
+      species.forEach((item) => {
+        const option = document.createElement("option");
+        option.value = item.id;
+        fragment.appendChild(option);
+      });
+      select.replaceChildren(fragment);
+    }
+    // Keep labels in sync with the current language.
+    Array.from(select.options).forEach((option) => {
+      option.textContent = t("tree." + option.value);
+    });
   }
 
   function renderTreePicker() {
-    if (els.treePicker.options.length === 0) {
-      TREE_SPECIES.forEach((species) => {
-        const opt = document.createElement("option");
-        opt.value = species.id;
-        els.treePicker.appendChild(opt);
-      });
-    }
-    // Keep labels in sync with the current language.
-    Array.from(els.treePicker.options).forEach((opt) => {
-      opt.textContent = t("tree." + opt.value);
-    });
+    const project = getProject(state.timer?.projectId || state.selectedProjectId);
+    fillTreeSelect(els.treePicker, { includeWilted: project.tree === WILTED_TREE.id });
     els.treePicker.value = state.selectedTreeId;
-    els.treePicker.disabled = !!state.timer;
+    els.treePicker.disabled = Boolean(state.timer) || project.missing;
   }
 
   function readStoredTimer() {
@@ -2139,6 +4070,7 @@
         mode: "stopwatch",
         status: "running",
         title: (timer.title || "Deep focus").trim() || "Deep focus",
+        projectId: timer.projectId || timer.project_id || DEFAULT_PROJECT_ID,
         selectedTreeId: timer.selectedTreeId || null,
         durationMinutes: 0,
         durationSeconds: 0,
@@ -2168,6 +4100,7 @@
       mode: "countdown",
       status: "running",
       title: (timer.title || "Deep focus").trim() || "Deep focus",
+      projectId: timer.projectId || timer.project_id || DEFAULT_PROJECT_ID,
       selectedTreeId: timer.selectedTreeId || null,
       durationMinutes,
       durationSeconds,
@@ -2184,36 +4117,48 @@
     const actual = cleanMinutes(record.actual_minutes, duration, 0);
     const title = record.title || "Deep focus";
     const status = record.status === "abandoned" ? "abandoned" : "completed";
+    // Records written before projects existed are mapped to one here, so the
+    // rest of the app never has to think about the two shapes.
+    const projectId = resolveProjectId(record);
     return {
       id: record.id || createId(),
       user_id: record.user_id || null,
       title,
+      project_id: projectId,
       duration_minutes: duration,
       actual_minutes: actual,
       status,
       started_at: record.started_at || now,
       ended_at: record.ended_at || record.started_at || now,
-      tree_kind: resolveTreeKind(record, title, status),
+      tree_kind: resolveTreeKind(record, projectId, status),
       created_at: record.created_at || now,
       updated_at: record.updated_at || now,
     };
   }
 
   // Keep the species that was actually chosen for this record. Only fall back
-  // to a derived default for legacy records that never stored a tree_kind.
-  function resolveTreeKind(record, title, status) {
+  // to the project's tree for records that never stored a tree_kind.
+  function resolveTreeKind(record, projectId, status) {
     if (status === "abandoned") return WILTED_TREE.label;
     const stored = record.tree_kind;
     // A rest plants a wilted tree even though it completes, and WILTED_TREE is
     // not part of TREE_SPECIES — keep it rather than re-deriving a healthy one.
     if (stored === WILTED_TREE.label) return stored;
     if (stored && TREE_SPECIES.some((s) => s.label === stored)) return stored;
-    return pickTreeKind(title, status);
+    return pickTreeKind(projectId, status);
   }
 
-  // Rests are stored as completed records carrying the wilted tree.
+  // Rest records store the English "Rest" so they mean the same thing in every
+  // language; only that untouched default is shown translated.
+  function recordDisplayTitle(record) {
+    return isRestRecord(record) && record.title === REST_RECORD_TITLE
+      ? t("rest.record_title")
+      : record.title;
+  }
+
+  // Rest is just a project now, which is what makes rests addable by hand.
   function isRestRecord(record) {
-    return record.status === "completed" && record.tree_kind === WILTED_TREE.label;
+    return resolveProjectId(record) === REST_PROJECT_ID;
   }
 
   function toCloudRecord(record, forUpdate) {
@@ -2228,6 +4173,10 @@
       updated_at: record.updated_at || new Date().toISOString(),
     };
 
+    // Databases that predate the projects migration have no such column; the
+    // record still saves, and picks its project up from its title as before.
+    if (!state.sessionsProjectColumnMissing) row.project_id = record.project_id || null;
+
     if (!forUpdate) {
       row.id = record.id;
       row.user_id = state.user.id;
@@ -2238,7 +4187,7 @@
   }
 
   function toCloudActiveTimer(timer) {
-    return {
+    const row = {
       user_id: state.user.id,
       timer_id: timer.id,
       mode: timer.mode || "countdown",
@@ -2249,17 +4198,21 @@
       end_at: new Date(timer.endAt).toISOString(),
       updated_at: new Date().toISOString(),
     };
+    // Older databases predate the column; the timer still syncs without it.
+    if (!state.activeTimerProjectMissing) row.project_id = timer.projectId || DEFAULT_PROJECT_ID;
+    return row;
   }
 
   function fromCloudActiveTimer(row) {
+    const projectId = row.project_id || DEFAULT_PROJECT_ID;
     return normalizeTimer({
       mode: row.mode || "countdown",
       title: row.title,
       id: row.timer_id,
-      // The active-timer table has no species column, so derive the tree from
-      // the synced name. The per-name default is deterministic and history is
-      // synced, so another device resolves the same tree.
-      selectedTreeId: resolveTreeForName(row.title),
+      projectId,
+      // The project owns the species, so a timer started on another device grows
+      // the same tree here.
+      selectedTreeId: getProject(projectId).tree,
       durationMinutes: row.duration_minutes,
       durationSeconds: row.duration_seconds,
       startedAt: row.started_at,
@@ -2285,15 +4238,13 @@
 
   function setFormDisabled(disabled) {
     Array.from(els.focusForm.elements).forEach((element) => {
+      // Managing projects stays available while a session runs.
+      if (element.hasAttribute("data-keep-enabled")) return;
       element.disabled = disabled;
     });
     els.durationButtons.forEach((button) => {
       button.disabled = disabled;
     });
-  }
-
-  function setButtonLabel(button, label, icon) {
-    button.innerHTML = `<i data-lucide="${icon}"></i><span>${label}</span>`;
   }
 
   function toggleTimerSound() {
@@ -2346,7 +4297,9 @@
   function toggleTheme() {
     state.theme = state.theme === "dark" ? "light" : "dark";
     localStorage.setItem(STORAGE_THEME, state.theme);
-    renderTheme();
+    // Project colours are adjusted per theme for contrast, so everything that
+    // paints with them is repainted too.
+    renderAll();
   }
 
   function renderTheme() {
@@ -2611,73 +4564,123 @@
     return new Date(b.started_at).getTime() - new Date(a.started_at).getTime();
   }
 
-  function pickTreeKind(title, status, speciesIdOverride) {
+  // The species stored on a record. Abandoned sessions always wilt; everything
+  // else takes the species its project is currently growing.
+  function pickTreeKind(projectId, status) {
     if (status === "abandoned") return WILTED_TREE.label;
-    if (speciesIdOverride) {
-      const s = TREE_SPECIES.find((sp) => sp.id === speciesIdOverride);
-      if (s) return s.label;
-    }
-    return getTreeForSession(title, status).label;
+    return treeLabelFromId(getProject(projectId).tree);
   }
 
-  function getTreeForSession(title, status) {
-    if (status === "abandoned") return WILTED_TREE;
-    const prefId = getTreePrefForName(title);
-    if (prefId) {
-      const s = TREE_SPECIES.find((sp) => sp.id === prefId);
-      if (s) return s;
-    }
-    const fallbackId = defaultTreeForName(title);
-    return TREE_SPECIES.find((s) => s.id === fallbackId) || TREE_SPECIES[0];
+  function treeLabelFromId(speciesId) {
+    const species = TREE_SPECIES.find((s) => s.id === speciesId);
+    if (species) return species.label;
+    return speciesId === WILTED_TREE.id ? WILTED_TREE.label : TREE_SPECIES[0].label;
   }
 
-  // The tree a session name should default to, in priority order:
-  //   1. an explicit choice saved on this device,
-  //   2. the species of the most recent completed session with that name —
-  //      this is synced to the cloud, so it follows the account across devices,
-  //   3. a stable per-name random as a last resort.
-  function resolveTreeForName(name) {
-    return getTreePrefForName(name) || treeIdFromHistory(name) || defaultTreeForName(name);
-  }
-
-  // Look up the species used for the most recent completed session of this name.
-  function treeIdFromHistory(name) {
-    const key = (name || "").toLowerCase().trim() || "deep focus";
-    const match = sortedSessions().find(
-      (record) => record.status === "completed" && (record.title || "").toLowerCase().trim() === key
+  // The species a record is *drawn* with. The project is the source of truth, so
+  // changing a project's tree re-plants its whole forest; the stored kind is the
+  // fallback for records whose project has been deleted.
+  function speciesForRecord(record) {
+    if (record.status === "abandoned") return WILTED_TREE;
+    const project = getRecordProject(record);
+    if (project.tree === WILTED_TREE.id) return WILTED_TREE;
+    const fromProject = TREE_SPECIES.find((s) => s.id === project.tree);
+    if (fromProject) return fromProject;
+    return (
+      TREE_SPECIES.find((s) => s.label === record.tree_kind) ||
+      TREE_SPECIES.find((s) => s.id === record.tree_kind) ||
+      TREE_SPECIES[0]
     );
-    if (!match) return null;
-    const species = TREE_SPECIES.find((s) => s.label === match.tree_kind);
-    return species ? species.id : null;
   }
 
-  // A new session name (one with no preference or history) gets a stable tree
-  // derived from the name itself, so new sessions vary across species instead
-  // of all defaulting to pine. The user can still change it any time.
+  // A new project gets a stable tree derived from its name, so projects vary
+  // across species instead of all defaulting to pine. It can be changed anytime.
   function defaultTreeForName(name) {
-    let seed = hashString(getTreeSeed(name) + ":species");
-    // Mix the bits so small-modulo selection spreads evenly across species.
-    // `>>> 0` keeps it an unsigned 32-bit int (XOR can otherwise go negative,
-    // which would yield a negative index).
-    seed ^= seed >>> 13;
-    seed = (seed * 0x5bd1e995) >>> 0;
-    seed = (seed ^ (seed >>> 15)) >>> 0;
-    return TREE_SPECIES[seed % TREE_SPECIES.length].id;
+    return TREE_SPECIES[mixedHash(`${getTreeSeed(name)}:species`) % TREE_SPECIES.length].id;
   }
 
-  function getTreePalette(seedSource) {
-    const normalizedSeed = getTreeSeed(seedSource);
-    const seed = hashString(normalizedSeed);
-    const hue = 80 + (seed % 94);
-    const leafSat = 48 + (Math.floor(seed / 17) % 18);
-    const leafLight = 58 + (Math.floor(seed / 29) % 13);
-    const barkHue = 22 + (Math.floor(seed / 7) % 32);
+  // --- Colour -------------------------------------------------------------
+  // Every tree is painted from its project's colour, so a red project grows red
+  // trees. Bark stays woody, nudged a little toward the project's hue.
+
+  function hexToRgb(hex) {
+    const value = normalizeColor(hex) || MISSING_PROJECT_COLOR;
     return {
-      leafA: `hsl(${hue}, ${leafSat}%, ${leafLight}%)`,
-      leafB: `hsl(${hue + 14 + (seed % 12)}, ${Math.max(38, leafSat - 9)}%, ${29 + (Math.floor(seed / 41) % 10)}%)`,
-      barkA: `hsl(${barkHue}, ${44 + (seed % 9)}%, ${49 + (Math.floor(seed / 11) % 12)}%)`,
-      barkB: `hsl(${barkHue}, ${38 + (Math.floor(seed / 13) % 9)}%, ${27 + (Math.floor(seed / 19) % 8)}%)`,
+      r: parseInt(value.slice(1, 3), 16),
+      g: parseInt(value.slice(3, 5), 16),
+      b: parseInt(value.slice(5, 7), 16),
     };
+  }
+
+  function hexToHsl(hex) {
+    const { r, g, b } = hexToRgb(hex);
+    const rr = r / 255;
+    const gg = g / 255;
+    const bb = b / 255;
+    const max = Math.max(rr, gg, bb);
+    const min = Math.min(rr, gg, bb);
+    const l = (max + min) / 2;
+    const delta = max - min;
+
+    if (!delta) return { h: 0, s: 0, l: l * 100 };
+
+    const s = delta / (1 - Math.abs(2 * l - 1));
+    let h;
+    if (max === rr) h = ((gg - bb) / delta) % 6;
+    else if (max === gg) h = (bb - rr) / delta + 2;
+    else h = (rr - gg) / delta + 4;
+
+    h = Math.round(h * 60);
+    if (h < 0) h += 360;
+    return { h, s: s * 100, l: l * 100 };
+  }
+
+  function hsl(h, s, l) {
+    return `hsl(${Math.round(((h % 360) + 360) % 360)}, ${clamp(Math.round(s), 0, 100)}%, ${clamp(Math.round(l), 0, 100)}%)`;
+  }
+
+  // `muted` is used for wilted trees (abandoned sessions): the project's colour
+  // is still recognisable, just drained of life.
+  function paletteFromColor(color, { muted = false } = {}) {
+    const { h, s, l } = hexToHsl(color);
+    const sat = muted ? s * 0.34 : s;
+    const light = muted ? Math.min(64, l + 6) : l;
+    // Pull the bark toward brown while keeping a hint of the project's hue.
+    const barkHue = h * 0.22 + 28 * 0.78;
+    return {
+      leafA: hsl(h, sat, clamp(light + 6, 26, 74)),
+      leafB: hsl(h + 8, sat * 0.92, clamp(light - 20, 14, 52)),
+      barkA: hsl(barkHue, muted ? 16 : 34, muted ? 44 : 46),
+      barkB: hsl(barkHue, muted ? 14 : 30, muted ? 30 : 30),
+    };
+  }
+
+  function getTreePalette(project, options) {
+    return paletteFromColor(project && project.color ? project.color : MISSING_PROJECT_COLOR, options);
+  }
+
+  // A readable version of a project colour for text on the current theme:
+  // lightened on dark, darkened on light.
+  function projectInk(color) {
+    const { h, s, l } = hexToHsl(color);
+    return state.theme === "dark"
+      ? hsl(h, Math.max(45, s), clamp(Math.max(l, 66), 66, 84))
+      : hsl(h, Math.max(40, s * 0.96), clamp(Math.min(l, 42), 24, 42));
+  }
+
+  function projectSoft(color, alpha) {
+    const { r, g, b } = hexToRgb(color);
+    const opacity = alpha != null ? alpha : (state.theme === "dark" ? 0.2 : 0.14);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+
+  // Hand a project's colours to CSS in one place, so components only style.
+  function applyProjectVars(element, project, options = {}) {
+    if (!element) return;
+    const color = (project && project.color) || MISSING_PROJECT_COLOR;
+    element.style.setProperty("--project-color", color);
+    element.style.setProperty("--project-ink", projectInk(color));
+    element.style.setProperty("--project-soft", projectSoft(color, options.alpha));
   }
 
   // --- SVG tree rendering -------------------------------------------------
@@ -2872,7 +4875,7 @@
   function cleanMinutes(value, fallback, min) {
     const number = Number.parseInt(value, 10);
     if (Number.isNaN(number)) return fallback;
-    return clamp(number, min, 600);
+    return clamp(number, min, MAX_RECORD_MINUTES);
   }
 
   function clamp(value, min, max) {
@@ -2903,6 +4906,51 @@
     }).format(new Date(value));
   }
 
+  // "8 Aug 2026, 14:00 – 15:30" — the end time matters now that records can be
+  // edited on a calendar.
+  function formatRecordRange(record) {
+    const started = new Date(record.started_at);
+    const ended = new Date(record.ended_at || record.started_at);
+    const startText = formatRecordDate(started);
+    if (ended.getTime() <= started.getTime()) return startText;
+    return `${startText} – ${formatTimeShort(ended)}`;
+  }
+
+  function formatTimeShort(value) {
+    return new Intl.DateTimeFormat(localeTag(), {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  }
+
+  function formatHourLabel(hour) {
+    return new Intl.DateTimeFormat(localeTag(), { hour: "numeric" }).format(new Date(2000, 0, 1, hour));
+  }
+
+  function formatCalendarRange(dayDates) {
+    const first = dayDates[0];
+    const last = dayDates[dayDates.length - 1];
+    const sameMonth = first.getMonth() === last.getMonth() && first.getFullYear() === last.getFullYear();
+
+    if (dayDates.length === 1) {
+      return new Intl.DateTimeFormat(localeTag(), {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }).format(first);
+    }
+
+    const startText = new Intl.DateTimeFormat(localeTag(), {
+      month: "short",
+      day: "numeric",
+    }).format(first);
+    const endText = new Intl.DateTimeFormat(localeTag(), {
+      month: sameMonth ? undefined : "short",
+      day: "numeric",
+    }).format(last);
+    return `${startText} – ${endText}`;
+  }
+
   function localDateKey(value) {
     const date = value instanceof Date ? value : new Date(value);
     const year = date.getFullYear();
@@ -2911,9 +4959,22 @@
     return `${year}-${month}-${day}`;
   }
 
-  function startOfWeek(value) {
+  function startOfDay(value) {
     const date = value instanceof Date ? new Date(value) : new Date(value);
     date.setHours(0, 0, 0, 0);
+    return date;
+  }
+
+  // New records snap to a quarter hour, which is where people actually put them.
+  function roundToQuarter(value) {
+    const date = new Date(value);
+    date.setSeconds(0, 0);
+    date.setMinutes(Math.round(date.getMinutes() / 15) * 15);
+    return date;
+  }
+
+  function startOfWeek(value) {
+    const date = startOfDay(value);
     date.setDate(date.getDate() - date.getDay());
     return date;
   }
@@ -2951,7 +5012,9 @@
   }
 
   function fromDatetimeLocal(value) {
-    return new Date(value);
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
   }
 
   function createId() {
@@ -2969,11 +5032,7 @@
   }
 
   function closeDialog() {
-    if (typeof els.recordDialog.close === "function") {
-      els.recordDialog.close();
-    } else {
-      els.recordDialog.removeAttribute("open");
-    }
+    hideDialog(els.recordDialog);
   }
 
   function showToast(message) {

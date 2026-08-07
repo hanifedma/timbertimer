@@ -12,7 +12,7 @@
     content="focus timer, pomodoro, productivity, focus app, forest timer, study timer, deep work, timeboxing" />
   <meta name="author" content="hanifedma" />
   <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://hanifedma.github.io/timbertimer/" />
+  <link rel="canonical" href="https://hanifedma.com/timbertimer/" />
   <meta name="color-scheme" content="dark light" />
   <meta id="themeColorMeta" name="theme-color" content="#000000" />
 
@@ -22,8 +22,8 @@
   <meta property="og:title" content="TimberTimer — Grow a forest while you focus" />
   <meta property="og:description"
     content="A free, minimalist focus timer. Plant a tree for every session, grow a forest, and track your focus history." />
-  <meta property="og:url" content="https://hanifedma.github.io/timbertimer/" />
-  <meta property="og:image" content="https://hanifedma.github.io/timbertimer/assets/og-image.png" />
+  <meta property="og:url" content="https://hanifedma.com/timbertimer/" />
+  <meta property="og:image" content="https://hanifedma.com/timbertimer/assets/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="TimberTimer — a forest grown from focus sessions" />
@@ -33,7 +33,7 @@
   <meta name="twitter:title" content="TimberTimer — Grow a forest while you focus" />
   <meta name="twitter:description"
     content="A free, minimalist focus timer. Plant a tree for every session and grow a forest." />
-  <meta name="twitter:image" content="https://hanifedma.github.io/timbertimer/assets/og-image.png" />
+  <meta name="twitter:image" content="https://hanifedma.com/timbertimer/assets/og-image.png" />
 
   <script>
     // Apply the saved theme before first paint so there is no flash of the
@@ -60,7 +60,7 @@
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "TimberTimer",
-      "url": "https://hanifedma.github.io/timbertimer/",
+      "url": "https://hanifedma.com/timbertimer/",
       "description": "A minimalist focus timer that grows a forest from your focus sessions, with a to-do list and optional Google sync.",
       "applicationCategory": "ProductivityApplication",
       "operatingSystem": "Any (modern web browser)",
@@ -84,8 +84,8 @@
     <div class="topbar-inner">
       <a class="brand" href="./" aria-label="TimberTimer home">
         <span class="brand-mark" aria-hidden="true">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
             <path d="M7 20h10" />
             <path d="M10 20c5.5-2.5.8-6.4 3-10" />
             <path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z" />
@@ -119,6 +119,17 @@
 
   <div class="app-shell">
 
+    <nav class="view-tabs" aria-label="Views">
+      <button id="viewFocusTab" class="view-tab is-selected" type="button" aria-current="page">
+        <span class="btn-emoji" aria-hidden="true">🌱</span>
+        <span data-i18n="view.focus">Focus</span>
+      </button>
+      <button id="viewCalendarTab" class="view-tab" type="button">
+        <span class="btn-emoji" aria-hidden="true">🗓️</span>
+        <span data-i18n="view.calendar">Calendar</span>
+      </button>
+    </nav>
+
     <main class="workspace" id="main">
       <section class="focus-panel" aria-labelledby="focusTitle">
         <h1 id="focusTitle" data-i18n="app.slogan">Forget all else, feel the timber grow.</h1>
@@ -136,11 +147,26 @@
 
         <form id="focusForm" class="focus-form">
           <label class="field">
-            <span data-i18n="field.session">Session</span>
+            <span data-i18n="field.session">Task</span>
             <input id="sessionTitle" name="sessionTitle" type="text" maxlength="80" value="Deep focus"
               list="sessionTitleSuggestions" autocomplete="off" />
           </label>
           <datalist id="sessionTitleSuggestions"></datalist>
+
+          <div class="field">
+            <span data-i18n="field.project">Project</span>
+            <div class="project-field">
+              <span id="projectDot" class="project-dot" aria-hidden="true"></span>
+              <select id="projectPicker" data-i18n-aria="field.project" aria-label="Project"></select>
+              <button id="manageProjectsButton" class="icon-only emoji-btn" type="button" data-keep-enabled
+                data-i18n-title="project.manage" data-i18n-aria="project.manage">🎨</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span data-i18n="field.tree_project">Tree (per project)</span>
+            <select id="treePicker" aria-label="Tree type"></select>
+          </div>
 
           <div id="durationField" class="field">
             <span data-i18n="field.duration">Duration</span>
@@ -155,11 +181,6 @@
                 <input id="durationInput" type="number" min="1" max="240" step="1" value="25" />
               </label>
             </div>
-          </div>
-
-          <div class="field">
-            <span data-i18n="field.tree">Tree</span>
-            <select id="treePicker" aria-label="Tree type"></select>
           </div>
 
         </form>
@@ -177,8 +198,8 @@
 
           <div class="timer-ring-wrap">
             <svg class="progress-ring" viewBox="0 0 200 200" aria-hidden="true">
-              <circle class="progress-ring-track" cx="100" cy="100" r="86"/>
-              <circle id="progressRingFill" class="progress-ring-fill" cx="100" cy="100" r="86"/>
+              <circle class="progress-ring-track" cx="100" cy="100" r="86" />
+              <circle id="progressRingFill" class="progress-ring-fill" cx="100" cy="100" r="86" />
             </svg>
             <div id="timerDisplay" class="timer-display">25:00</div>
           </div>
@@ -201,8 +222,8 @@
                 <span>Sound on</span>
               </button>
               <div id="volumeRow" class="volume-row">
-                <input id="volumeSlider" type="range" min="0" max="200" step="5" value="80"
-                  class="volume-slider" aria-label="Sound volume" />
+                <input id="volumeSlider" type="range" min="0" max="200" step="5" value="80" class="volume-slider"
+                  aria-label="Sound volume" />
                 <span id="volumeLabel" class="volume-label">80%</span>
               </div>
             </div>
@@ -235,105 +256,187 @@
 
       <div class="records-col">
 
-      <section class="notes-panel" aria-labelledby="notesTitle">
-        <div class="section-head">
-          <div>
-            <div class="panel-kicker" data-i18n="notes.kicker">Tasks</div>
-            <h2 id="notesTitle" data-i18n="notes.title">To-Do</h2>
-          </div>
-        </div>
-        <ul id="notesList" class="notes-list" aria-live="polite" aria-label="Task list"></ul>
-        <form id="notesForm" class="notes-form">
-          <input id="notesInput" type="text" maxlength="500" data-i18n-ph="notes.placeholder"
-            placeholder="Add a task…" autocomplete="off" />
-          <button class="icon-only" type="submit" data-i18n-title="notes.add">
-            <i data-lucide="corner-down-left"></i>
-          </button>
-        </form>
-      </section>
-
-      <section id="recordsPanel" class="records-panel" aria-labelledby="recordsTitle">
-        <div class="section-head">
-          <div>
-            <div class="panel-kicker" data-i18n="records.kicker">Forest record</div>
-            <h2 id="recordsTitle" data-i18n="records.title">Focus history</h2>
-          </div>
-          <button id="addRecordButton" class="secondary-button" type="button" data-i18n-title="records.add">
-            <i data-lucide="plus"></i><span data-i18n="records.add">Add session</span>
-          </button>
-        </div>
-
-        <div class="stats-grid" aria-label="Focus stats">
-          <article class="stat">
-            <span data-i18n="stats.today">Today</span>
-            <strong id="todayStat">0m</strong>
-          </article>
-          <article class="stat">
-            <span data-i18n="stats.total">Total</span>
-            <strong id="totalStat">0h</strong>
-          </article>
-        </div>
-
-        <div class="week-grove" aria-label="Your forest">
-          <div class="week-grove-head">
-            <div class="week-grove-title">
-              <div class="panel-kicker" id="grovePanelKicker">Weekly forest</div>
-              <div class="week-range-nav" aria-label="Navigate period">
-                <button id="prevWeekButton" class="icon-only range-nav-btn" type="button" title="Previous">
-                  <i data-lucide="chevron-left"></i>
-                </button>
-                <p id="weekRange">Loading</p>
-                <button id="nextWeekButton" class="icon-only range-nav-btn" type="button" title="Next">
-                  <i data-lucide="chevron-right"></i>
-                </button>
-                <button id="thisWeekButton" class="secondary-button week-today" type="button"
-                  data-i18n="grove.current">Current</button>
-              </div>
-            </div>
-            <div class="grove-controls-row">
-              <div class="grove-view-toggle" role="group" aria-label="Forest view">
-                <button class="pill-button" id="groveTodayButton" type="button" data-i18n="grove.view_today">Today</button>
-                <button class="pill-button is-selected" id="groveWeekButton" type="button" data-i18n="grove.view_week">Week</button>
-                <button class="pill-button" id="groveMonthButton" type="button" data-i18n="grove.view_month">Month</button>
-              </div>
+        <section class="notes-panel" aria-labelledby="notesTitle">
+          <div class="section-head">
+            <div>
+              <div class="panel-kicker" data-i18n="notes.kicker">Tasks</div>
+              <h2 id="notesTitle" data-i18n="notes.title">To-Do</h2>
             </div>
           </div>
-          <div class="week-grove-summary">
-            <span id="weekTreeCount">0 trees</span>
-            <span id="weekFocusTime">0m focused</span>
-            <span id="weekRestTime" hidden>0m rested</span>
+          <ul id="notesList" class="notes-list" aria-live="polite" aria-label="Task list"></ul>
+          <form id="notesForm" class="notes-form">
+            <input id="notesInput" type="text" maxlength="500" data-i18n-ph="notes.placeholder"
+              placeholder="Add a task…" autocomplete="off" />
+            <button class="icon-only" type="submit" data-i18n-title="notes.add">
+              <i data-lucide="corner-down-left"></i>
+            </button>
+          </form>
+        </section>
+
+        <section id="recordsPanel" class="records-panel" aria-labelledby="recordsTitle">
+          <div class="section-head">
+            <div>
+              <div class="panel-kicker" data-i18n="records.kicker">Forest record</div>
+              <h2 id="recordsTitle" data-i18n="records.title">Focus history</h2>
+            </div>
+            <button id="addRecordButton" class="secondary-button" type="button" data-i18n-title="records.add">
+              <i data-lucide="plus"></i><span data-i18n="records.add">Add session</span>
+            </button>
           </div>
-          <div id="weekForest" class="week-forest" aria-live="polite"></div>
-        </div>
 
-        <div class="record-tools">
-          <label class="search-field">
-            <i data-lucide="search"></i>
-            <input id="searchInput" type="search" list="sessionTitleSuggestions"
-              data-i18n-ph="records.search" placeholder="Search records" />
-          </label>
-          <select id="statusFilter" aria-label="Filter records">
-            <option value="all" data-i18n="filter.all">All</option>
-            <option value="completed" data-i18n="filter.completed">Completed</option>
-            <option value="abandoned" data-i18n="filter.abandoned">Abandoned</option>
-          </select>
-        </div>
+          <div class="stats-grid" aria-label="Focus stats">
+            <article class="stat">
+              <span data-i18n="stats.today">Today</span>
+              <strong id="todayStat">0m</strong>
+            </article>
+            <article class="stat">
+              <span data-i18n="stats.total">Total</span>
+              <strong id="totalStat">0h</strong>
+            </article>
+          </div>
 
-        <div id="emptyState" class="empty-state" hidden>
-          <i data-lucide="tree-palm"></i>
-          <strong data-i18n="records.empty">No records yet.</strong>
-        </div>
+          <div class="period-bar">
+            <div class="grove-view-toggle" role="group" aria-label="Period">
+              <button class="pill-button is-selected" id="groveTodayButton" type="button"
+                data-i18n="grove.view_today">Today</button>
+              <button class="pill-button" id="groveWeekButton" type="button" data-i18n="grove.view_week">Week</button>
+              <button class="pill-button" id="groveMonthButton" type="button"
+                data-i18n="grove.view_month">Month</button>
+            </div>
+            <div class="week-range-nav" aria-label="Navigate period">
+              <button id="prevWeekButton" class="icon-only range-nav-btn" type="button" data-i18n-title="grove.prev">
+                <i data-lucide="chevron-left"></i>
+              </button>
+              <p id="weekRange">Loading</p>
+              <button id="nextWeekButton" class="icon-only range-nav-btn" type="button" data-i18n-title="grove.next">
+                <i data-lucide="chevron-right"></i>
+              </button>
+              <button id="thisWeekButton" class="secondary-button week-today" type="button"
+                data-i18n="grove.current">Current</button>
+            </div>
+          </div>
 
-        <div id="recordsList" class="records-list" aria-live="polite"></div>
-      </section>
+          <section class="project-summary" aria-labelledby="summaryTitle">
+            <div class="summary-head">
+              <div>
+                <div class="panel-kicker" data-i18n="summary.kicker">Projects</div>
+                <h3 id="summaryTitle" data-i18n="summary.title">Time by project</h3>
+              </div>
+              <strong id="summaryTotal" class="summary-total">0m</strong>
+            </div>
+            <div class="summary-body">
+              <div class="donut-wrap">
+                <svg id="projectDonut" class="donut" viewBox="0 0 42 42" role="img" data-i18n-aria="summary.chart_label"
+                  aria-label="Time by project"></svg>
+                <div class="donut-center">
+                  <strong id="donutTotal">0m</strong>
+                  <small id="donutCount">0</small>
+                </div>
+              </div>
+              <ul id="projectLegend" class="project-legend"></ul>
+            </div>
+            <p id="summaryEmpty" class="summary-empty" data-i18n="summary.empty" hidden>No time tracked in this period.
+            </p>
+          </section>
+
+          <div class="week-grove" aria-label="Your forest">
+            <div class="week-grove-head">
+              <div class="panel-kicker" id="grovePanelKicker">Today's forest</div>
+              <div class="week-grove-summary">
+                <span id="weekTreeCount">0 trees</span>
+                <span id="weekFocusTime">0m focused</span>
+                <span id="weekRestTime" hidden>0m rested</span>
+              </div>
+            </div>
+            <div id="weekForest" class="week-forest" aria-live="polite"></div>
+          </div>
+
+          <div class="record-tools">
+            <label class="search-field">
+              <i data-lucide="search"></i>
+              <input id="searchInput" type="search" list="sessionTitleSuggestions" data-i18n-ph="records.search"
+                placeholder="Search records" />
+            </label>
+            <select id="statusFilter" aria-label="Filter records">
+              <option value="all" data-i18n="filter.all">All</option>
+              <option value="completed" data-i18n="filter.completed">Completed</option>
+              <option value="abandoned" data-i18n="filter.abandoned">Abandoned</option>
+            </select>
+          </div>
+
+          <div id="emptyState" class="empty-state" hidden>
+            <i data-lucide="tree-palm"></i>
+            <strong data-i18n="records.empty">No records yet.</strong>
+          </div>
+
+          <div id="recordsList" class="records-list" aria-live="polite"></div>
+        </section>
 
       </div>
 
     </main>
 
+    <section id="calendarView" class="calendar-view" aria-labelledby="calendarTitle" hidden>
+      <div class="section-head">
+        <div>
+          <div class="panel-kicker" data-i18n="calendar.kicker">Timeline</div>
+          <h2 id="calendarTitle" data-i18n="calendar.title">Calendar</h2>
+        </div>
+        <button id="calAddButton" class="secondary-button" type="button" data-i18n-title="records.add">
+          <i data-lucide="plus"></i><span data-i18n="records.add">Add session</span>
+        </button>
+      </div>
+
+      <div class="cal-toolbar">
+        <div class="cal-nav">
+          <button id="calPrevButton" class="icon-only range-nav-btn" type="button" data-i18n-title="calendar.prev">
+            <i data-lucide="chevron-left"></i>
+          </button>
+          <p id="calRange">Loading</p>
+          <button id="calNextButton" class="icon-only range-nav-btn" type="button" data-i18n-title="calendar.next">
+            <i data-lucide="chevron-right"></i>
+          </button>
+          <button id="calTodayButton" class="secondary-button week-today" type="button"
+            data-i18n="calendar.today">Today</button>
+        </div>
+
+        <div class="cal-controls">
+          <label class="cal-days-field">
+            <span data-i18n="calendar.days_label">Days</span>
+            <select id="calDaysSelect" data-i18n-aria="calendar.days_label" aria-label="Days shown">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3" selected>3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+            </select>
+          </label>
+          <div class="cal-zoom" role="group" data-i18n-aria="calendar.zoom" aria-label="Zoom">
+            <button id="calZoomOutButton" class="icon-only range-nav-btn" type="button"
+              data-i18n-title="calendar.zoom_out">
+              <i data-lucide="minus"></i>
+            </button>
+            <button id="calZoomInButton" class="icon-only range-nav-btn" type="button"
+              data-i18n-title="calendar.zoom_in">
+              <i data-lucide="plus"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="calScroll" class="cal-scroll">
+        <div id="calGrid" class="cal-grid"></div>
+      </div>
+
+      <p class="cal-hint" data-i18n="calendar.hint">Tap an empty slot to add a record, or a block to edit it.</p>
+    </section>
+
     <footer class="site-footer">
       <p data-i18n-html="footer.tagline">🌲 <strong>TimberTimer</strong> — grow a forest while you focus.</p>
-      <p class="footer-meta" data-i18n="footer.meta">Your records stay in this browser, or sync privately with Google.</p>
+      <p class="footer-meta" data-i18n="footer.meta">Your records stay in this browser, or sync privately with Google.
+      </p>
     </footer>
   </div>
 
@@ -357,6 +460,7 @@
       </div>
 
       <div id="authActions" class="auth-form" hidden>
+        <div id="googleButtonHolder" class="google-button-holder"></div>
         <button id="googleSignInButton" class="google-button" type="button">
           <svg class="google-g" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
             <path fill="#EA4335"
@@ -395,7 +499,7 @@
           <div class="panel-kicker" data-i18n="dialog.record">Record</div>
           <h2 id="dialogTitle">Edit session</h2>
         </div>
-        <button class="icon-only" value="cancel" type="submit" data-i18n-title="account.close">
+        <button class="icon-only" value="cancel" type="submit" formnovalidate data-i18n-title="account.close">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -403,14 +507,27 @@
       <input id="recordIdInput" type="hidden" />
 
       <label class="field">
-        <span data-i18n="field.session">Session</span>
-        <input id="recordTitleInput" type="text" maxlength="80" list="sessionTitleSuggestions" required />
+        <span data-i18n="field.session">Task</span>
+        <input id="recordTitleInput" type="text" maxlength="80" list="sessionTitleSuggestions"
+          data-i18n-ph="field.task_placeholder" placeholder="Task name (optional)" />
       </label>
+
+      <div class="field">
+        <span data-i18n="field.project">Project</span>
+        <div class="project-field">
+          <span id="recordProjectDot" class="project-dot" aria-hidden="true"></span>
+          <select id="recordProjectInput" data-i18n-aria="field.project" aria-label="Project"></select>
+        </div>
+      </div>
 
       <div class="form-grid">
         <label class="field">
           <span data-i18n="field.started">Started</span>
           <input id="recordStartedInput" type="datetime-local" required />
+        </label>
+        <label class="field">
+          <span data-i18n="field.ended">Ended</span>
+          <input id="recordEndedInput" type="datetime-local" required />
         </label>
         <label class="field">
           <span data-i18n="field.status">Status</span>
@@ -421,22 +538,85 @@
         </label>
         <label class="field">
           <span data-i18n="field.goal_minutes">Goal minutes</span>
-          <input id="recordDurationInput" type="number" min="1" max="600" required />
+          <input id="recordDurationInput" type="number" min="1" max="1440" required />
         </label>
-        <label class="field">
-          <span data-i18n="field.actual_minutes">Actual minutes</span>
-          <input id="recordActualInput" type="number" min="0" max="600" required />
-        </label>
+      </div>
+
+      <p id="recordDurationHint" class="dialog-hint"></p>
+
+      <menu class="dialog-actions">
+        <button id="deleteRecordButton" class="ghost-button danger-button dialog-delete" value="cancel" type="button"
+          data-i18n="action.delete">Delete</button>
+        <button class="ghost-button" value="cancel" type="submit" formnovalidate data-i18n="btn.cancel">Cancel</button>
+        <button id="saveRecordButton" class="primary-button" value="default" type="button">
+          <i data-lucide="save"></i>
+          <span data-i18n="btn.save">Save</span>
+        </button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="projectsDialog" class="projects-dialog" aria-labelledby="projectsTitle">
+    <div class="projects-dialog-body">
+      <div class="section-head">
+        <div>
+          <div class="panel-kicker" data-i18n="project.kicker">Projects</div>
+          <h2 id="projectsTitle" data-i18n="project.manage">Manage projects</h2>
+        </div>
+        <button id="closeProjectsDialogButton" class="icon-only" type="button" data-i18n-title="account.close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <ul id="projectsList" class="projects-list"></ul>
+
+      <button id="newProjectButton" class="primary-button" type="button">
+        <i data-lucide="plus"></i>
+        <span data-i18n="project.new">New project</span>
+      </button>
+    </div>
+  </dialog>
+
+  <dialog id="projectDialog" class="project-dialog">
+    <form id="projectForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <div class="panel-kicker" data-i18n="project.kicker">Projects</div>
+          <h2 id="projectDialogTitle" data-i18n="project.new">New project</h2>
+        </div>
+        <button class="icon-only" value="cancel" type="submit" formnovalidate data-i18n-title="account.close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <input id="projectIdInput" type="hidden" />
+
+      <label class="field">
+        <span data-i18n="project.name">Project name</span>
+        <input id="projectNameInput" type="text" maxlength="60" required />
+      </label>
+
+      <div class="field">
+        <span data-i18n="project.color">Color</span>
+        <div id="projectColorGrid" class="color-grid" role="radiogroup" data-i18n-aria="project.color"
+          aria-label="Color"></div>
       </div>
 
       <label class="field">
         <span data-i18n="field.tree">Tree</span>
-        <select id="recordTreeInput" aria-label="Tree type"></select>
+        <select id="projectTreeInput" aria-label="Tree type"></select>
       </label>
 
+      <div class="project-preview">
+        <span id="projectPreviewPlant" class="plant" aria-hidden="true"></span>
+        <span id="projectPreviewName" class="project-chip"></span>
+      </div>
+
       <menu class="dialog-actions">
-        <button class="ghost-button" value="cancel" type="submit" data-i18n="btn.cancel">Cancel</button>
-        <button id="saveRecordButton" class="primary-button" value="default" type="button">
+        <button id="deleteProjectButton" class="ghost-button danger-button dialog-delete" value="cancel" type="button"
+          data-i18n="project.delete">Delete</button>
+        <button class="ghost-button" value="cancel" type="submit" formnovalidate data-i18n="btn.cancel">Cancel</button>
+        <button id="saveProjectButton" class="primary-button" value="default" type="button">
           <i data-lucide="save"></i>
           <span data-i18n="btn.save">Save</span>
         </button>

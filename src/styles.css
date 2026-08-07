@@ -28,6 +28,7 @@
   --leaf: #30d158;
   --amber: #ff9f0a;
   --danger: #ff453a;
+  --now: #ff453a;
   --leaf-soft: rgba(48, 209, 88, 0.16);
   --danger-soft: rgba(255, 69, 58, 0.16);
 
@@ -69,6 +70,7 @@
   --leaf: #248a3d;
   --amber: #ff9500;
   --danger: #ff3b30;
+  --now: #ff3b30;
   --leaf-soft: rgba(36, 138, 61, 0.12);
   --danger-soft: rgba(255, 59, 48, 0.1);
 
@@ -695,6 +697,17 @@ button:focus-visible {
   background: var(--accent);
 }
 
+/* Holds Google's own rendered button. It collapses when there isn't one, so
+   the fallback below sits where it always has. */
+.google-button-holder {
+  display: flex;
+  justify-content: center;
+}
+
+.google-button-holder:empty {
+  display: none;
+}
+
 /* Standard white "Sign in with Google" button, works in both themes. */
 .google-button {
   display: inline-flex;
@@ -1217,6 +1230,10 @@ body.is-reordering .note-item {
   white-space: nowrap;
 }
 
+.record-main > .project-chip {
+  margin-top: 7px;
+}
+
 .record-date {
   margin-top: 4px;
 }
@@ -1358,8 +1375,10 @@ body.is-reordering .note-item {
 }
 
 .account-dialog::backdrop,
-.record-dialog::backdrop {
-  background: var(--surface-2);
+.record-dialog::backdrop,
+.projects-dialog::backdrop,
+.project-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
 }
 
 .account-dialog-body,
@@ -1637,6 +1656,847 @@ body.is-reordering .note-item {
   text-align: right;
   white-space: nowrap;
 }
+/* --- View tabs (Focus / Calendar) --------------------------------------- */
+
+.view-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.view-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  min-height: 40px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: transparent;
+  font-weight: 500;
+}
+
+.view-tab:hover {
+  color: var(--ink);
+  background: var(--fill-1);
+}
+
+.view-tab.is-selected {
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+/* --- Projects ------------------------------------------------------------ */
+
+.project-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.project-field select {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-dot {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--project-color, var(--accent));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--project-color, var(--accent)) 22%, transparent);
+}
+
+.project-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  max-width: 100%;
+  padding: 2px 9px 2px 7px;
+  border-radius: 999px;
+  color: var(--project-ink, var(--accent));
+  background: var(--project-soft, var(--fill-2));
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-chip::before {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--project-color, var(--accent));
+  content: "";
+}
+
+/* --- Period bar ---------------------------------------------------------- */
+
+.period-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.period-bar .week-range-nav {
+  margin-top: 0;
+}
+
+/* --- Project summary (donut + legend) ------------------------------------ */
+
+.project-summary {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.summary-head h3 {
+  font-size: 1.02rem;
+}
+
+.summary-total {
+  font-size: 1.34rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.summary-body {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.summary-body[hidden] {
+  display: none;
+}
+
+.donut-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 148px;
+  height: 148px;
+}
+
+.donut {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.donut circle {
+  fill: none;
+  stroke-width: 5.2;
+  transition: stroke-dasharray 320ms ease;
+}
+
+.donut .donut-track {
+  stroke: var(--fill-2);
+}
+
+.donut-center {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  pointer-events: none;
+  text-align: center;
+}
+
+.donut-center strong {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.donut-center small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.project-legend {
+  display: grid;
+  gap: 4px;
+  max-height: 168px;
+  margin: 0;
+  padding: 0 4px 0 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.legend-item {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+}
+
+.legend-item:hover {
+  background: var(--fill-1);
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--project-color, var(--accent));
+}
+
+.legend-name {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legend-time {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.legend-pct {
+  min-width: 38px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.summary-empty {
+  margin: 14px 0 2px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+/* --- Calendar ------------------------------------------------------------ */
+
+.calendar-view {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.calendar-view[hidden] {
+  display: none;
+}
+
+.cal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.cal-nav,
+.cal-controls,
+.cal-zoom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cal-controls {
+  gap: 10px;
+}
+
+.cal-nav p {
+  margin: 0 4px;
+  min-width: 120px;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.cal-days-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cal-days-field span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cal-days-field select {
+  width: 68px;
+  min-height: 34px;
+  padding: 0 26px 0 10px;
+}
+
+/* The scroller owns both axes: the header row sticks to its top and the hour
+   gutter to its left, so a wide week can scroll sideways without losing them. */
+.cal-scroll {
+  position: relative;
+  height: min(66vh, 720px);
+  min-height: 320px;
+  margin-top: 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: 56px repeat(var(--cal-days, 3), minmax(var(--cal-col-min, 96px), 1fr));
+  grid-template-rows: auto auto;
+  min-width: min-content;
+}
+
+/* Stacking order inside the scroller, lowest first: day background → event
+   blocks (1) → now line (2) → hour gutter (6) → day headers (8) → corner (10).
+   The gutter and the headers have to stay above the blocks, because both axes
+   scroll underneath them. */
+.cal-corner,
+.cal-dayhead {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.cal-corner {
+  left: 0;
+  z-index: 10;
+  border-right: 1px solid var(--line);
+}
+
+.cal-dayhead {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: 8px 4px;
+  border-left: 1px solid var(--line);
+  text-align: center;
+}
+
+.cal-dayhead .cal-weekday {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cal-dayhead .cal-daynum {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.cal-dayhead .cal-daytotal {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tint today's header as an image layer, so it keeps the opaque background
+   colour underneath — otherwise blocks scrolling under it would show through. */
+.cal-dayhead.is-today {
+  background-image: linear-gradient(var(--accent-soft), var(--accent-soft));
+}
+
+.cal-dayhead.is-today .cal-daynum,
+.cal-dayhead.is-today .cal-weekday {
+  color: var(--accent);
+}
+
+.cal-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  height: calc(24 * var(--cal-hour, 64px));
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.cal-hour-label {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  color: var(--soft);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cal-day {
+  position: relative;
+  z-index: 0;
+  height: calc(24 * var(--cal-hour, 64px));
+  border-left: 1px solid var(--line);
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      var(--line) 0,
+      var(--line) 1px,
+      transparent 1px,
+      transparent var(--cal-hour, 64px)
+    );
+}
+
+.cal-day.is-weekend {
+  background-color: var(--fill-1);
+}
+
+.cal-event {
+  position: absolute;
+  top: calc(var(--cal-start, 0) * var(--cal-hour, 64px));
+  left: calc(var(--cal-left, 0) * 100%);
+  width: calc(var(--cal-width, 1) * 100%);
+  height: calc(var(--cal-span, 1) * var(--cal-hour, 64px));
+  min-height: 15px;
+  display: block;
+  overflow: hidden;
+  padding: 3px 6px 3px 8px;
+  border: none;
+  border-left: 3px solid var(--project-color, var(--accent));
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--project-soft, var(--fill-2));
+  text-align: left;
+  font: inherit;
+  z-index: 1;
+  transition: filter 140ms ease;
+}
+
+.cal-event:hover,
+.cal-event:focus-visible {
+  filter: brightness(1.08);
+  z-index: 3;
+}
+
+.cal-event:not([data-running]):not([data-partial]) {
+  cursor: grab;
+}
+
+/* Edge grips for changing when a record started or ended. They sit inside the
+   block, so a short one keeps its whole surface for moving instead. */
+.cal-resize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 9px;
+  cursor: ns-resize;
+}
+
+.cal-resize.is-start {
+  top: 0;
+}
+
+.cal-resize.is-end {
+  bottom: 0;
+}
+
+.cal-event.is-short .cal-resize {
+  display: none;
+}
+
+.cal-event.is-dragging {
+  z-index: 6;
+  cursor: grabbing;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  filter: brightness(1.1);
+}
+
+/* The block being drawn out on empty space. */
+.cal-ghost {
+  position: absolute;
+  top: calc(var(--cal-start, 0) * var(--cal-hour, 64px));
+  left: 0;
+  width: 100%;
+  height: calc(var(--cal-span, 1) * var(--cal-hour, 64px));
+  min-height: 16px;
+  z-index: 6;
+  display: flex;
+  align-items: flex-start;
+  overflow: hidden;
+  padding: 3px 6px;
+  border: 1px dashed var(--accent);
+  border-radius: 6px;
+  background: var(--accent-soft);
+  pointer-events: none;
+}
+
+.cal-ghost span {
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+body.is-cal-dragging {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.is-cal-dragging .cal-event {
+  cursor: grabbing;
+}
+
+.cal-event.is-abandoned {
+  border-left-style: dashed;
+  opacity: 0.78;
+}
+
+.cal-event.is-running {
+  border-left-color: var(--now);
+  box-shadow: inset 0 0 0 1px var(--now);
+}
+
+.cal-event-title {
+  display: block;
+  overflow: hidden;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-event-project {
+  display: block;
+  overflow: hidden;
+  color: var(--project-ink, var(--accent));
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-event-time {
+  display: block;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+/* Short blocks only have room for the title. */
+.cal-event.is-short {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+.cal-event.is-short .cal-event-project,
+.cal-event.is-short .cal-event-time {
+  display: none;
+}
+
+.cal-event.is-medium .cal-event-time {
+  display: none;
+}
+
+.cal-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid var(--now);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.cal-now::before {
+  position: absolute;
+  top: -5px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--now);
+  content: "";
+}
+
+.cal-hint {
+  margin: 10px 2px 0;
+  color: var(--soft);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+/* --- Project dialogs ----------------------------------------------------- */
+
+.projects-dialog,
+.project-dialog {
+  width: min(520px, calc(100% - 28px));
+  max-height: calc(100vh - 28px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.projects-dialog-body,
+.project-dialog form {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.projects-list {
+  display: grid;
+  gap: 6px;
+  max-height: min(52vh, 420px);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.project-row-item {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--control);
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--surface-2);
+  text-align: left;
+  font: inherit;
+}
+
+.project-row-item:hover {
+  background: var(--fill-2);
+}
+
+.project-row-name {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-row-meta {
+  color: var(--muted);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+  gap: 8px;
+}
+
+.color-swatch {
+  position: relative;
+  height: 34px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--swatch);
+}
+
+.color-swatch[aria-checked="true"] {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px var(--surface) inset;
+}
+
+.project-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 110px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.project-preview .plant {
+  width: 96px;
+  height: 106px;
+  transform: scale(0.92);
+}
+
+.dialog-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.dialog-delete {
+  width: auto;
+  margin-right: auto;
+}
+
+.dialog-actions {
+  flex-wrap: wrap;
+}
+
+/* --- Responsive ---------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .summary-body {
+    grid-template-columns: 124px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .donut-wrap {
+    width: 124px;
+    height: 124px;
+  }
+}
+
+@media (max-width: 780px) {
+  .calendar-view {
+    margin-top: 12px;
+    padding: 14px;
+  }
+
+  .cal-toolbar {
+    gap: 8px;
+  }
+
+  .cal-nav {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+
+  .cal-nav p {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.8rem;
+  }
+
+  .cal-controls {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+
+  .cal-scroll {
+    height: min(62vh, 560px);
+  }
+
+  .cal-grid {
+    grid-template-columns: 44px repeat(var(--cal-days, 3), minmax(var(--cal-col-min, 78px), 1fr));
+  }
+
+  .summary-body {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  .project-legend {
+    width: 100%;
+    max-height: 200px;
+  }
+
+  .period-bar {
+    justify-content: center;
+  }
+
+  .period-bar .grove-view-toggle,
+  .period-bar .week-range-nav {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  .view-tabs {
+    position: sticky;
+    top: 58px;
+    z-index: 15;
+  }
+}
+
+@media (max-width: 430px) {
+  /* Let the heading wrap instead of the button splitting across two lines. */
+  .section-head {
+    flex-wrap: wrap;
+  }
+
+  .section-head .secondary-button {
+    white-space: nowrap;
+  }
+
+  .cal-grid {
+    grid-template-columns: 38px repeat(var(--cal-days, 3), minmax(var(--cal-col-min, 72px), 1fr));
+  }
+
+  .cal-event {
+    padding-left: 5px;
+    padding-right: 3px;
+  }
+
+  .cal-hour-label {
+    right: 4px;
+    font-size: 0.62rem;
+  }
+
+  .color-grid {
+    grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
+  }
+}
+
+/* Wide screens: the calendar gets the full column width the workspace uses. */
+@media (min-width: 1200px) {
+  .cal-scroll {
+    height: min(70vh, 820px);
+  }
+}
+
 .site-footer {
   margin-top: 22px;
   padding: 22px 8px 6px;

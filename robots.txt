@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://hanifedma.github.io/timbertimer/sitemap.xml
+Sitemap: https://hanifedma.com/timbertimer/sitemap.xml
