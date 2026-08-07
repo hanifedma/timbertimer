@@ -8,5 +8,5 @@ window.TIMBERTIMER_SUPABASE = {
   // of the Supabase callback URL. Left empty, sign-in falls back to redirecting
   // through Supabase, which works just as well but shows that address.
   // A client id is public — it is meant to be visible in the page.
-  googleClientId: "",
+  googleClientId: "423591952914-13cjnfhqqjs2aq1o6flbdj1dtusruo5g.apps.googleusercontent.com",
 };

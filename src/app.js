@@ -620,6 +620,7 @@
     els.closeProjectsDialogButton.addEventListener("click", closeProjectsDialog);
     els.newProjectButton.addEventListener("click", () => openProjectDialog());
     els.saveProjectButton.addEventListener("click", saveProjectDialog);
+    bindEnterToSave(els.projectForm, saveProjectDialog);
     els.deleteProjectButton.addEventListener("click", deleteProjectFromDialog);
     els.projectNameInput.addEventListener("input", onProjectNameInput);
     els.projectTreeInput.addEventListener("change", () => {
@@ -707,6 +708,7 @@
     els.addRecordButton.addEventListener("click", () => openRecordDialog());
     els.calAddButton.addEventListener("click", () => openRecordDialog());
     els.saveRecordButton.addEventListener("click", saveDialogRecord);
+    bindEnterToSave(els.recordForm, saveDialogRecord);
     els.deleteRecordButton.addEventListener("click", deleteDialogRecord);
     els.recordProjectInput.addEventListener("change", renderRecordDialogProject);
     els.recordTitleInput.addEventListener("input", () => {
@@ -3676,6 +3678,22 @@
     if (silent || state.activeTimerSyncWarningShown) return;
     state.activeTimerSyncWarningShown = true;
     showToast(t("toast.cloud_timer_sql"));
+  }
+
+  // Enter saves. Without this the browser submits the form through its first
+  // submit button — which is the close button — so pressing Enter after typing
+  // would throw the work away.
+  function bindEnterToSave(form, save) {
+    form.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      // Mid-composition Enter is how an IME accepts a word (Korean, Japanese,
+      // pinyin), not how it submits a form.
+      if (event.isComposing || event.keyCode === 229) return;
+      const target = event.target;
+      if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
+      event.preventDefault();
+      save();
+    });
   }
 
   // One way to open and close every dialog, with a fallback for browsers that
