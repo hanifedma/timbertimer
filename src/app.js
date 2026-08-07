@@ -143,6 +143,7 @@
     "account.status_local": { en: "Records are saved in this browser.", ko: "기록이 이 브라우저에 저장됩니다." },
     "account.status_cloud": { en: "Use Google to sync records across devices.", ko: "Google로 로그인하면 기기 간에 동기화돼요." },
     "account.continue_google": { en: "Continue with Google", ko: "Google로 계속하기" },
+    "account.other_way": { en: "Trouble signing in? Use the redirect", ko: "로그인이 안 되나요? 리디렉션 사용" },
     "account.sign_out": { en: "Sign out", ko: "로그아웃" },
     "account.delete_all": { en: "Delete all records", ko: "모든 기록 삭제" },
     "badge.local": { en: "Local", ko: "로컬" },
@@ -3896,18 +3897,32 @@
     return { raw, hashed };
   }
 
+  // The redirect button is always on screen — as the only way in when Google's
+  // own button can't be used, and as a quiet second option when it can. Some
+  // failures (an unregistered origin, say) happen inside Google's popup and
+  // never report back here, so hiding it would leave no way to sign in at all.
+  function setGoogleFallbackRole(role) {
+    const label = els.googleSignInButton.querySelector("span");
+    const key = role === "secondary" ? "account.other_way" : "account.continue_google";
+    els.googleSignInButton.hidden = false;
+    els.googleSignInButton.classList.toggle("is-secondary", role === "secondary");
+    // Set the key too, so switching language keeps the right label.
+    label.dataset.i18n = key;
+    label.textContent = t(key);
+  }
+
   async function renderGoogleSignIn() {
     els.googleButtonHolder.replaceChildren();
 
     if (!canUseGoogleIdentity()) {
-      els.googleSignInButton.hidden = false;
+      setGoogleFallbackRole("primary");
       return;
     }
 
     const loaded = await loadGoogleIdentityScript();
     // Blocked, offline, or an ad blocker ate it — the redirect still works.
     if (!loaded) {
-      els.googleSignInButton.hidden = false;
+      setGoogleFallbackRole("primary");
       return;
     }
 
@@ -3935,10 +3950,10 @@
         width: Math.round(clamp(els.googleButtonHolder.clientWidth || 320, 200, 400)),
       });
 
-      els.googleSignInButton.hidden = true;
+      setGoogleFallbackRole("secondary");
     } catch (error) {
       console.warn(error);
-      els.googleSignInButton.hidden = false;
+      setGoogleFallbackRole("primary");
     }
   }
 
@@ -3954,7 +3969,7 @@
     if (error) {
       // Most likely this client id isn't listed on Supabase's Google provider.
       console.warn(error);
-      els.googleSignInButton.hidden = false;
+      setGoogleFallbackRole("primary");
       showToast(t("toast.google_id_failed"));
       return;
     }

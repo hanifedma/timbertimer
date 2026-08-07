@@ -728,6 +728,25 @@ button:focus-visible {
   flex: 0 0 auto;
 }
 
+/* Standing behind Google's own button: still reachable, but clearly the
+   second choice. */
+.google-button.is-secondary {
+  min-height: 34px;
+  border-color: transparent;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.82rem;
+}
+
+.google-button.is-secondary:hover {
+  color: var(--ink);
+  background: var(--fill-1);
+}
+
+.google-button.is-secondary .google-g {
+  display: none;
+}
+
 /* Colourful emoji in place of flat icons. */
 .emoji-btn {
   font-size: 20px;
