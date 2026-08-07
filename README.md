@@ -6,6 +6,23 @@ Live: **https://hanifedma.com/timbertimer/**
 
 No build step — it's a static site (HTML/CSS/vanilla JS) that also works offline as an installable PWA.
 
+## A look at it
+
+Timer, to‑do list, and where the day actually went — each project in its own colour,
+and a forest grown from the sessions you finished.
+
+![The focus view: a countdown timer beside a to-do list, a donut of time by project, and today's forest of coloured trees](docs/screenshots/focus.png)
+
+The calendar shows one to seven days at a time. Drag empty space to add a record,
+drag a block to move it, or drag its edges to change when it started or ended.
+
+![The calendar view: three days side by side, each record a block coloured by its project](docs/screenshots/calendar.png)
+
+A project owns its colour and its tree, so recolouring one re‑plants its whole forest.
+Name a new project and both are picked for you.
+
+![The project editor: a name, a grid of colour swatches, a tree picker, and a live preview](docs/screenshots/project.png)
+
 ## Features
 
 - **Projects with their own colour and tree** — every record belongs to a project; pick from 16 colours and 7 tree species, or just name it and let both be chosen for you. Change a project's colour and its whole forest changes with it.
@@ -122,6 +139,7 @@ Everything degrades gracefully, so nothing breaks if you deploy the files before
 - `src/styles.css` — responsive light/dark UI.
 - `src/supabase-config.js` — Supabase connection settings.
 - `docs/supabase-schema.sql` — database tables + per‑user RLS policies.
+- `docs/screenshots/` — the images in this README.
 - `service-worker.js` — offline PWA cache.
 - `manifest.webmanifest` — install metadata.
 - `robots.txt`, `sitemap.xml` — SEO.
