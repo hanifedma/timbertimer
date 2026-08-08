@@ -60,8 +60,6 @@
 
   // --- i18n (English default, Korean opt-in) ------------------------------
   const TR = {
-    "nav.record": { en: "Record", ko: "기록" },
-    "nav.records": { en: "Records", ko: "기록" },
     "nav.account": { en: "Account", ko: "계정" },
     "nav.local": { en: "Local", ko: "로컬" },
     "nav.sign_in": { en: "Sign in", ko: "로그인" },
@@ -353,7 +351,6 @@
     startButton: document.getElementById("startButton"),
     finishButton: document.getElementById("finishButton"),
     soundToggleButton: document.getElementById("soundToggleButton"),
-    recordsPanel: document.getElementById("recordsPanel"),
     accountButton: document.getElementById("accountButton"),
     accountDialog: document.getElementById("accountDialog"),
     closeAccountDialogButton: document.getElementById("closeAccountDialogButton"),
@@ -785,18 +782,6 @@
     els.closeAccountDialogButton.addEventListener("click", closeAccountDialog);
     els.accountDialog.addEventListener("click", (event) => {
       if (event.target === els.accountDialog) closeAccountDialog();
-    });
-
-    document.querySelectorAll("[data-panel-jump]").forEach((button) => {
-      button.addEventListener("click", () => {
-        if (button.dataset.panelJump !== "records") return;
-        // The history lives on the focus view, so come back to it first and let
-        // the browser lay the panel out before scrolling to it.
-        setView("timer");
-        requestAnimationFrame(() => {
-          els.recordsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      });
     });
   }
 

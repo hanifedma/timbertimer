@@ -1,4 +1,4 @@
-const CACHE_NAME = "timbertimer-v71";
+const CACHE_NAME = "timbertimer-v72";
 const CACHE_PREFIX = "timbertimer-";
 // Every entry must resolve: cache.addAll() rejects the whole install if any
 // single request 404s, which would silently disable the worker.

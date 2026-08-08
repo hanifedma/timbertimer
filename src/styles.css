@@ -2472,12 +2472,6 @@ body.is-cal-dragging .cal-event {
     flex: 1 1 100%;
     justify-content: center;
   }
-
-  .view-tabs {
-    position: sticky;
-    top: 58px;
-    z-index: 15;
-  }
 }
 
 @media (max-width: 430px) {
