@@ -276,7 +276,9 @@ button:disabled {
   flex: 0 0 44px;
   border: 1px solid var(--accent-line);
   border-radius: var(--radius);
-  color: var(--accent-ink);
+  /* White rather than --accent-ink, so the mark matches the favicon and app
+     icon in both themes instead of turning dark alongside button labels. */
+  color: #ffffff;
   background: var(--accent);
 }
 
