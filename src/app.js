@@ -180,7 +180,6 @@
     "confirm.delete_all_cloud": { en: "Delete all cloud records? This cannot be undone.", ko: "모든 클라우드 기록을 삭제할까요? 되돌릴 수 없어요." },
     "confirm.delete_all_local": { en: "Delete all local records? This cannot be undone.", ko: "모든 로컬 기록을 삭제할까요? 되돌릴 수 없어요." },
     "confirm.delete_record": { en: 'Delete "{title}"?', ko: '"{title}"을(를) 삭제할까요?' },
-    "title.focus_running": { en: "Focus running", ko: "집중 진행 중" },
     "title.focus": { en: "Focus", ko: "집중" },
     "title.rest": { en: "Rest", ko: "휴식" },
     "title.ready": { en: "Ready", ko: "준비됨" },
@@ -2139,7 +2138,10 @@
   function startTicker() {
     window.clearInterval(state.tickId);
     state.tickId = window.setInterval(() => {
-      if (state.timer && state.timer.status === "running") {
+      // Only a countdown can run out. The stopwatch carries a far-future endAt
+      // as a placeholder, so leave it alone or it would chime and self-finish
+      // once that placeholder came due.
+      if (state.timer && state.timer.status === "running" && state.timer.mode !== "stopwatch") {
         const remainingSeconds = getRemainingSeconds();
         if (remainingSeconds > 0 && remainingSeconds <= 10) {
           playFinishSoonSound(remainingSeconds);
@@ -2317,10 +2319,12 @@
 
   function updateDocumentTitle() {
     if (state.timer) {
-      // Countdown shows its remaining time in the tab; the stopwatch does not.
-      document.title = state.timer.mode === "stopwatch"
-        ? `${t("title.focus_running")} | ${APP_TITLE}`
-        : `${formatClock(getRemainingSeconds())} ${t("title.focus")} | ${APP_TITLE}`;
+      // Both modes show their clock in the tab: the countdown counts its time
+      // down, the stopwatch counts the time it has gathered up.
+      const seconds = state.timer.mode === "stopwatch"
+        ? getElapsedSeconds()
+        : getRemainingSeconds();
+      document.title = `${formatClock(seconds)} ${t("title.focus")} | ${APP_TITLE}`;
       return;
     }
 
@@ -4901,7 +4905,9 @@
   }
 
   function formatClock(seconds) {
-    const safeSeconds = Math.max(0, Number(seconds) || 0);
+    // Floor here so a fractional reading (the stopwatch keeps sub-second
+    // precision) still prints as a clean clock rather than "05:33.417".
+    const safeSeconds = Math.floor(Math.max(0, Number(seconds) || 0));
     const minutes = Math.floor(safeSeconds / 60);
     const leftover = safeSeconds % 60;
     return `${String(minutes).padStart(2, "0")}:${String(leftover).padStart(2, "0")}`;
