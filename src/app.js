@@ -491,9 +491,14 @@
     calSuppressClick: false,
     projectsCloudMissing: false,
     // Google Identity Services: loaded on demand, with the nonce that ties the
-    // token Google hands back to this particular sign-in.
+    // token Google hands back to this particular sign-in. `googleButtonKey`
+    // records what the button on screen was built for, so a render that would
+    // rebuild the very same button is skipped; `googleRenderToken` lets a newer
+    // render cancel one still waiting on the script or the nonce.
     gsiPromise: null,
     googleNonce: null,
+    googleButtonKey: null,
+    googleRenderToken: 0,
     activeTimerProjectMissing: false,
     sessionsProjectColumnMissing: false,
     notes: [],
@@ -3464,6 +3469,15 @@
     els.authActions.hidden = !state.supabaseConfigured || Boolean(state.user);
     els.signedInActions.hidden = !state.user;
 
+    // Signing out leaves this dialog open, so the sign-in section comes back
+    // without openAccountDialog() running again — and a theme or language
+    // switch redraws everything around Google's button. Both land here, which
+    // makes this the place to keep the button in step with what's on screen.
+    // Without it, signing out and back in offers only the redirect, whose
+    // Google prompt names the Supabase callback rather than this site.
+    // The attribute, not `.open`: it is set either way a dialog is opened.
+    if (els.accountDialog.hasAttribute("open") && !els.authActions.hidden) renderGoogleSignIn();
+
     if (!state.supabaseConfigured) {
       els.syncBadge.textContent = t("badge.local");
       els.modeLabel.textContent = t("brand.local_garden");
@@ -3842,17 +3856,23 @@
     return typeof config.googleClientId === "string" ? config.googleClientId.trim() : "";
   }
 
-  // The in-page flow needs a client id, a signed-out session, and a secure
-  // context (it hashes the nonce with WebCrypto, which http:// doesn't offer).
+  // The in-page flow needs a client id and a secure context (it hashes the
+  // nonce with WebCrypto, which http:// doesn't offer).
   function canUseGoogleIdentity() {
     return Boolean(
       googleClientId() &&
       state.supabase &&
-      !state.user &&
       window.isSecureContext &&
       window.crypto &&
       window.crypto.subtle
     );
+  }
+
+  // Everything the rendered button is built from. Google bakes the theme and
+  // the language into its button at render time, so a change to either has to
+  // rebuild it — and nothing else does.
+  function googleButtonKey() {
+    return [googleClientId(), localeTag(), state.theme].join("|");
   }
 
   function loadGoogleIdentityScript() {
@@ -3900,24 +3920,61 @@
     label.textContent = t(key);
   }
 
-  async function renderGoogleSignIn() {
+  function clearGoogleButton() {
     els.googleButtonHolder.replaceChildren();
+    state.googleButtonKey = null;
+  }
+
+  // Called on every open of the account dialog, and again whenever the account
+  // panel is redrawn while it is open — signing out is the one that matters,
+  // since it reveals the sign-in section without reopening the dialog.
+  async function renderGoogleSignIn() {
+    // Rendering waits on Google's script and on the nonce, so a second render
+    // can start before the first has finished. Claiming a token here lets every
+    // path cancel the one still in flight, and only the newest may touch the
+    // holder — otherwise the nonce handed to Supabase could belong to a
+    // different button than the one Google signed its token against.
+    const token = ++state.googleRenderToken;
+    const stale = () => token !== state.googleRenderToken;
+
+    // Signed in, the sign-in section is hidden. Drop the button rather than
+    // leaving a stale one behind: signing out builds a fresh one, with a nonce
+    // that belongs to that sign-in alone.
+    if (state.user) {
+      clearGoogleButton();
+      return;
+    }
 
     if (!canUseGoogleIdentity()) {
+      clearGoogleButton();
       setGoogleFallbackRole("primary");
       return;
     }
 
+    // A button that is already the one we would draw is left alone, so the
+    // repeated renders behind a redraw cost nothing and never swap a working
+    // button (and its nonce) for an identical one mid-click.
+    const key = googleButtonKey();
+    if (state.googleButtonKey === key && els.googleButtonHolder.firstChild) return;
+
+    // Nulled for the duration: the button on screen, if any, is no longer the
+    // one this render is building towards.
+    state.googleButtonKey = null;
+
     const loaded = await loadGoogleIdentityScript();
+    if (stale()) return;
     // Blocked, offline, or an ad blocker ate it — the redirect still works.
     if (!loaded) {
+      clearGoogleButton();
       setGoogleFallbackRole("primary");
       return;
     }
 
     try {
       const nonce = await createGoogleNonce();
+      if (stale()) return;
       state.googleNonce = nonce.raw;
+      els.googleButtonHolder.replaceChildren();
 
       window.google.accounts.id.initialize({
         client_id: googleClientId(),
@@ -3936,12 +3993,16 @@
         logo_alignment: "left",
         // Follow the app's own language toggle rather than the browser's.
         locale: localeTag(),
-        width: Math.round(clamp(els.googleButtonHolder.clientWidth || 320, 200, 400)),
+        // Measured on the form, not the holder: an empty holder is collapsed by
+        // its own `:empty` rule, so it has no width to read here.
+        width: Math.round(clamp(els.authActions.clientWidth || 320, 200, 400)),
       });
 
+      state.googleButtonKey = key;
       setGoogleFallbackRole("secondary");
     } catch (error) {
       console.warn(error);
+      clearGoogleButton();
       setGoogleFallbackRole("primary");
     }
   }
