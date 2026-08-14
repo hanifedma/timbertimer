@@ -276,10 +276,13 @@ button:disabled {
   flex: 0 0 44px;
   border: 1px solid var(--accent-line);
   border-radius: var(--radius);
-  /* White rather than --accent-ink, so the mark matches the favicon and app
-     icon in both themes instead of turning dark alongside button labels. */
-  color: #ffffff;
-  background: var(--accent);
+  /* The icon's own two colours, written out rather than taken from the theme:
+     this tile *is* the favicon and the app icon, and it has to be the same
+     green on the same black in both appearances. Taking --accent would darken
+     the sprout on the light theme and leave the header mark looking like a
+     different logo from the one in the tab. */
+  color: #30d158;
+  background: #000000;
 }
 
 .brand strong,
