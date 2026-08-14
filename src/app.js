@@ -18,7 +18,7 @@
   const STORAGE_TASK_PROJECT = "timbertimer:task-project:v1";
   const STORAGE_CAL_DAYS = "timbertimer:cal-days:v1";
   const STORAGE_CAL_ZOOM = "timbertimer:cal-zoom:v1";
-  const DEFAULT_DURATION = 25;
+  const DEFAULT_DURATION = 30;
   // A record can now span at most one day: the calendar edits real start/end
   // times, and the database check constraints allow the same ceiling.
   const MAX_RECORD_MINUTES = 1440;
@@ -1983,7 +1983,7 @@
 
       const elapsedSeconds = getElapsedSeconds();
       // A countdown that reached its end is credited in full: a second of
-      // rounding slack should not turn a 25-minute session into 24. Anything
+      // rounding slack should not turn a 30-minute session into 29. Anything
       // else is the time that actually ran — at least a minute, so a session
       // leaves a tree rather than a record reading "0m", and at most a day,
       // which is what the table accepts.
