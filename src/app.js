@@ -74,9 +74,6 @@
     "field.custom": { en: "Custom", ko: "직접 입력" },
     "field.tree": { en: "Tree", ko: "나무" },
     "field.started": { en: "Started", ko: "시작 시각" },
-    "field.status": { en: "Status", ko: "상태" },
-    "field.goal_minutes": { en: "Goal minutes", ko: "목표 (분)" },
-    "field.actual_minutes": { en: "Actual minutes", ko: "실제 (분)" },
     "timer.ready": { en: "Ready", ko: "준비됨" },
     "timer.growing": { en: "Growing", ko: "자라는 중" },
     "btn.start": { en: "Start", ko: "시작" },
@@ -91,7 +88,6 @@
     "rest.start": { en: "Start rest", ko: "휴식 시작" },
     "rest.finish": { en: "Finish rest", ko: "휴식 완료" },
     "rest.record_title": { en: "Rest", ko: "휴식" },
-    "record.rested": { en: "Rested", ko: "휴식함" },
     "toast.rest_planted": { en: "Rest planted a wilted tree.", ko: "휴식이 시든 나무를 심었어요." },
     "toast.rest_discarded": { en: "Rest was too short to plant.", ko: "휴식이 너무 짧아 심지 않았어요." },
     "notes.kicker": { en: "Tasks", ko: "할 일" },
@@ -112,27 +108,21 @@
     "grove.weekly": { en: "Weekly forest", ko: "주간 숲" },
     "grove.monthly": { en: "Monthly forest", ko: "월간 숲" },
     "grove.today": { en: "Today's forest", ko: "오늘의 숲" },
+    "grove.daily": { en: "A day's forest", ko: "하루의 숲" },
     "grove.current": { en: "Current", ko: "현재" },
-    "grove.view_today": { en: "Today", ko: "오늘" },
+    "grove.view_today": { en: "Day", ko: "일" },
     "grove.view_week": { en: "Week", ko: "주" },
     "grove.view_month": { en: "Month", ko: "월" },
     "grove.loading": { en: "Loading", ko: "불러오는 중" },
     "grove.empty_today": { en: "No trees planted today.", ko: "오늘 심은 나무가 없어요." },
+    "grove.empty_day": { en: "No trees planted on this day.", ko: "이 날 심은 나무가 없어요." },
     "grove.empty_week": { en: "No trees planted this week.", ko: "이번 주에 심은 나무가 없어요." },
     "grove.empty_month": { en: "No trees planted this month.", ko: "이번 달에 심은 나무가 없어요." },
     "grove.tree_one": { en: "1 tree", ko: "1그루" },
     "grove.trees": { en: "{n} trees", ko: "{n}그루" },
     "grove.focused": { en: "{time} focused", ko: "{time} 집중" },
     "grove.rested": { en: "{time} rested", ko: "{time} 휴식" },
-    "filter.all": { en: "All", ko: "전체" },
-    "filter.completed": { en: "Completed", ko: "완료" },
-    "filter.abandoned": { en: "Abandoned", ko: "중단" },
-    "status.completed": { en: "Completed", ko: "완료" },
-    "status.abandoned": { en: "Abandoned", ko: "중단" },
-    "record.planted": { en: "Planted", ko: "심음" },
-    "record.abandoned": { en: "Abandoned", ko: "중단" },
     "metric.focused": { en: "{n}m focused", ko: "{n}분 집중" },
-    "metric.goal": { en: "{n}m goal", ko: "목표 {n}분" },
     "action.edit": { en: "Edit", ko: "편집" },
     "action.delete": { en: "Delete", ko: "삭제" },
     "account.kicker": { en: "Accounts", ko: "계정" },
@@ -158,7 +148,6 @@
     "toast.session_started": { en: "Session started.", ko: "세션을 시작했어요." },
     "toast.stopwatch_started": { en: "Stopwatch started.", ko: "스톱워치를 시작했어요." },
     "toast.session_planted": { en: "Session planted.", ko: "세션을 심었어요." },
-    "toast.session_abandoned": { en: "Session recorded as abandoned.", ko: "세션을 중단으로 기록했어요." },
     "toast.timer_finished_elsewhere": { en: "Timer already finished on another device.", ko: "다른 기기에서 이미 타이머가 끝났어요." },
     "toast.record_saved": { en: "Record saved.", ko: "기록을 저장했어요." },
     "toast.record_deleted": { en: "Record deleted.", ko: "기록을 삭제했어요." },
@@ -380,7 +369,6 @@
     groveWeekButton: document.getElementById("groveWeekButton"),
     groveMonthButton: document.getElementById("groveMonthButton"),
     searchInput: document.getElementById("searchInput"),
-    statusFilter: document.getElementById("statusFilter"),
     recordsList: document.getElementById("recordsList"),
     emptyState: document.getElementById("emptyState"),
     addRecordButton: document.getElementById("addRecordButton"),
@@ -397,8 +385,6 @@
     recordIdInput: document.getElementById("recordIdInput"),
     recordTitleInput: document.getElementById("recordTitleInput"),
     recordStartedInput: document.getElementById("recordStartedInput"),
-    recordStatusInput: document.getElementById("recordStatusInput"),
-    recordDurationInput: document.getElementById("recordDurationInput"),
     recordEndedInput: document.getElementById("recordEndedInput"),
     recordProjectInput: document.getElementById("recordProjectInput"),
     recordProjectDot: document.getElementById("recordProjectDot"),
@@ -506,8 +492,10 @@
     activeSoundMasters: [],
     finishSoonSoundTimerId: null,
     weekStart: startOfWeek(new Date()),
-    // Today is the default period for the forest and the project summary.
-    groveView: "today",
+    // One day is the default period for the forest and the project summary, and
+    // like the week and the month it can be stepped back through.
+    groveView: "day",
+    dayStart: startOfDay(new Date()),
     monthStart: startOfMonth(new Date()),
     timer: null,
     restTimer: null,
@@ -667,14 +655,10 @@
     els.restStartButton.addEventListener("click", startRestTimer);
     els.restResetButton.addEventListener("click", finishRestTimer);
 
-    els.prevWeekButton.addEventListener("click", () => changeWeek(-1));
-    els.nextWeekButton.addEventListener("click", () => changeWeek(1));
+    els.prevWeekButton.addEventListener("click", () => shiftPeriod(-1));
+    els.nextWeekButton.addEventListener("click", () => shiftPeriod(1));
     els.thisWeekButton.addEventListener("click", () => {
-      if (state.groveView === "month") {
-        state.monthStart = startOfMonth(new Date());
-      } else {
-        state.weekStart = startOfWeek(new Date());
-      }
+      resetPeriodToCurrent();
       renderPeriod();
     });
     els.notesForm.addEventListener("submit", async (e) => {
@@ -685,12 +669,11 @@
       await addNote(text);
     });
 
-    els.groveTodayButton.addEventListener("click", () => setGroveView("today"));
+    els.groveTodayButton.addEventListener("click", () => setGroveView("day"));
     els.groveWeekButton.addEventListener("click", () => setGroveView("week"));
     els.groveMonthButton.addEventListener("click", () => setGroveView("month"));
 
     els.searchInput.addEventListener("input", renderRecords);
-    els.statusFilter.addEventListener("change", renderRecords);
 
     els.recordsList.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-action]");
@@ -1495,11 +1478,18 @@
   }
 
   // Resolve which project a record belongs to. Records written since projects
-  // exist carry the id; older ones are mapped by their shape: a completed
-  // wilted tree was a rest, anything else keys off its title.
+  // exist carry the id; older ones are mapped by their shape: a wilted tree that
+  // was not an abandoned session was a rest, anything else keys off its title.
+  //
+  // `status` is a field no record carries any more. It survives in this one
+  // condition to read records saved by a version that did — the ones still in
+  // this browser's storage — because it is the only thing that tells an old rest
+  // apart from an old abandoned session. Cloud rows had that answer written into
+  // `project_id` by the migration in docs/supabase-schema.sql before the column
+  // was dropped, so they never reach this line.
   function resolveProjectId(record) {
     if (record.project_id) return String(record.project_id);
-    if (record.status === "completed" && record.tree_kind === WILTED_TREE.label) return REST_PROJECT_ID;
+    if (record.status !== "abandoned" && record.tree_kind === WILTED_TREE.label) return REST_PROJECT_ID;
     return legacyProjectIdForTitle(record.title);
   }
 
@@ -1968,7 +1958,12 @@
     await saveActiveTimerToCloud();
   }
 
-  async function completeTimer(status) {
+  // Ends the session and plants the tree it grew.
+  //
+  // A countdown still counts down — it just has nothing to fall short of. Ending
+  // one early is not an outcome the record remembers; it simply ran for as long
+  // as it ran, and the tree grows from that.
+  async function completeTimer() {
     if (!state.timer || state.timerCompleting) return;
 
     state.timerCompleting = true;
@@ -1986,44 +1981,49 @@
         return;
       }
 
-      const isStopwatch = timer.mode === "stopwatch";
       const elapsedSeconds = getElapsedSeconds();
-      const actualMinutes =
-        status === "completed"
-          ? Math.max(1, Math.round(elapsedSeconds / 60))
-          : Math.max(0, Math.round(elapsedSeconds / 60));
-      const endedAt = new Date().toISOString();
+      // A countdown that reached its end is credited in full: a second of
+      // rounding slack should not turn a 25-minute session into 24. Anything
+      // else is the time that actually ran — at least a minute, so a session
+      // leaves a tree rather than a record reading "0m", and at most a day,
+      // which is what the table accepts.
+      const ranOut =
+        timer.mode !== "stopwatch" && elapsedSeconds >= timer.durationSeconds - 1;
+      const actualMinutes = clamp(
+        ranOut ? timer.durationMinutes : Math.round(elapsedSeconds / 60),
+        1,
+        MAX_RECORD_MINUTES
+      );
+      const startedAtMs = new Date(timer.startedAt).getTime();
+      // The end is stored as exactly the minutes we keep, so the calendar block
+      // and the "focused" figure can never disagree — the same rule the record
+      // editor and a calendar drag already follow.
+      const endedAt = new Date(startedAtMs + actualMinutes * 60000).toISOString();
+      const now = new Date().toISOString();
       const projectId = timer.projectId || DEFAULT_PROJECT_ID;
       const record = {
         id: createId(),
         title: timer.title,
         project_id: projectId,
-        duration_minutes: isStopwatch ? actualMinutes : timer.durationMinutes,
-        actual_minutes: isStopwatch
-          ? actualMinutes
-          : (status === "completed" && elapsedSeconds >= timer.durationSeconds - 1
-              ? timer.durationMinutes
-              : actualMinutes),
-        status,
+        actual_minutes: actualMinutes,
         started_at: timer.startedAt,
         ended_at: endedAt,
-        tree_kind: pickTreeKind(projectId, status),
-        created_at: endedAt,
-        updated_at: endedAt,
+        tree_kind: pickTreeKind(projectId),
+        created_at: now,
+        updated_at: now,
       };
 
-      if (status === "completed") {
-        playCompletionSound();
-      } else {
-        stopActiveTimerSounds();
-      }
+      // The run-in drone is sized to end exactly at zero, so a session finished
+      // during it has to be silenced before the chime lands on top.
+      stopActiveTimerSounds();
+      playCompletionSound();
 
       state.timer = null;
       state.finishSoonSoundTimerId = null;
       persistTimer();
       await createRecord(record);
       renderTimer();
-      showToast(status === "completed" ? t("toast.session_planted") : t("toast.session_abandoned"));
+      showToast(t("toast.session_planted"));
     } finally {
       state.timerCompleting = false;
     }
@@ -2031,12 +2031,7 @@
 
   function finishCurrentSession() {
     if (!state.timer) return;
-    if (state.timer.mode === "stopwatch") {
-      completeTimer("completed");
-      return;
-    }
-    const status = getRemainingSeconds() <= 0 ? "completed" : "abandoned";
-    completeTimer(status);
+    completeTimer();
   }
 
   async function startRestTimer() {
@@ -2064,19 +2059,23 @@
       return;
     }
 
-    const endedAt = new Date().toISOString();
+    // Capped at a day for the same reason a focus session is: the table refuses
+    // anything longer, and a rest left running is still worth recording.
+    const cappedMinutes = Math.min(minutes, MAX_RECORD_MINUTES);
+    const endedAt = new Date(
+      new Date(startedAt).getTime() + cappedMinutes * 60000
+    ).toISOString();
+    const now = new Date().toISOString();
     await createRecord({
       id: createId(),
       title: REST_RECORD_TITLE,
       project_id: REST_PROJECT_ID,
-      duration_minutes: minutes,
-      actual_minutes: minutes,
-      status: "completed",
+      actual_minutes: cappedMinutes,
       started_at: startedAt,
       ended_at: endedAt,
-      tree_kind: pickTreeKind(REST_PROJECT_ID, "completed"),
-      created_at: endedAt,
-      updated_at: endedAt,
+      tree_kind: pickTreeKind(REST_PROJECT_ID),
+      created_at: now,
+      updated_at: now,
     });
     showToast(t("toast.rest_planted"));
   }
@@ -2090,14 +2089,17 @@
         const cloudTimer = activeTimerState.timer;
 
         if (activeTimerState.ok && !cloudTimer) {
-          const currentTimer = normalizeTimer(state.timer);
+          // `saved` as well as the live one: a session started while the network
+          // was down is only on disk, and reading just the in-memory timer at
+          // startup — where it is always null — used to throw it away.
+          const currentTimer = normalizeTimer(state.timer || saved);
 
           if (currentTimer && !currentTimer.cloudSynced) {
             state.timer = currentTimer;
             persistTimer();
             await saveActiveTimerToCloud();
             if (getRemainingSeconds() <= 0) {
-              await completeTimer("completed");
+              await completeTimer();
             }
             return;
           }
@@ -2111,7 +2113,7 @@
           state.timer = cloudTimer;
           persistTimer();
           if (getRemainingSeconds() <= 0) {
-            await completeTimer("completed");
+            await completeTimer();
           }
           return;
         }
@@ -2121,7 +2123,7 @@
           persistTimer();
           await saveActiveTimerToCloud();
           if (getRemainingSeconds() <= 0) {
-            await completeTimer("completed");
+            await completeTimer();
           }
           return;
         }
@@ -2132,7 +2134,7 @@
 
       state.timer = normalizeTimer(saved);
       if (state.timer && getRemainingSeconds() <= 0) {
-        await completeTimer("completed");
+        await completeTimer();
       }
     } catch (error) {
       localStorage.removeItem(STORAGE_TIMER);
@@ -2153,7 +2155,7 @@
         }
 
         if (remainingSeconds <= 0) {
-          completeTimer("completed");
+          completeTimer();
         }
       }
 
@@ -2254,7 +2256,7 @@
     if (!timer) {
       const isStopwatch = state.timerMode === "stopwatch";
       els.timerState.textContent = t("timer.ready");
-      els.timerDisplay.textContent = isStopwatch ? "00:00" : formatClock(state.selectedDuration * 60);
+      setClockText(els.timerDisplay, isStopwatch ? "00:00" : formatClock(state.selectedDuration * 60));
       els.startButton.disabled = false;
       els.finishButton.disabled = true;
       setFormDisabled(false);
@@ -2299,7 +2301,7 @@
     const elapsedSeconds = state.restTimer ? getRestElapsedSeconds() : 0;
     const isRunning = Boolean(state.restTimer);
 
-    els.restDisplay.textContent = formatClock(elapsedSeconds);
+    setClockText(els.restDisplay, formatClock(elapsedSeconds));
     els.restState.textContent = isRunning ? t("rest.resting") : t("rest.title");
     els.restModeLabel.textContent = t("rest.elapsed");
     els.restStartButton.disabled = isRunning;
@@ -2341,10 +2343,17 @@
     document.title = `${t("title.ready")} | ${APP_TITLE}`;
   }
 
+  // Past an hour a clock gains a field, so the type gives way rather than
+  // running off the edge of a phone.
+  function setClockText(element, text) {
+    element.textContent = text;
+    element.classList.toggle("is-long", text.length > 5);
+  }
+
   const RING_CIRCUMFERENCE = 2 * Math.PI * 86;
 
   function updateTimerDisplay(remainingSeconds, progress) {
-    els.timerDisplay.textContent = formatClock(remainingSeconds);
+    setClockText(els.timerDisplay, formatClock(remainingSeconds));
     els.timerProgressLabel.textContent = `${Math.round(progress * 100)}%`;
     els.growthStage.style.setProperty("--growth", String(Math.max(0.08, progress)));
     els.progressRingFill.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - progress));
@@ -2393,12 +2402,11 @@
 
   function renderRecords() {
     const query = els.searchInput.value.trim().toLowerCase();
-    const status = els.statusFilter.value;
     const records = sortedSessions().filter((record) => {
-      const statusMatches = status === "all" || record.status === status;
+      if (!query) return true;
       // Searching by project name as well, now that it is part of a record.
       const searchable = `${record.title} ${projectDisplayName(getRecordProject(record))}`.toLowerCase();
-      return statusMatches && (!query || searchable.includes(query));
+      return searchable.includes(query);
     });
 
     els.recordsList.replaceChildren();
@@ -2420,20 +2428,13 @@
     const titleRow = document.createElement("div");
     titleRow.className = "record-title-row";
 
-    const rest = isRestRecord(record);
     const project = getRecordProject(record);
 
     const title = document.createElement("h3");
     title.className = "record-title";
     title.textContent = recordDisplayTitle(record);
 
-    const status = document.createElement("span");
-    status.className = `record-status ${rest ? "rested" : record.status}`;
-    status.textContent = rest
-      ? t("record.rested")
-      : (record.status === "completed" ? t("record.planted") : t("record.abandoned"));
-
-    titleRow.append(title, status);
+    titleRow.append(title);
 
     const projectChip = document.createElement("span");
     projectChip.className = "project-chip";
@@ -2448,7 +2449,6 @@
     metrics.className = "record-metrics";
     metrics.append(
       createMetric(t("metric.focused", { n: record.actual_minutes })),
-      createMetric(t("metric.goal", { n: record.duration_minutes })),
       createMetric(treeDisplayFromKind(speciesForRecord(record).label))
     );
 
@@ -2485,8 +2485,8 @@
   }
 
   function renderStats() {
-    // Focus stats count time spent focusing, whether or not the session was
-    // seen through; rests have their own project and are excluded.
+    // Focus stats count time spent focusing; rests have their own project and
+    // are excluded.
     const focus = state.sessions.filter((record) => !isRestRecord(record));
     const today = localDateKey(new Date());
     const todayMinutes = focus
@@ -2499,7 +2499,9 @@
   }
 
   // The period chosen here drives both the forest and the project summary, so
-  // there is one place to look at "how did this day / week / month go".
+  // there is one place to look at "how did this day / week / month go". Each of
+  // the three can be stepped back through, so yesterday's forest is one tap away
+  // rather than something only the calendar could show.
   function getPeriodRange() {
     const view = state.groveView;
 
@@ -2509,6 +2511,7 @@
         view,
         start,
         end: new Date(start.getFullYear(), start.getMonth() + 1, 1),
+        current: startOfMonth(new Date()),
         rangeText: formatMonthRange(start),
         emptyText: t("grove.empty_month"),
         kicker: t("grove.monthly"),
@@ -2521,32 +2524,37 @@
         view,
         start,
         end: addDays(start, 7),
+        current: startOfWeek(new Date()),
         rangeText: formatWeekRange(start),
         emptyText: t("grove.empty_week"),
         kicker: t("grove.weekly"),
       };
     }
 
+    const start = new Date(state.dayStart);
     const today = startOfDay(new Date());
+    const isToday = start.getTime() === today.getTime();
     return {
-      view: "today",
-      start: today,
-      end: addDays(today, 1),
+      view: "day",
+      start,
+      end: addDays(start, 1),
+      current: today,
       rangeText: new Intl.DateTimeFormat(localeTag(), {
         weekday: "long",
         month: "long",
         day: "numeric",
-      }).format(today),
-      emptyText: t("grove.empty_today"),
-      kicker: t("grove.today"),
+      }).format(start),
+      emptyText: isToday ? t("grove.empty_today") : t("grove.empty_day"),
+      kicker: isToday ? t("grove.today") : t("grove.daily"),
     };
   }
 
-  function recordsInRange(start, end, { completedOnly = true } = {}) {
+  // Every record in the window, oldest first. Each one planted a tree: a session
+  // has no outcome to fall short of, so nothing is left out of the forest.
+  function recordsInRange(start, end) {
     return state.sessions
       .filter((record) => {
         const plantedAt = new Date(record.ended_at || record.started_at);
-        if (completedOnly && record.status !== "completed") return false;
         return plantedAt >= start && plantedAt < end;
       })
       .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime());
@@ -2559,49 +2567,33 @@
   }
 
   function renderWeekGrove(range = getPeriodRange()) {
-    const { view, start, end, rangeText, emptyText, kicker } = range;
+    const { view, start, end, current, rangeText, emptyText, kicker } = range;
 
-    // Trees come from completed sessions — an abandoned one grows nothing — but
-    // the time it took still counts toward the totals.
-    const completed = recordsInRange(start, end);
-    const tracked = recordsInRange(start, end, { completedOnly: false });
-    const minutesOf = (records) =>
-      records.reduce((sum, record) => sum + Number(record.actual_minutes || 0), 0);
-    const focusMinutes = minutesOf(tracked.filter((r) => !isRestRecord(r)));
-    const restMinutes = minutesOf(tracked.filter(isRestRecord));
+    const records = recordsInRange(start, end);
+    const minutesOf = (rows) =>
+      rows.reduce((sum, record) => sum + Number(record.actual_minutes || 0), 0);
+    const focusMinutes = minutesOf(records.filter((r) => !isRestRecord(r)));
+    const restMinutes = minutesOf(records.filter(isRestRecord));
 
     els.grovePanelKicker.textContent = kicker;
     els.weekRange.textContent = rangeText;
-    els.weekTreeCount.textContent = t(completed.length === 1 ? "grove.tree_one" : "grove.trees", { n: completed.length });
+    els.weekTreeCount.textContent = t(records.length === 1 ? "grove.tree_one" : "grove.trees", { n: records.length });
     els.weekFocusTime.textContent = t("grove.focused", { time: formatMinutes(focusMinutes) });
     els.weekRestTime.textContent = t("grove.rested", { time: formatMinutes(restMinutes) });
     els.weekRestTime.hidden = restMinutes === 0;
 
-    els.groveTodayButton.classList.toggle("is-selected", view === "today");
+    els.groveTodayButton.classList.toggle("is-selected", view === "day");
     els.groveWeekButton.classList.toggle("is-selected", view === "week");
     els.groveMonthButton.classList.toggle("is-selected", view === "month");
 
-    const isToday = view === "today";
-    els.prevWeekButton.hidden = isToday;
-    els.nextWeekButton.hidden = isToday;
-    els.thisWeekButton.hidden = isToday;
-    if (view === "month") {
-      const currentMonth = startOfMonth(new Date());
-      const onCurrent = start.getTime() === currentMonth.getTime();
-      els.nextWeekButton.disabled = start.getTime() >= currentMonth.getTime();
-      els.thisWeekButton.classList.toggle("is-current", onCurrent);
-    } else if (view === "week") {
-      const currentWeek = startOfWeek(new Date());
-      const onCurrent = start.getTime() === currentWeek.getTime();
-      els.nextWeekButton.disabled = start.getTime() >= currentWeek.getTime();
-      els.thisWeekButton.classList.toggle("is-current", onCurrent);
-    } else {
-      els.thisWeekButton.classList.remove("is-current");
-    }
+    // Nothing has been planted in the future, so there is nowhere forward to go
+    // from the period containing now.
+    els.nextWeekButton.disabled = start.getTime() >= current.getTime();
+    els.thisWeekButton.classList.toggle("is-current", start.getTime() === current.getTime());
 
     els.weekForest.replaceChildren();
 
-    if (!completed.length) {
+    if (!records.length) {
       const empty = document.createElement("div");
       empty.className = "week-forest-empty";
       empty.textContent = emptyText;
@@ -2610,26 +2602,39 @@
     }
 
     const fragment = document.createDocumentFragment();
-    completed.forEach((record, index) => {
+    records.forEach((record, index) => {
       fragment.appendChild(createGroveTree(record, index));
     });
     els.weekForest.appendChild(fragment);
   }
 
+  // Switching period jumps to the one containing now, which is what someone
+  // asking for "the week" almost always means.
   function setGroveView(view) {
     state.groveView = view;
-    if (view === "week") state.weekStart = startOfWeek(new Date());
-    if (view === "month") state.monthStart = startOfMonth(new Date());
+    resetPeriodToCurrent();
     renderPeriod();
   }
 
-  function changeWeek(direction) {
+  function resetPeriodToCurrent() {
+    const now = new Date();
+    if (state.groveView === "month") state.monthStart = startOfMonth(now);
+    else if (state.groveView === "week") state.weekStart = startOfWeek(now);
+    else state.dayStart = startOfDay(now);
+  }
+
+  function shiftPeriod(direction) {
     if (state.groveView === "month") {
       const d = new Date(state.monthStart);
+      // Set the day first: stepping from the 31st into a 30-day month would
+      // otherwise overflow into the month after the one being asked for.
+      d.setDate(1);
       d.setMonth(d.getMonth() + direction);
       state.monthStart = startOfMonth(d);
-    } else {
+    } else if (state.groveView === "week") {
       state.weekStart = addDays(state.weekStart, direction * 7);
+    } else {
+      state.dayStart = addDays(state.dayStart, direction);
     }
     renderPeriod();
   }
@@ -2650,10 +2655,8 @@
     return [...totals.values()].sort((a, b) => b.minutes - a.minutes);
   }
 
-  // Time tracked, not trees earned: an abandoned session still cost you the
-  // time, it just never grew anything, so it counts here.
   function renderProjectSummary(range = getPeriodRange()) {
-    const rows = projectTotals(recordsInRange(range.start, range.end, { completedOnly: false }));
+    const rows = projectTotals(recordsInRange(range.start, range.end));
     const totalMinutes = rows.reduce((sum, row) => sum + row.minutes, 0);
 
     els.summaryTotal.textContent = formatMinutes(totalMinutes);
@@ -2737,8 +2740,7 @@
   function createGroveTree(record, index) {
     const project = getRecordProject(record);
     const species = speciesForRecord(record);
-    // Abandoned sessions keep the project's colour, drained of life.
-    const palette = getTreePalette(project, { muted: record.status === "abandoned" });
+    const palette = getTreePalette(project);
     // The jitter that keeps the forest from looking like a plantation stays
     // per-record, so two trees of the same project still differ.
     const seed = getTreeSeed(`${project.id}:${record.id}`);
@@ -3101,7 +3103,6 @@
     node.className = "cal-event";
     if (record) {
       node.dataset.id = record.id;
-      if (record.status === "abandoned") node.classList.add("is-abandoned");
     } else {
       node.classList.add("is-running");
       node.dataset.running = "true";
@@ -3603,7 +3604,7 @@
         persistTimer();
 
         if (getRemainingSeconds() <= 0) {
-          await completeTimer("completed");
+          await completeTimer();
         } else if (previousStartedAt !== state.timer.startedAt) {
           renderTimer();
           renderTimerModeToggle();
@@ -3735,8 +3736,6 @@
       project_id: defaults.project_id || state.selectedProjectId,
       started_at: start.toISOString(),
       ended_at: new Date(start.getTime() + fallbackMinutes * 60000).toISOString(),
-      status: "completed",
-      duration_minutes: fallbackMinutes,
       actual_minutes: fallbackMinutes,
     };
 
@@ -3748,8 +3747,6 @@
     els.recordEndedInput.value = toDatetimeLocal(
       value.ended_at || new Date(new Date(value.started_at).getTime() + value.actual_minutes * 60000)
     );
-    els.recordStatusInput.value = value.status;
-    els.recordDurationInput.value = value.duration_minutes;
     els.deleteRecordButton.hidden = !record;
 
     renderRecordDialogProject();
@@ -3795,13 +3792,11 @@
 
     const id = els.recordIdInput.value || createId();
     const projectId = els.recordProjectInput.value || DEFAULT_PROJECT_ID;
-    const status = els.recordStatusInput.value;
     const actualMinutes = clamp(
       Math.round((endedAtInput.getTime() - startedAt.getTime()) / 60000),
       0,
       MAX_RECORD_MINUTES
     );
-    const durationMinutes = cleanMinutes(els.recordDurationInput.value, actualMinutes || 1, 1);
     const title = els.recordTitleInput.value.trim() || projectDisplayName(getProject(projectId));
     const changes = {
       id,
@@ -3811,10 +3806,8 @@
       // Store the end exactly as the minutes we keep, so the calendar block and
       // the "focused" figure can never disagree.
       ended_at: new Date(startedAt.getTime() + actualMinutes * 60000).toISOString(),
-      status,
-      duration_minutes: durationMinutes,
       actual_minutes: actualMinutes,
-      tree_kind: pickTreeKind(projectId, status),
+      tree_kind: pickTreeKind(projectId),
       updated_at: new Date().toISOString(),
     };
 
@@ -4194,12 +4187,11 @@
     };
   }
 
+  // A record is a title, a project, when it ran and for how long. There is no
+  // goal it was measured against and no outcome it is filed under.
   function normalizeRecord(record) {
     const now = new Date().toISOString();
-    const duration = cleanMinutes(record.duration_minutes, DEFAULT_DURATION, 1);
-    const actual = cleanMinutes(record.actual_minutes, duration, 0);
     const title = record.title || "Deep focus";
-    const status = record.status === "abandoned" ? "abandoned" : "completed";
     // Records written before projects existed are mapped to one here, so the
     // rest of the app never has to think about the two shapes.
     const projectId = resolveProjectId(record);
@@ -4208,12 +4200,10 @@
       user_id: record.user_id || null,
       title,
       project_id: projectId,
-      duration_minutes: duration,
-      actual_minutes: actual,
-      status,
+      actual_minutes: cleanMinutes(record.actual_minutes, 0, 0),
       started_at: record.started_at || now,
       ended_at: record.ended_at || record.started_at || now,
-      tree_kind: resolveTreeKind(record, projectId, status),
+      tree_kind: resolveTreeKind(record, projectId),
       created_at: record.created_at || now,
       updated_at: record.updated_at || now,
     };
@@ -4221,14 +4211,13 @@
 
   // Keep the species that was actually chosen for this record. Only fall back
   // to the project's tree for records that never stored a tree_kind.
-  function resolveTreeKind(record, projectId, status) {
-    if (status === "abandoned") return WILTED_TREE.label;
+  function resolveTreeKind(record, projectId) {
     const stored = record.tree_kind;
-    // A rest plants a wilted tree even though it completes, and WILTED_TREE is
-    // not part of TREE_SPECIES — keep it rather than re-deriving a healthy one.
+    // Rest plants a wilted tree, and WILTED_TREE is not part of TREE_SPECIES —
+    // keep it rather than re-deriving a healthy one.
     if (stored === WILTED_TREE.label) return stored;
     if (stored && TREE_SPECIES.some((s) => s.label === stored)) return stored;
-    return pickTreeKind(projectId, status);
+    return pickTreeKind(projectId);
   }
 
   // Rest records store the English "Rest" so they mean the same thing in every
@@ -4247,9 +4236,7 @@
   function toCloudRecord(record, forUpdate) {
     const row = {
       title: record.title,
-      duration_minutes: Number(record.duration_minutes),
       actual_minutes: Number(record.actual_minutes),
-      status: record.status,
       started_at: record.started_at,
       ended_at: record.ended_at,
       tree_kind: record.tree_kind,
@@ -4647,10 +4634,8 @@
     return new Date(b.started_at).getTime() - new Date(a.started_at).getTime();
   }
 
-  // The species stored on a record. Abandoned sessions always wilt; everything
-  // else takes the species its project is currently growing.
-  function pickTreeKind(projectId, status) {
-    if (status === "abandoned") return WILTED_TREE.label;
+  // The species stored on a record: whatever its project is currently growing.
+  function pickTreeKind(projectId) {
     return treeLabelFromId(getProject(projectId).tree);
   }
 
@@ -4664,7 +4649,6 @@
   // changing a project's tree re-plants its whole forest; the stored kind is the
   // fallback for records whose project has been deleted.
   function speciesForRecord(record) {
-    if (record.status === "abandoned") return WILTED_TREE;
     const project = getRecordProject(record);
     if (project.tree === WILTED_TREE.id) return WILTED_TREE;
     const fromProject = TREE_SPECIES.find((s) => s.id === project.tree);
@@ -4722,24 +4706,21 @@
     return `hsl(${Math.round(((h % 360) + 360) % 360)}, ${clamp(Math.round(s), 0, 100)}%, ${clamp(Math.round(l), 0, 100)}%)`;
   }
 
-  // `muted` is used for wilted trees (abandoned sessions): the project's colour
-  // is still recognisable, just drained of life.
-  function paletteFromColor(color, { muted = false } = {}) {
+  // The four colours a tree is drawn with, derived from its project's colour.
+  function paletteFromColor(color) {
     const { h, s, l } = hexToHsl(color);
-    const sat = muted ? s * 0.34 : s;
-    const light = muted ? Math.min(64, l + 6) : l;
     // Pull the bark toward brown while keeping a hint of the project's hue.
     const barkHue = h * 0.22 + 28 * 0.78;
     return {
-      leafA: hsl(h, sat, clamp(light + 6, 26, 74)),
-      leafB: hsl(h + 8, sat * 0.92, clamp(light - 20, 14, 52)),
-      barkA: hsl(barkHue, muted ? 16 : 34, muted ? 44 : 46),
-      barkB: hsl(barkHue, muted ? 14 : 30, muted ? 30 : 30),
+      leafA: hsl(h, s, clamp(l + 6, 26, 74)),
+      leafB: hsl(h + 8, s * 0.92, clamp(l - 20, 14, 52)),
+      barkA: hsl(barkHue, 34, 46),
+      barkB: hsl(barkHue, 30, 30),
     };
   }
 
-  function getTreePalette(project, options) {
-    return paletteFromColor(project && project.color ? project.color : MISSING_PROJECT_COLOR, options);
+  function getTreePalette(project) {
+    return paletteFromColor(project && project.color ? project.color : MISSING_PROJECT_COLOR);
   }
 
   // A readable version of a project colour for text on the current theme:
@@ -4965,13 +4946,17 @@
     return Math.min(max, Math.max(min, value));
   }
 
+  // mm:ss, widening to h:mm:ss past an hour. A stopwatch has no ceiling, so
+  // "125:43" would be a number nobody reads as two hours.
   function formatClock(seconds) {
     // Floor here so a fractional reading (the stopwatch keeps sub-second
     // precision) still prints as a clean clock rather than "05:33.417".
     const safeSeconds = Math.floor(Math.max(0, Number(seconds) || 0));
-    const minutes = Math.floor(safeSeconds / 60);
+    const hours = Math.floor(safeSeconds / 3600);
+    const minutes = Math.floor(safeSeconds / 60) % 60;
     const leftover = safeSeconds % 60;
-    return `${String(minutes).padStart(2, "0")}:${String(leftover).padStart(2, "0")}`;
+    const mmss = `${String(minutes).padStart(2, "0")}:${String(leftover).padStart(2, "0")}`;
+    return hours > 0 ? `${hours}:${mmss}` : mmss;
   }
 
   function formatMinutes(minutes) {

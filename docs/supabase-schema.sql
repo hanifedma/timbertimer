@@ -4,13 +4,23 @@
 
 create extension if not exists pgcrypto;
 
+-- Defined before the first trigger that names it: a `create trigger` whose
+-- function does not exist yet fails the whole script on a fresh database.
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
 create table if not exists public.focus_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null check (char_length(title) between 1 and 80),
-  duration_minutes integer not null check (duration_minutes between 1 and 600),
-  actual_minutes integer not null check (actual_minutes between 0 and 600),
-  status text not null check (status in ('completed', 'abandoned')),
+  actual_minutes integer not null check (actual_minutes between 0 and 1440),
   started_at timestamptz not null,
   ended_at timestamptz not null,
   tree_kind text not null default 'young sprout',
@@ -82,16 +92,50 @@ create index if not exists focus_sessions_user_project_idx
 -- Migration: records may now span a whole day (the calendar can edit start and
 -- end times directly), so the old 10-hour ceiling is lifted.
 alter table public.focus_sessions
-  drop constraint if exists focus_sessions_duration_minutes_check;
-alter table public.focus_sessions
-  add constraint focus_sessions_duration_minutes_check
-  check (duration_minutes between 1 and 1440);
-
-alter table public.focus_sessions
   drop constraint if exists focus_sessions_actual_minutes_check;
 alter table public.focus_sessions
   add constraint focus_sessions_actual_minutes_check
   check (actual_minutes between 0 and 1440);
+
+-- Migration: a record no longer remembers a goal it was measured against or an
+-- outcome it was filed under. The timer still counts down and you still choose
+-- how long it runs — that lives on `active_focus_timers` while it is running —
+-- but what it leaves behind is just when it ran and for how long.
+--
+-- The backfill has to come first, while `status` still exists: a row written
+-- before projects existed carries no `project_id`, and every client works out
+-- where it belongs from its shape — a wilted tree that was not abandoned was a
+-- rest, anything else keys off its title. Dropping the column before writing
+-- that answer down would file every abandoned session under Rest for good.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'focus_sessions'
+      and column_name = 'status'
+  ) then
+    update public.focus_sessions
+       set project_id = case
+             when status <> 'abandoned' and tree_kind = 'wilted sprout' then 'rest'
+             else 't:' || coalesce(nullif(lower(btrim(title)), ''), 'deep focus')
+           end
+     where project_id is null;
+
+    -- An abandoned session was drawn as a wilted sprout whatever its project
+    -- grows. With nothing abandoned any more, that stored species would plant a
+    -- dead tree in a project full of live ones, so it goes back to a healthy
+    -- fallback — which only shows at all if the project is later deleted.
+    update public.focus_sessions
+       set tree_kind = 'pine tree'
+     where status = 'abandoned'
+       and tree_kind = 'wilted sprout'
+       and project_id <> 'rest';
+  end if;
+end $$;
+
+alter table public.focus_sessions drop column if exists status;
+alter table public.focus_sessions drop column if exists duration_minutes;
 
 alter table public.focus_sessions enable row level security;
 
@@ -128,16 +172,6 @@ create policy "users can delete own sessions"
   for delete
   to authenticated
   using (auth.uid() is not null and auth.uid() = user_id);
-
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
 
 drop trigger if exists focus_sessions_set_updated_at on public.focus_sessions;
 

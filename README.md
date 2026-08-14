@@ -29,8 +29,8 @@ Name a new project and both are picked for you.
 - **Calendar view** — a Toggl-style day grid showing 1–7 days at once (3 by default), zoomable, with a live "now" line. Drag empty space to block out a new record, drag a block to move it (across days too), or drag its edges to change when it started or ended. Tap anything to edit it.
 - **Tasks remember their project** — track "wash dishes" under Errands once and choosing that task picks Errands again by itself, on any device.
 - **Time by project** — a donut chart and breakdown of where the period's hours went, in each project's colour.
-- **Countdown & stopwatch** focus modes; finishing a countdown early records an abandoned session.
-- **Forest visualizer** — today / weekly / monthly views of the trees you've grown. Abandoned sessions still count as time tracked; they just don't plant anything.
+- **Countdown & stopwatch** focus modes. You still choose how long a countdown runs, but that goal is not written onto the record it leaves behind: a finished session is just when it ran and for how long, so ending one early costs you nothing but the time you didn't spend.
+- **Forest visualizer** — day / week / month views of the trees you've grown, each steppable backwards, so yesterday's forest is one tap away. Every session plants a tree, sized by the time it actually took.
 - **Rest is a project too**, so rests can be added by hand like any other record.
 - **Separate rest stopwatch** for tracking breaks as you take them.
 - **To‑do list** with drag‑to‑reorder, synced when signed in.
@@ -126,7 +126,9 @@ flow, which keeps working exactly as before.
 
 ## Upgrading an existing install
 
-Everything degrades gracefully, so nothing breaks if you deploy the files before touching the database:
+**Re-run `docs/supabase-schema.sql` before deploying this version.** A record no longer stores a goal or an outcome, so `focus_sessions.duration_minutes` and `focus_sessions.status` are gone — and both were `not null`, so a client that has stopped writing them cannot save a session until the script has run. It is safe to re-run, and it does the migration in the right order: it writes each pre-projects record's project down first (the last thing `status` was needed for), then drops the columns. `active_focus_timers` is untouched — a running countdown still needs to know when it ends.
+
+After that, everything else degrades gracefully:
 
 - Records made before projects existed are grouped into a project named after their session title, keeping the tree they were planted with. The mapping is worked out the same way on every device, so nothing has to be migrated up front.
 - If `docs/supabase-schema.sql` hasn't been re‑run yet, projects are kept on the device and records still save — they just don't carry their project to the cloud until the columns exist.

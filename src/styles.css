@@ -649,6 +649,12 @@ button:focus-visible {
   z-index: 1;
 }
 
+/* Past an hour a clock gains a field, so the type gives way rather than
+   running off the edge. */
+.timer-display.is-long {
+  font-size: 4.4rem;
+}
+
 .timer-actions {
   display: grid;
   gap: 9px;
@@ -670,6 +676,10 @@ button:focus-visible {
   font-size: 2.8rem;
   font-weight: 700;
   line-height: 1;
+}
+
+.rest-display.is-long {
+  font-size: 2.2rem;
 }
 
 .primary-button,
@@ -819,7 +829,6 @@ svg {
 
 .stat span,
 .record-date,
-.record-status,
 .account-status {
   color: var(--muted);
   font-size: 0.82rem;
@@ -1206,10 +1215,6 @@ body.is-reordering .note-item {
   padding-left: 40px;
 }
 
-.record-tools select {
-  width: min(168px, 38%);
-}
-
 .records-list {
   display: grid;
   gap: 10px;
@@ -1257,31 +1262,6 @@ body.is-reordering .note-item {
 
 .record-date {
   margin-top: 4px;
-}
-
-.record-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex: 0 0 auto;
-  min-height: 24px;
-  padding: 2px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--leaf);
-  background: var(--leaf-soft);
-  white-space: nowrap;
-}
-
-.record-status.abandoned {
-  color: var(--danger);
-  background: var(--danger-soft);
-}
-
-/* A rest counts, but it isn't a focus win — keep it neutral. */
-.record-status.rested {
-  color: var(--muted);
-  background: var(--fill-2);
 }
 
 .record-metrics {
@@ -1543,13 +1523,13 @@ body.is-reordering .note-item {
     font-size: 4.2rem;
   }
 
+  .timer-display.is-long {
+    font-size: 3.3rem;
+  }
+
   .record-tools {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .record-tools select {
-    width: 100%;
   }
 
   .record-item {
@@ -1572,6 +1552,10 @@ body.is-reordering .note-item {
 
   .timer-display {
     font-size: 3.4rem;
+  }
+
+  .timer-display.is-long {
+    font-size: 2.7rem;
   }
 
   .record-title-row {
@@ -2205,11 +2189,6 @@ body.is-cal-dragging {
 
 body.is-cal-dragging .cal-event {
   cursor: grabbing;
-}
-
-.cal-event.is-abandoned {
-  border-left-style: dashed;
-  opacity: 0.78;
 }
 
 .cal-event.is-running {

@@ -353,11 +353,6 @@
               <input id="searchInput" type="search" list="sessionTitleSuggestions" data-i18n-ph="records.search"
                 placeholder="Search records" />
             </label>
-            <select id="statusFilter" aria-label="Filter records">
-              <option value="all" data-i18n="filter.all">All</option>
-              <option value="completed" data-i18n="filter.completed">Completed</option>
-              <option value="abandoned" data-i18n="filter.abandoned">Abandoned</option>
-            </select>
           </div>
 
           <div id="emptyState" class="empty-state" hidden>
@@ -524,17 +519,6 @@
         <label class="field">
           <span data-i18n="field.ended">Ended</span>
           <input id="recordEndedInput" type="datetime-local" required />
-        </label>
-        <label class="field">
-          <span data-i18n="field.status">Status</span>
-          <select id="recordStatusInput">
-            <option value="completed" data-i18n="status.completed">Completed</option>
-            <option value="abandoned" data-i18n="status.abandoned">Abandoned</option>
-          </select>
-        </label>
-        <label class="field">
-          <span data-i18n="field.goal_minutes">Goal minutes</span>
-          <input id="recordDurationInput" type="number" min="1" max="1440" required />
         </label>
       </div>
 
