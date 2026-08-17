@@ -256,13 +256,43 @@ alter table public.active_focus_timers
   add constraint active_focus_timers_duration_seconds_check
   check (duration_seconds between 0 and 86400);
 
--- Rest timer sync: one row per user, just stores when rest started.
+-- Rest timer sync: one row per user, holding the rest that is running now.
 create table if not exists public.active_rest_timers (
   user_id uuid primary key references auth.users(id) on delete cascade,
   started_at timestamptz not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Migration: rest countdowns. Safe to re-run; run this if the table already
+-- exists.
+--
+-- `end_at` null is the open-ended rest stopwatch, which is what every rest was
+-- before this and what a client that has not been updated still writes. A rest
+-- with an end is a countdown, and the client that owns it alarms when it lands.
+--
+-- Both clients keep working without this migration: each drops the two columns
+-- from its reads and writes on the first rejection, and a countdown then simply
+-- does not cross between devices. The alarm is scheduled locally from an instant
+-- that never leaves the device, so it still fires on the one that set it.
+alter table public.active_rest_timers
+  add column if not exists end_at timestamptz,
+  add column if not exists duration_minutes integer not null default 0;
+
+-- The same ceiling the focus timer's goal has, and the same reason: a rest
+-- measured in days is a mistake rather than an intention.
+alter table public.active_rest_timers
+  drop constraint if exists active_rest_timers_duration_minutes_check;
+alter table public.active_rest_timers
+  add constraint active_rest_timers_duration_minutes_check
+  check (duration_minutes between 0 and 600);
+
+-- A countdown cannot end before it began. Null passes, which is the stopwatch.
+alter table public.active_rest_timers
+  drop constraint if exists active_rest_timers_end_after_start_check;
+alter table public.active_rest_timers
+  add constraint active_rest_timers_end_after_start_check
+  check (end_at is null or end_at >= started_at);
 
 alter table public.active_rest_timers enable row level security;
 

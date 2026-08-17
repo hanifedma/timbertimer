@@ -18,10 +18,35 @@
   const STORAGE_TASK_PROJECT = "timbertimer:task-project:v1";
   const STORAGE_CAL_DAYS = "timbertimer:cal-days:v1";
   const STORAGE_CAL_ZOOM = "timbertimer:cal-zoom:v1";
+  const STORAGE_REST = "timbertimer:rest:v1";
+  const STORAGE_REST_MODE = "timbertimer:rest-mode:v1";
+  const STORAGE_REST_DURATION = "timbertimer:rest-duration:v1";
+  const STORAGE_REST_ALERT = "timbertimer:rest-alert:v1";
   const DEFAULT_DURATION = 30;
   // A record can now span at most one day: the calendar edits real start/end
   // times, and the database check constraints allow the same ceiling.
   const MAX_RECORD_MINUTES = 1440;
+
+  // --- Rest ----------------------------------------------------------------
+  // The rest shortcuts are 5, 10 and 15 minutes, written into the panel's
+  // markup, and matched by the Android app so a rest set on one client reads
+  // the same on the other. Ten rather than five is the default because it is
+  // the one most people actually want, and the shorter shortcut sits beside it.
+  const DEFAULT_REST_DURATION = 10;
+  const REST_EXTEND_MINUTES = 5;
+  // The same ceiling the focus form has, and the database's own.
+  const MAX_TIMER_MINUTES = 600;
+
+  // How long the alarm stays loud. Finite on purpose: the common case for an
+  // unanswered one is a laptop left on a desk while its owner is in a meeting,
+  // and something that shrieks for an hour gets the feature turned off. What
+  // survives past this is the notification, which is what carries the message.
+  const REST_ALARM_RING_MS = 120000;
+  // How far ahead the audio clock is fed. Long enough that a throttled tab
+  // (which gets one timer callback a second at best) always has more queued;
+  // short enough that stopping the alarm is instant.
+  const REST_ALARM_BLOCK_MS = 6600;
+  const REST_ALARM_NOTIFICATION_TAG = "timbertimer-rest-alarm";
 
   // --- Projects ------------------------------------------------------------
   // Every record belongs to a project, and the project owns both the colour and
@@ -82,14 +107,34 @@
     "btn.save": { en: "Save", ko: "저장" },
     "sound.on": { en: "Sound on", ko: "소리 켜짐" },
     "sound.off": { en: "Sound off", ko: "소리 꺼짐" },
-    "rest.title": { en: "Rest stopwatch", ko: "휴식 스톱워치" },
+    "rest.title": { en: "Rest", ko: "휴식" },
+    "rest.title_open": { en: "Rest stopwatch", ko: "휴식 스톱워치" },
     "rest.resting": { en: "Resting", ko: "휴식 중" },
     "rest.elapsed": { en: "Elapsed", ko: "경과" },
+    "rest.remaining": { en: "Remaining", ko: "남은 시간" },
     "rest.start": { en: "Start rest", ko: "휴식 시작" },
     "rest.finish": { en: "Finish rest", ko: "휴식 완료" },
     "rest.record_title": { en: "Rest", ko: "휴식" },
+    "rest.length": { en: "Rest length", ko: "휴식 길이" },
+    "rest.mode_timer": { en: "Timer", ko: "타이머" },
+    "rest.mode_open": { en: "Open-ended", ko: "제한 없음" },
+    "rest.extend": { en: "+5 min", ko: "+5분" },
+    "rest.ends_at": { en: "Ends at {time}", ko: "{time}에 종료" },
+    "rest.alarm_title": { en: "Rest is over", ko: "휴식이 끝났어요" },
+    "rest.alarm_body": { en: "Your {time} rest has finished.", ko: "{time} 휴식이 끝났습니다." },
+    "rest.alarm_dismiss": { en: "Dismiss", ko: "확인" },
+    "rest.alarm_extend": { en: "Rest 5 more minutes", ko: "5분 더 쉬기" },
+    "rest.alarm_focus": { en: "Start focusing", ko: "집중 시작하기" },
+    "rest.alert_label": { en: "Rest alarm", ko: "휴식 알람" },
+    "rest.alert_both": { en: "Sound + buzz", ko: "소리 + 진동" },
+    "rest.alert_sound": { en: "Sound", ko: "소리" },
+    "rest.alert_vibrate": { en: "Buzz", ko: "진동" },
+    "rest.alert_silent": { en: "Silent", ko: "무음" },
+    "rest.notify_body": { en: "Your {time} rest has finished. Time to get back to it.", ko: "{time} 휴식이 끝났습니다. 다시 시작해 볼까요." },
     "toast.rest_planted": { en: "Rest planted a wilted tree.", ko: "휴식이 시든 나무를 심었어요." },
     "toast.rest_discarded": { en: "Rest was too short to plant.", ko: "휴식이 너무 짧아 심지 않았어요." },
+    "toast.rest_extended": { en: "Five more minutes.", ko: "5분 더 쉬어요." },
+    "toast.rest_notify_blocked": { en: "Notifications are blocked, so the rest alarm can only sound while this tab is open.", ko: "알림이 차단되어 있어, 이 탭이 열려 있을 때만 휴식 알람이 울립니다." },
     "notes.kicker": { en: "Tasks", ko: "할 일" },
     "notes.title": { en: "To-Do", ko: "투두" },
     "notes.placeholder": { en: "Add a task…", ko: "할 일 추가…" },
@@ -348,10 +393,25 @@
     restState: document.getElementById("restState"),
     restModeLabel: document.getElementById("restModeLabel"),
     restDisplay: document.getElementById("restDisplay"),
+    restEndsAt: document.getElementById("restEndsAt"),
+    restSetup: document.getElementById("restSetup"),
+    restModeTimerButton: document.getElementById("restModeTimerButton"),
+    restModeOpenButton: document.getElementById("restModeOpenButton"),
+    restDurationField: document.getElementById("restDurationField"),
+    restDurationInput: document.getElementById("restDurationInput"),
+    restDurationButtons: Array.from(document.querySelectorAll("[data-rest-duration]")),
     restStartButton: document.getElementById("restStartButton"),
     restResetButton: document.getElementById("restResetButton"),
+    restExtendButton: document.getElementById("restExtendButton"),
+    restAlertButtons: Array.from(document.querySelectorAll("[data-rest-alert]")),
     restStage: document.getElementById("restStage"),
     restPlant: document.getElementById("restPlant"),
+    restAlarm: document.getElementById("restAlarm"),
+    restAlarmPlant: document.getElementById("restAlarmPlant"),
+    restAlarmBody: document.getElementById("restAlarmBody"),
+    restAlarmDismiss: document.getElementById("restAlarmDismiss"),
+    restAlarmExtend: document.getElementById("restAlarmExtend"),
+    restAlarmFocus: document.getElementById("restAlarmFocus"),
     weekRange: document.getElementById("weekRange"),
     weekTreeCount: document.getElementById("weekTreeCount"),
     weekFocusTime: document.getElementById("weekFocusTime"),
@@ -499,6 +559,24 @@
     monthStart: startOfMonth(new Date()),
     timer: null,
     restTimer: null,
+    // What the *next* rest will be, kept apart from the one that is running.
+    restMode: loadRestMode(),
+    restDuration: loadRestDuration(),
+    restAlert: loadRestAlert(),
+    // The rest alarm while it is going off: { durationMinutes, firedAt, loud }.
+    restAlarm: null,
+    // Handles for the things the alarm has to be able to take back: the
+    // scheduled audio, the vibration loop, the ring cap, and the title flash.
+    restAlarmNodes: [],
+    restAlarmLoopId: null,
+    restAlarmStopId: null,
+    restAlarmVibrateId: null,
+    restAlarmFlashId: null,
+    restCompleting: false,
+    // Set once the rest columns are found to be missing, so the countdown
+    // silently stops syncing rather than failing every write.
+    restCountdownColumnsMissing: false,
+    wakeLock: null,
     tickId: null,
     toastId: null,
     lastCloudTimerSyncAt: 0,
@@ -538,6 +616,10 @@
     await reconcileProjects();
     hydrateSessionName();
     await loadNotes();
+    // Painted from storage in phase 1 so a running rest is on screen from the
+    // first frame rather than after the Supabase library has downloaded. Phase 2
+    // reconciles it against the shared row and fires the alarm if it is due.
+    state.restTimer = readStoredRest();
     applyRoute();
     renderAll();
     startTicker();
@@ -654,6 +736,59 @@
     els.soundToggleButton.addEventListener("click", toggleTimerSound);
     els.restStartButton.addEventListener("click", startRestTimer);
     els.restResetButton.addEventListener("click", finishRestTimer);
+    els.restExtendButton.addEventListener("click", extendRestTimer);
+
+    els.restModeTimerButton.addEventListener("click", () => setRestMode("countdown"));
+    els.restModeOpenButton.addEventListener("click", () => setRestMode("stopwatch"));
+
+    els.restAlertButtons.forEach((button) => {
+      button.addEventListener("click", () => setRestAlert(button.dataset.restAlert));
+    });
+
+    els.restDurationButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        setRestDuration(Number(button.dataset.restDuration));
+      });
+    });
+
+    els.restDurationInput.addEventListener("input", () => {
+      setRestDuration(cleanMinutes(els.restDurationInput.value, state.restDuration, 1));
+    });
+
+    els.restAlarmDismiss.addEventListener("click", () => dismissRestAlarm());
+    els.restAlarmExtend.addEventListener("click", () => {
+      // "Five more minutes" here starts a *fresh* five-minute rest rather than
+      // reviving the one that ended: by the time this alarm exists its rest has
+      // been recorded and its tree planted, and un-planting it to bolt five
+      // minutes onto the end would rewrite a record the user can already see.
+      // Two rests back to back is also the honest description of what happened.
+      dismissRestAlarm();
+      // Passed rather than set: this must not become the length the panel
+      // offers from now on. The user asked for five more minutes once, not to
+      // change what "rest" means to them.
+      startRestTimer({ minutes: REST_EXTEND_MINUTES });
+    });
+    els.restAlarmFocus.addEventListener("click", () => {
+      dismissRestAlarm();
+      els.sessionTitle.focus();
+      els.sessionTitle.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    // Escape answers the alarm, the way it answers every other sheet here.
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && state.restAlarm) dismissRestAlarm();
+    });
+
+    // Coming back to the tab is the moment a rest that ran out while it was
+    // hidden has to be noticed: a background tab's timers are throttled, and on
+    // mobile suspended outright, so the tick may simply not have happened.
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) return;
+      completeRestIfDue();
+      // The browser drops a wake lock whenever the page is hidden, so a rest
+      // still running has to take it again rather than assume it still holds one.
+      if (state.restTimer && state.restTimer.endAt) requestWakeLock();
+    });
 
     els.prevWeekButton.addEventListener("click", () => shiftPeriod(-1));
     els.nextWeekButton.addEventListener("click", () => shiftPeriod(1));
@@ -2034,12 +2169,55 @@
     completeTimer();
   }
 
-  async function startRestTimer() {
+  // Starting a rest is the gesture that unlocks audio for the alarm that ends
+  // it. Browsers only let a page make noise after a user interaction, and the
+  // alarm itself happens minutes later with no gesture anywhere near it — so
+  // this tap is the one chance to open the audio context, and it is taken
+  // whether or not the rest is a countdown.
+  /**
+   * Starts a rest.
+   *
+   * [options.minutes], when given, runs a countdown of that length *without*
+   * adopting it as the panel's remembered default — which is what the alarm's
+   * "five more minutes" needs, and what the Start button deliberately does not
+   * use.
+   */
+  async function startRestTimer(options = {}) {
     if (state.restTimer) return;
 
-    state.restTimer = { startedAt: Date.now() };
+    dismissRestAlarm({ silent: true });
+    primeCompletionSound();
+
+    const startedAt = Date.now();
+    const override = Number(options.minutes);
+    const forced = Number.isFinite(override) && override > 0;
+    const isCountdown = forced || state.restMode === "countdown";
+    const minutes = (() => {
+      if (forced) return clamp(Math.round(override), 1, MAX_TIMER_MINUTES);
+      if (!isCountdown) return 0;
+      return cleanMinutes(els.restDurationInput.value, state.restDuration, 1);
+    })();
+
+    if (isCountdown) requestRestNotificationPermission();
+    if (isCountdown && !forced) {
+      state.restDuration = minutes;
+      saveRestDuration();
+    }
+
+    state.restTimer = {
+      startedAt,
+      // Null is the open-ended stopwatch, which has nothing to count toward.
+      endAt: isCountdown ? startedAt + minutes * 60000 : null,
+      durationMinutes: minutes,
+      cloudSynced: false,
+    };
+
+    persistRestTimer();
     renderRestTimer();
-    await saveRestTimerToCloud();
+    // A countdown that is going to alarm needs the screen awake to be sure of
+    // running its own ticker; the open-ended one has nothing to be late for.
+    if (isCountdown) requestWakeLock();
+    if (await saveRestTimerToCloud()) markRestSynced();
   }
 
   // Ending a rest plants the wilted tree it grew, and its minutes count toward
@@ -2047,13 +2225,23 @@
   async function finishRestTimer() {
     if (!state.restTimer) return;
 
+    dismissRestAlarm({ silent: true });
+
+    const rest = state.restTimer;
     const elapsedSeconds = getRestElapsedSeconds();
-    const startedAt = new Date(state.restTimer.startedAt).toISOString();
+    const startedAt = new Date(rest.startedAt).toISOString();
+    // A countdown that reached its end is credited in full, for the same reason
+    // a focus session is: a second of rounding slack should not turn a
+    // 15-minute rest into 14.
+    const ranOut = Boolean(rest.endAt) && elapsedSeconds >= rest.durationMinutes * 60 - 1;
+
     state.restTimer = null;
+    persistRestTimer();
     renderRestTimer();
+    releaseWakeLock();
     await deleteRestTimerFromCloud();
 
-    const minutes = Math.round(elapsedSeconds / 60);
+    const minutes = ranOut ? rest.durationMinutes : Math.round(elapsedSeconds / 60);
     if (minutes < 1) {
       showToast(t("toast.rest_discarded"));
       return;
@@ -2078,6 +2266,56 @@
       updated_at: now,
     });
     showToast(t("toast.rest_planted"));
+  }
+
+  // Another five minutes, measured from now rather than from the end that just
+  // passed — the user is asking for five more minutes of rest starting when
+  // they asked, not five minutes that half expired while the alarm rang.
+  async function extendRestTimer() {
+    const rest = state.restTimer;
+    if (!rest || !rest.endAt) return;
+
+    dismissRestAlarm({ silent: true });
+    state.restCompleting = false;
+
+    const base = Math.max(rest.endAt, Date.now());
+    state.restTimer = {
+      ...rest,
+      endAt: base + REST_EXTEND_MINUTES * 60000,
+      durationMinutes: Math.min(
+        rest.durationMinutes + REST_EXTEND_MINUTES,
+        MAX_TIMER_MINUTES
+      ),
+    };
+
+    persistRestTimer();
+    renderRestTimer();
+    requestWakeLock();
+    if (await saveRestTimerToCloud()) markRestSynced();
+    showToast(t("toast.rest_extended"));
+  }
+
+  /**
+   * A rest countdown has reached its end.
+   *
+   * The rest is recorded exactly as if Finish had been pressed, and only then
+   * does the alarm go up. That order is the point: by the time anything is
+   * making a noise the record is already written, so an alarm ignored for an
+   * hour — or a tab closed while it rings — cannot cost the session.
+   */
+  async function completeRestIfDue() {
+    const rest = state.restTimer;
+    if (!rest || !rest.endAt || state.restCompleting) return;
+    if (Date.now() < rest.endAt) return;
+
+    state.restCompleting = true;
+    try {
+      const minutes = rest.durationMinutes;
+      await finishRestTimer();
+      fireRestAlarm(minutes);
+    } finally {
+      state.restCompleting = false;
+    }
   }
 
   async function hydrateTimer() {
@@ -2159,6 +2397,11 @@
         }
       }
 
+      // The rest is checked from the clock every tick, which is what catches a
+      // laptop that was asleep when the moment passed: nothing counts down, so
+      // a rest whose end is behind us is simply due now.
+      completeRestIfDue();
+
       // With Realtime connected this poll is only a backstop for a socket that
       // died without saying so, so it can run far less often.
       const syncInterval = state.realtimeLive ? 60000 : 15000;
@@ -2201,6 +2444,8 @@
     renderRecords();
     renderTimer();
     renderRestTimer();
+    renderRestAlarm();
+    renderRestAlertControl();
     renderSoundToggle();
     renderVolumeControl();
     renderTimerModeToggle();
@@ -2298,33 +2543,131 @@
   }
 
   function renderRestTimer() {
-    const elapsedSeconds = state.restTimer ? getRestElapsedSeconds() : 0;
-    const isRunning = Boolean(state.restTimer);
+    const rest = state.restTimer;
+    const isRunning = Boolean(rest);
+    // Not running, a countdown shows the length it is set to rather than 00:00,
+    // the same way the focus dial does — so pressing Start holds no surprise.
+    const isCountdown = rest ? Boolean(rest.endAt) : state.restMode === "countdown";
+    const elapsedSeconds = isRunning ? getRestElapsedSeconds() : 0;
+    const shownSeconds = (() => {
+      if (rest && rest.endAt) return Math.max(0, Math.ceil((rest.endAt - Date.now()) / 1000));
+      if (rest) return elapsedSeconds;
+      return isCountdown ? state.restDuration * 60 : 0;
+    })();
 
-    setClockText(els.restDisplay, formatClock(elapsedSeconds));
-    els.restState.textContent = isRunning ? t("rest.resting") : t("rest.title");
-    els.restModeLabel.textContent = t("rest.elapsed");
+    setClockText(els.restDisplay, formatClock(shownSeconds));
+    els.restState.textContent = isRunning
+      ? t("rest.resting")
+      : isCountdown ? t("rest.title") : t("rest.title_open");
+    els.restModeLabel.textContent = isCountdown ? t("rest.remaining") : t("rest.elapsed");
     els.restStartButton.disabled = isRunning;
     els.restResetButton.disabled = !isRunning;
-    renderRestTree(elapsedSeconds);
+
+    // The wall-clock time it lands on, which is the question anyone mid-rest
+    // actually has: not "how long left" but "can I finish this first".
+    if (rest && rest.endAt) {
+      els.restEndsAt.hidden = false;
+      els.restEndsAt.textContent = t("rest.ends_at", { time: formatTimeShort(rest.endAt) });
+    } else {
+      els.restEndsAt.hidden = true;
+    }
+
+    // The length is fixed once it is running, so a picker that could no longer
+    // change anything is taken away rather than left there disabled.
+    els.restSetup.hidden = isRunning;
+    els.restExtendButton.hidden = !(rest && rest.endAt);
+    renderRestModeToggle();
+
+    // The tree fills over the rest's own length, so a five-minute break grows
+    // the same amount as a thirty-minute one over its own span. Open-ended
+    // keeps the old half-hour reference, having nothing else to measure by.
+    const growthSeconds = rest && rest.endAt ? rest.durationMinutes * 60 : 1800;
+    renderRestTree(elapsedSeconds, growthSeconds);
     updateDocumentTitle();
   }
 
+  function renderRestModeToggle() {
+    const isCountdown = state.restMode === "countdown";
+    const running = Boolean(state.restTimer);
+
+    els.restModeTimerButton.classList.toggle("is-selected", isCountdown);
+    els.restModeOpenButton.classList.toggle("is-selected", !isCountdown);
+    els.restModeTimerButton.disabled = running;
+    els.restModeOpenButton.disabled = running;
+    els.restDurationField.hidden = !isCountdown;
+
+    els.restDurationButtons.forEach((button) => {
+      button.classList.toggle(
+        "is-selected",
+        Number(button.dataset.restDuration) === state.restDuration
+      );
+      button.disabled = running;
+    });
+    els.restDurationInput.disabled = running;
+    if (document.activeElement !== els.restDurationInput) {
+      els.restDurationInput.value = String(state.restDuration);
+    }
+  }
+
+  function setRestMode(mode) {
+    if (state.restTimer) return;
+    state.restMode = mode;
+    saveRestMode();
+    renderRestTimer();
+  }
+
+  function setRestDuration(minutes) {
+    if (state.restTimer) return;
+    state.restDuration = clamp(minutes, 1, MAX_TIMER_MINUTES);
+    saveRestDuration();
+    renderRestTimer();
+  }
+
+  function renderRestAlarm() {
+    const alarm = state.restAlarm;
+    els.restAlarm.hidden = !alarm;
+    document.body.classList.toggle("rest-alarm-open", Boolean(alarm));
+    if (!alarm) return;
+
+    els.restAlarmBody.textContent = t("rest.alarm_body", {
+      time: formatMinutes(alarm.durationMinutes),
+    });
+
+    const restProject = getProject(REST_PROJECT_ID);
+    const treeKey = `wilted|${restProject.color}`;
+    if (els.restAlarmPlant.dataset.treeKey !== treeKey) {
+      els.restAlarmPlant.innerHTML = buildTreeSVG(WILTED_TREE.id, getTreePalette(restProject));
+      els.restAlarmPlant.dataset.treeKey = treeKey;
+    }
+  }
+
+  function renderRestAlertControl() {
+    if (!els.restAlertButtons) return;
+    els.restAlertButtons.forEach((button) => {
+      button.classList.toggle("is-selected", button.dataset.restAlert === state.restAlert.wire);
+    });
+  }
+
   // Resting grows a wilted tree instead of a healthy one — it starts as a small
-  // sprout and creeps up over the first half hour of rest.
-  function renderRestTree(elapsedSeconds) {
+  // sprout and creeps up over [referenceSeconds], which is the rest's own length
+  // when it has one so the sprout lands full-grown exactly as the rest ends.
+  function renderRestTree(elapsedSeconds, referenceSeconds = 1800) {
     const restProject = getProject(REST_PROJECT_ID);
     const treeKey = `wilted|${restProject.color}`;
     if (els.restPlant.dataset.treeKey !== treeKey) {
       els.restPlant.innerHTML = buildTreeSVG(WILTED_TREE.id, getTreePalette(restProject));
       els.restPlant.dataset.treeKey = treeKey;
     }
-    const growth = clamp(elapsedSeconds / 1800, 0, 1);
+    const growth = clamp(elapsedSeconds / Math.max(1, referenceSeconds), 0, 1);
     // 0.46 keeps the idle sprout readable; 0.86 fills the shorter rest stage.
     els.restStage.style.setProperty("--active-scale", (0.46 + growth * 0.4).toFixed(3));
   }
 
   function updateDocumentTitle() {
+    // The flashing alarm owns the tab while it is up, and rewriting the title
+    // underneath it would just fight the flash.
+    if (state.restAlarm) return;
+
     if (state.timer) {
       // Both modes show their clock in the tab: the countdown counts its time
       // down, the stopwatch counts the time it has gathered up.
@@ -2336,7 +2679,12 @@
     }
 
     if (state.restTimer) {
-      document.title = `${formatClock(getRestElapsedSeconds())} ${t("title.rest")} | ${APP_TITLE}`;
+      // A countdown counts its time down in the tab, the same way the focus
+      // countdown does; the open-ended one counts what it has gathered up.
+      const seconds = state.restTimer.endAt
+        ? Math.max(0, Math.ceil((state.restTimer.endAt - Date.now()) / 1000))
+        : getRestElapsedSeconds();
+      document.title = `${formatClock(seconds)} ${t("title.rest")} | ${APP_TITLE}`;
       return;
     }
 
@@ -3623,16 +3971,53 @@
     }
   }
 
+  /**
+   * Publishes the running rest. Returns true only when the row actually landed.
+   *
+   * The caller uses that to set `cloudSynced`, and the distinction matters for
+   * the same reason it does on the focus timer: a rest wrongly believed to be
+   * in the table would be dropped by the next sync, which finds no row and
+   * concludes another device ended it — taking a running countdown with it.
+   */
   async function saveRestTimerToCloud() {
-    if (!canUseCloud() || !state.restTimer) return;
+    if (!canUseCloud() || !state.restTimer) return false;
+
+    const base = {
+      user_id: state.user.id,
+      started_at: new Date(state.restTimer.startedAt).toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const row = state.restCountdownColumnsMissing ? base : {
+      ...base,
+      end_at: state.restTimer.endAt ? new Date(state.restTimer.endAt).toISOString() : null,
+      duration_minutes: state.restTimer.durationMinutes || 0,
+    };
+
     const { error } = await state.supabase
       .from("active_rest_timers")
-      .upsert({
-        user_id: state.user.id,
-        started_at: new Date(state.restTimer.startedAt).toISOString(),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id" });
-    if (error) console.warn(error);
+      .upsert(row, { onConflict: "user_id" });
+
+    if (!error) return true;
+
+    // A database that predates the rest-countdown migration rejects the whole
+    // request for naming a column it does not have. Drop the two fields and
+    // retry: the rest still syncs, just without its length, which is exactly
+    // what every rest was before this feature.
+    if (!state.restCountdownColumnsMissing && isMissingRestColumns(error)) {
+      state.restCountdownColumnsMissing = true;
+      return saveRestTimerToCloud();
+    }
+
+    console.warn(error);
+    return false;
+  }
+
+  // Only the server saying the column is absent may latch the flag. Latching on
+  // any failure looks harmless and is not: one lost packet would silently strip
+  // the length from every rest for the rest of the session.
+  function isMissingRestColumns(error) {
+    const code = error && error.code;
+    return code === "PGRST204" || code === "PGRST205" || code === "42703" || code === "42P01";
   }
 
   async function deleteRestTimerFromCloud() {
@@ -3646,36 +4031,107 @@
 
   async function fetchRestTimerFromCloud() {
     if (!canUseCloud()) return null;
+
+    const columns = state.restCountdownColumnsMissing
+      ? "started_at"
+      : "started_at,end_at,duration_minutes";
+
     const { data, error } = await state.supabase
       .from("active_rest_timers")
-      .select("started_at")
+      .select(columns)
       .eq("user_id", state.user.id)
       .maybeSingle();
-    if (error) { console.warn(error); return null; }
-    return data ? { startedAt: new Date(data.started_at).getTime() } : null;
+
+    if (error) {
+      if (!state.restCountdownColumnsMissing && isMissingRestColumns(error)) {
+        state.restCountdownColumnsMissing = true;
+        return fetchRestTimerFromCloud();
+      }
+      console.warn(error);
+      return null;
+    }
+    if (!data) return null;
+
+    return {
+      startedAt: new Date(data.started_at).getTime(),
+      endAt: data.end_at ? new Date(data.end_at).getTime() : null,
+      durationMinutes: Number(data.duration_minutes) || 0,
+      // It came from the table, so it is by definition in it.
+      cloudSynced: true,
+    };
+  }
+
+  /**
+   * Adopts the shared row, keeping what only this device knows.
+   *
+   * The row is authoritative about *whether* a rest is running. It is not
+   * always authoritative about its length: against a database without the
+   * migration every rest reads as open-ended, and adopting that verbatim would
+   * silently disarm a countdown this tab started and is holding an alarm for.
+   */
+  function adoptCloudRest(cloud, current) {
+    if (
+      cloud.endAt === null && current && current.endAt &&
+      Math.abs(current.startedAt - cloud.startedAt) <= 2000
+    ) {
+      return current;
+    }
+    return cloud;
   }
 
   async function hydrateRestTimer() {
     const cloud = await fetchRestTimerFromCloud();
+    const saved = state.restTimer || readStoredRest();
+
     if (cloud) {
-      state.restTimer = cloud;
+      state.restTimer = adoptCloudRest(cloud, saved);
+    } else if (saved && canUseCloud() && !saved.cloudSynced) {
+      // Started while signed out or with no network; publish it rather than
+      // lose it, and only call it published if the write actually landed.
+      state.restTimer = saved;
+      if (await saveRestTimerToCloud()) markRestSynced();
+    } else if (saved && !canUseCloud()) {
+      state.restTimer = saved;
+    } else if (saved && saved.cloudSynced) {
+      // It was published, and it is gone: another device ended it.
+      state.restTimer = null;
     }
+
+    persistRestTimer();
+    if (state.restTimer && state.restTimer.endAt) requestWakeLock();
+    // A rest whose moment passed while this tab was closed is simply due now.
+    await completeRestIfDue();
   }
 
   async function refreshCloudRestTimer() {
     if (!canUseCloud()) return;
     const cloud = await fetchRestTimerFromCloud();
+    const current = state.restTimer;
 
-    if (cloud && !state.restTimer) {
-      state.restTimer = cloud;
-      renderRestTimer();
-    } else if (!cloud && state.restTimer) {
-      state.restTimer = null;
-      renderRestTimer();
-    } else if (cloud && state.restTimer && Math.abs(cloud.startedAt - state.restTimer.startedAt) > 2000) {
-      state.restTimer = cloud;
+    if (!cloud) {
+      // Only a rest we had published can be "the one that vanished"; a
+      // local-only rest simply has not been pushed yet.
+      if (current && current.cloudSynced) {
+        state.restTimer = null;
+        persistRestTimer();
+        renderRestTimer();
+      }
+      return;
+    }
+
+    const adopted = adoptCloudRest(cloud, current);
+    // The end matters as well as the start now: extending a rest on one device
+    // has to move the other device's alarm, and that leaves the start alone.
+    const changed = !current ||
+      Math.abs(adopted.startedAt - current.startedAt) > 2000 ||
+      adopted.endAt !== current.endAt;
+
+    if (changed) {
+      state.restTimer = adopted;
+      persistRestTimer();
       renderRestTimer();
     }
+    await completeRestIfDue();
   }
 
   function warnActiveTimerSync(error, silent) {
@@ -4331,6 +4787,138 @@
     showToast(t(state.soundEnabled ? "toast.sound_on" : "toast.sound_off"));
   }
 
+  // --- Rest preferences ----------------------------------------------------
+
+  function loadRestMode() {
+    // A countdown is the default: a rest you have to remember to end is the one
+    // that quietly becomes an hour, which is the whole reason for the presets.
+    return localStorage.getItem(STORAGE_REST_MODE) === "stopwatch" ? "stopwatch" : "countdown";
+  }
+
+  function saveRestMode() {
+    localStorage.setItem(STORAGE_REST_MODE, state.restMode);
+  }
+
+  function loadRestDuration() {
+    const saved = parseInt(localStorage.getItem(STORAGE_REST_DURATION), 10);
+    return Number.isFinite(saved) ? clamp(saved, 1, MAX_TIMER_MINUTES) : DEFAULT_REST_DURATION;
+  }
+
+  function saveRestDuration() {
+    localStorage.setItem(STORAGE_REST_DURATION, String(state.restDuration));
+  }
+
+  /**
+   * How the end of a rest announces itself.
+   *
+   * Deliberately its own setting rather than a reading of the sound toggle.
+   * That governs a cue — the chime a finished session ends on, pleasant to have
+   * and no loss to miss. This governs an alarm: the whole reason a rest has a
+   * length is that the user intends to be pulled out of it.
+   */
+  function loadRestAlert() {
+    const saved = localStorage.getItem(STORAGE_REST_ALERT);
+    return restAlertFor(saved === null ? "both" : saved);
+  }
+
+  function restAlertFor(wire) {
+    const known = ["both", "sound", "vibrate", "silent"].includes(wire) ? wire : "both";
+    return {
+      wire: known,
+      sound: known === "both" || known === "sound",
+      vibrate: known === "both" || known === "vibrate",
+    };
+  }
+
+  function setRestAlert(wire) {
+    state.restAlert = restAlertFor(wire);
+    localStorage.setItem(STORAGE_REST_ALERT, state.restAlert.wire);
+    renderRestAlertControl();
+    // Auditioned as it is chosen, the way the volume slider is. A setting whose
+    // whole subject is "how loud and how insistent" cannot be judged from four
+    // words, and the one time it normally plays is the one time nobody can be
+    // experimenting with it.
+    previewRestAlarm();
+  }
+
+  // One cycle of the real thing at the real level. A quieter preview would
+  // answer a different question than the one being asked.
+  function previewRestAlarm() {
+    if (state.restAlarm) return;
+    if (state.restAlert.sound) {
+      const context = getAudioContext();
+      if (context) {
+        const play = () => {
+          const wasAlarm = state.restAlarm;
+          // scheduleRestAlarmBlock reads state.restAlarm as its "still wanted"
+          // guard, so a preview borrows it for exactly one block.
+          state.restAlarm = { durationMinutes: 0, firedAt: Date.now(), loud: true, preview: true };
+          scheduleRestAlarmBlock();
+          state.restAlarm = wasAlarm;
+          window.setTimeout(() => {
+            // Only if a real alarm has not started in the meantime — a rest can
+            // run out during the two seconds a preview lasts, and stopping that
+            // would be the preview silencing the thing it was demonstrating.
+            if (!state.restAlarm) stopRestAlarmSound();
+          }, 2400);
+        };
+        if (context.state === "suspended") {
+          context.resume().then(play).catch(() => undefined);
+        } else {
+          play();
+        }
+      }
+    }
+    if (state.restAlert.vibrate && navigator.vibrate) {
+      try {
+        navigator.vibrate([600, 250, 300, 250, 600]);
+      } catch (error) {
+        // Refused; nothing to undo.
+      }
+    }
+  }
+
+  function persistRestTimer() {
+    if (!state.restTimer) {
+      localStorage.removeItem(STORAGE_REST);
+      return;
+    }
+    localStorage.setItem(STORAGE_REST, JSON.stringify(state.restTimer));
+  }
+
+  /**
+   * The saved rest, or null.
+   *
+   * A bare number is what an older build wrote, and it still means what it
+   * meant then: an open-ended stopwatch. Reading it back that way is what keeps
+   * an upgrade mid-rest from dropping the rest.
+   */
+  function readStoredRest() {
+    const raw = localStorage.getItem(STORAGE_REST);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      const startedAt = typeof parsed === "number" ? parsed : Number(parsed.startedAt);
+      if (!Number.isFinite(startedAt) || startedAt <= 0) return null;
+      const endAt = typeof parsed === "object" && parsed ? Number(parsed.endAt) : NaN;
+      return {
+        startedAt,
+        endAt: Number.isFinite(endAt) && endAt > 0 ? endAt : null,
+        durationMinutes: Number(parsed && parsed.durationMinutes) || 0,
+        cloudSynced: Boolean(parsed && parsed.cloudSynced),
+      };
+    } catch (error) {
+      localStorage.removeItem(STORAGE_REST);
+      return null;
+    }
+  }
+
+  function markRestSynced() {
+    if (!state.restTimer || state.restTimer.cloudSynced) return;
+    state.restTimer = { ...state.restTimer, cloudSynced: true };
+    persistRestTimer();
+  }
+
   function loadSoundPreference() {
     return localStorage.getItem(STORAGE_SOUND_ENABLED) !== "off";
   }
@@ -4606,6 +5194,334 @@
       }
     });
     state.activeSoundMasters = [];
+  }
+
+  // --- The rest alarm ------------------------------------------------------
+  //
+  // A focus session finishing is news; a rest finishing is an instruction. The
+  // user asked to be pulled out of something at a particular moment, so this
+  // has to survive the things a browser normally does to a page nobody is
+  // looking at.
+  //
+  // Four defences, because no single one is reliable on its own:
+  //
+  //   the sound      scheduled *ahead of time* on the audio clock, so a
+  //                  throttled or descheduled tab still makes the noise
+  //   a notification requireInteraction, so it stays until it is answered
+  //   vibration      Android browsers only, and free where it works
+  //   the page       a full-bleed sheet and a flashing title, for the tab
+  //                  that is still open
+  //
+  // Nothing here can run away: everything is owned by this page and stops when
+  // it is closed, so the failure mode is silence rather than a browser that
+  // will not shut up.
+
+  function fireRestAlarm(durationMinutes) {
+    if (state.restAlarm) return;
+
+    state.restAlarm = { durationMinutes, firedAt: Date.now(), loud: true };
+
+    startRestAlarmSound();
+    startRestAlarmVibration();
+    showRestAlarmNotification(durationMinutes);
+    renderRestAlarm();
+    startRestAlarmTitleFlash();
+
+    // Quietens at the cap but does not clear: the message outlives the noise.
+    // An alarm with no end is not more reliable, only more likely to be
+    // switched off for good.
+    window.clearTimeout(state.restAlarmStopId);
+    state.restAlarmStopId = window.setTimeout(() => {
+      silenceRestAlarm();
+    }, REST_ALARM_RING_MS);
+  }
+
+  // Stops the noise, leaves the alarm standing.
+  function silenceRestAlarm() {
+    if (!state.restAlarm || !state.restAlarm.loud) return;
+    state.restAlarm = { ...state.restAlarm, loud: false };
+    stopRestAlarmSound();
+    stopRestAlarmVibration();
+    renderRestAlarm();
+  }
+
+  // The only thing that clears it. A swipe on the notification does not, which
+  // is the whole of what "stubborn" means here.
+  function dismissRestAlarm(options = {}) {
+    if (!state.restAlarm) return;
+    state.restAlarm = null;
+    stopRestAlarmSound();
+    stopRestAlarmVibration();
+    stopRestAlarmTitleFlash();
+    closeRestAlarmNotification();
+    renderRestAlarm();
+    releaseWakeLock();
+    if (!options.silent) updateDocumentTitle();
+  }
+
+  /**
+   * Schedules the alarm on the audio clock rather than driving it from a timer.
+   *
+   * This is the part that matters. `setInterval` in a background tab is
+   * throttled to once a second at best and suspended outright on mobile, so a
+   * loop that re-triggers each beep would stutter or stop — at exactly the
+   * moment the page is least likely to be in front. An AudioContext keeps its
+   * own clock and plays what it has already been given, so scheduling the whole
+   * ring up front means the noise happens whether or not JavaScript gets to run.
+   *
+   * It is re-scheduled in blocks rather than all at once so that stopping it
+   * stays instant: every oscillator is held in `restAlarmNodes` and cancelled
+   * together.
+   */
+  function startRestAlarmSound() {
+    if (!state.restAlert.sound) return;
+
+    const context = getAudioContext();
+    if (!context) return;
+
+    const schedule = () => {
+      scheduleRestAlarmBlock();
+      // Each block is shorter than the one it queues, so there is always
+      // another already in the audio clock's hands before the current one ends.
+      window.clearInterval(state.restAlarmLoopId);
+      state.restAlarmLoopId = window.setInterval(
+        scheduleRestAlarmBlock,
+        REST_ALARM_BLOCK_MS
+      );
+    };
+
+    if (context.state === "suspended") {
+      // The gesture that started the rest should have unlocked this already;
+      // if the browser suspended it since, this is the last chance.
+      context.resume().then(schedule).catch(() => {
+        // No audio. The notification and the sheet still carry the message.
+      });
+      return;
+    }
+
+    schedule();
+  }
+
+  // One block of the alarm: rising three-note bursts, repeated.
+  //
+  // Deliberately not the session chime. That one resolves — it is a full stop,
+  // and a full stop is not a summons. This rises and does not settle, and sits
+  // high enough to carry across a room.
+  function scheduleRestAlarmBlock() {
+    const context = state.audioContext;
+    if (!context || !state.restAlarm || !state.restAlarm.loud) return;
+
+    const master = context.createGain();
+    // Its own level, floored at full: someone who turned the chime down did so
+    // to be less disturbed while working, which says nothing about whether they
+    // want to be woken from a break.
+    master.gain.value = Math.max(1, state.soundVolume);
+    master.connect(context.destination);
+    state.restAlarmNodes.push(master);
+
+    const blockSeconds = REST_ALARM_BLOCK_MS / 1000;
+    const startTime = context.currentTime + 0.05;
+    const cycle = 2.2;
+
+    for (let index = 0; index * cycle < blockSeconds; index += 1) {
+      const cycleStart = startTime + index * cycle;
+      [880, 1108.73, 1318.51].forEach((frequency, note) => {
+        const oscillator = context.createOscillator();
+        const envelope = context.createGain();
+        const noteStart = cycleStart + note * 0.36;
+        const noteEnd = noteStart + 0.3;
+
+        oscillator.type = "triangle";
+        oscillator.frequency.setValueAtTime(frequency, noteStart);
+        // A near-square attack and a hard cut: no bell-like decay, which would
+        // blur the three beeps into one wash.
+        envelope.gain.setValueAtTime(0.0001, noteStart);
+        envelope.gain.exponentialRampToValueAtTime(0.5, noteStart + 0.008);
+        envelope.gain.setValueAtTime(0.5, noteEnd - 0.03);
+        envelope.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+
+        oscillator.connect(envelope);
+        envelope.connect(master);
+        oscillator.start(noteStart);
+        oscillator.stop(noteEnd + 0.02);
+        state.restAlarmNodes.push(oscillator);
+      });
+    }
+  }
+
+  function stopRestAlarmSound() {
+    window.clearInterval(state.restAlarmLoopId);
+    state.restAlarmLoopId = null;
+    window.clearTimeout(state.restAlarmStopId);
+    state.restAlarmStopId = null;
+
+    state.restAlarmNodes.forEach((node) => {
+      try {
+        if (typeof node.stop === "function") node.stop();
+      } catch (error) {
+        // Already stopped, or never started.
+      }
+      try {
+        node.disconnect();
+      } catch (error) {
+        // Already disconnected.
+      }
+    });
+    state.restAlarmNodes = [];
+  }
+
+  // Android browsers only, and silently absent everywhere else. Chrome also
+  // requires the page to have been interacted with, which starting the rest
+  // satisfies — and refuses while the tab is hidden, which is why this is a
+  // supplement to the notification rather than a replacement for it.
+  function startRestAlarmVibration() {
+    if (!state.restAlert.vibrate || !navigator.vibrate) return;
+
+    const pattern = [600, 250, 300, 250, 600, 900];
+    const buzz = () => {
+      try {
+        navigator.vibrate(pattern);
+      } catch (error) {
+        // Refused (usually: the tab is hidden). Nothing else to do.
+      }
+    };
+
+    buzz();
+    window.clearInterval(state.restAlarmVibrateId);
+    state.restAlarmVibrateId = window.setInterval(buzz, 2900);
+  }
+
+  function stopRestAlarmVibration() {
+    window.clearInterval(state.restAlarmVibrateId);
+    state.restAlarmVibrateId = null;
+    if (navigator.vibrate) {
+      try {
+        navigator.vibrate(0);
+      } catch (error) {
+        // Nothing to cancel.
+      }
+    }
+  }
+
+  /**
+   * The one part of this that works with the tab closed.
+   *
+   * `requireInteraction` keeps it on screen until it is answered rather than
+   * fading after a few seconds, which is the browser's equivalent of an ongoing
+   * notification. It is posted through the service worker where there is one,
+   * because a worker notification survives the page being discarded — and falls
+   * back to a page notification where there is not.
+   */
+  function showRestAlarmNotification(durationMinutes) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+    const body = t("rest.notify_body", { time: formatMinutes(durationMinutes) });
+    const options = {
+      body,
+      tag: REST_ALARM_NOTIFICATION_TAG,
+      requireInteraction: true,
+      renotify: true,
+      icon: "./assets/canopy-logo-192.png",
+      badge: "./assets/canopy-logo-192.png",
+      // The browser's own vibration, for the case where the page's is refused.
+      vibrate: state.restAlert.vibrate ? [600, 250, 300, 250, 600] : undefined,
+      silent: !state.restAlert.sound,
+    };
+
+    if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+      navigator.serviceWorker.ready
+        .then((registration) => registration.showNotification(t("rest.alarm_title"), options))
+        .catch(() => {
+          tryPageNotification(options);
+        });
+      return;
+    }
+
+    tryPageNotification(options);
+  }
+
+  function tryPageNotification(options) {
+    try {
+      new Notification(t("rest.alarm_title"), options);
+    } catch (error) {
+      // Some browsers refuse the constructor when a worker is available.
+    }
+  }
+
+  function closeRestAlarmNotification() {
+    if (!navigator.serviceWorker || !navigator.serviceWorker.ready) return;
+    navigator.serviceWorker.ready
+      .then((registration) => registration.getNotifications({ tag: REST_ALARM_NOTIFICATION_TAG }))
+      .then((list) => list.forEach((notification) => notification.close()))
+      .catch(() => undefined);
+  }
+
+  /**
+   * Asked for when a rest starts, not on page load.
+   *
+   * A permission prompt at load is noise the user has no context for and will
+   * dismiss; asked at the moment they set a timer that has to interrupt them,
+   * it is a question with an obvious answer. Declining costs the notification
+   * and nothing else.
+   */
+  function requestRestNotificationPermission() {
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "default") return;
+
+    Notification.requestPermission()
+      .then((result) => {
+        if (result === "denied") showToast(t("toast.rest_notify_blocked"));
+      })
+      .catch(() => undefined);
+  }
+
+  // The tab strip is the one place a user glances at without switching to it.
+  function startRestAlarmTitleFlash() {
+    let on = true;
+    window.clearInterval(state.restAlarmFlashId);
+    state.restAlarmFlashId = window.setInterval(() => {
+      document.title = on
+        ? `⏰ ${t("rest.alarm_title")} | ${APP_TITLE}`
+        : `${t("rest.alarm_title")} | ${APP_TITLE}`;
+      on = !on;
+    }, 900);
+  }
+
+  function stopRestAlarmTitleFlash() {
+    window.clearInterval(state.restAlarmFlashId);
+    state.restAlarmFlashId = null;
+  }
+
+  /**
+   * Keeps the screen — and with it this page's timers — awake during a rest.
+   *
+   * A phone whose screen sleeps may freeze the page entirely, and the scheduled
+   * audio only survives that up to a point. Best-effort: it needs a secure
+   * context and a visible page, and is simply absent on desktop Safari.
+   */
+  function requestWakeLock() {
+    if (!navigator.wakeLock || state.wakeLock) return;
+    navigator.wakeLock
+      .request("screen")
+      .then((lock) => {
+        state.wakeLock = lock;
+        // Released by the browser whenever the page is hidden, so it has to be
+        // re-taken on the way back rather than assumed to still be held.
+        lock.addEventListener("release", () => {
+          state.wakeLock = null;
+        });
+      })
+      .catch(() => undefined);
+  }
+
+  function releaseWakeLock() {
+    // Still wanted while a countdown runs or an alarm is up.
+    if (state.restTimer && state.restTimer.endAt) return;
+    if (state.restAlarm) return;
+    const lock = state.wakeLock;
+    state.wakeLock = null;
+    if (!lock) return;
+    lock.release().catch(() => undefined);
   }
 
   function getRemainingSeconds() {
@@ -5127,6 +6043,14 @@
     // script every load, so a new deploy is picked up promptly. The worker's
     // activate handler then clears old caches and reloads open tabs, which
     // makes every device that already has the site re-download fresh assets.
+    // A tap on the rest alarm's notification is answered by the worker, which
+    // focuses this tab and says so. Silencing here rather than dismissing: the
+    // user has clearly seen it, so the noise should stop — but the sheet stays
+    // up so there is still something to press on the screen they just arrived at.
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      if (event.data && event.data.type === "rest-alarm-click") silenceRestAlarm();
+    });
+
     navigator.serviceWorker
       .register("./service-worker.js", { updateViaCache: "none" })
       .then((registration) => {

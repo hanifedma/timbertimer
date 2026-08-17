@@ -226,15 +226,40 @@
 
         <div class="rest-card" aria-live="polite">
           <div class="timer-meta">
-            <span id="restState">Rest stopwatch</span>
-            <span id="restModeLabel">Elapsed</span>
+            <span id="restState">Rest</span>
+            <span id="restModeLabel">Remaining</span>
           </div>
 
           <div class="growth-stage rest-stage" id="restStage" aria-hidden="true">
             <div class="plant" id="restPlant"></div>
           </div>
 
-          <div id="restDisplay" class="rest-display">00:00</div>
+          <div id="restDisplay" class="rest-display">10:00</div>
+          <div id="restEndsAt" class="rest-ends-at" hidden></div>
+
+          <!-- Hidden while a rest runs: its length is fixed by then. -->
+          <div id="restSetup" class="rest-setup">
+            <div class="mode-toggle rest-mode-toggle" role="group" aria-label="Rest mode">
+              <button id="restModeTimerButton" class="pill-button is-selected" type="button"
+                data-i18n="rest.mode_timer">Timer</button>
+              <button id="restModeOpenButton" class="pill-button" type="button"
+                data-i18n="rest.mode_open">Open-ended</button>
+            </div>
+
+            <div id="restDurationField" class="field">
+              <span data-i18n="rest.length">Rest length</span>
+              <div class="duration-row" role="group" aria-label="Rest length presets">
+                <button class="pill-button" type="button" data-rest-duration="5">5m</button>
+                <button class="pill-button is-selected" type="button" data-rest-duration="10">10m</button>
+                <button class="pill-button" type="button" data-rest-duration="15">15m</button>
+                <label class="custom-duration">
+                  <span data-i18n="field.custom">Custom</span>
+                  <input id="restDurationInput" type="number" min="1" max="600" step="1" value="10" />
+                </label>
+              </div>
+            </div>
+          </div>
+
           <div class="timer-actions">
             <button id="restStartButton" class="secondary-button" type="button">
               <span class="btn-emoji" aria-hidden="true">▶️</span>
@@ -244,6 +269,29 @@
               <span class="btn-emoji" aria-hidden="true">🍂</span>
               <span data-i18n="rest.finish">Finish rest</span>
             </button>
+            <button id="restExtendButton" class="ghost-button" type="button" hidden>
+              <span class="btn-emoji" aria-hidden="true">➕</span>
+              <span data-i18n="rest.extend">+5 min</span>
+            </button>
+          </div>
+
+          <!--
+            How the alarm announces itself. Its own control rather than a
+            reading of the sound toggle above: that governs a cue, this governs
+            an alarm, and silencing one says nothing about the other.
+          -->
+          <div class="field rest-alert-field">
+            <span data-i18n="rest.alert_label">Rest alarm</span>
+            <div class="duration-row" role="group" aria-label="Rest alarm">
+              <button class="pill-button is-selected" type="button" data-rest-alert="both"
+                data-i18n="rest.alert_both">Sound + buzz</button>
+              <button class="pill-button" type="button" data-rest-alert="sound"
+                data-i18n="rest.alert_sound">Sound</button>
+              <button class="pill-button" type="button" data-rest-alert="vibrate"
+                data-i18n="rest.alert_vibrate">Buzz</button>
+              <button class="pill-button" type="button" data-rest-alert="silent"
+                data-i18n="rest.alert_silent">Silent</button>
+            </div>
           </div>
         </div>
       </section>
@@ -601,6 +649,31 @@
       </menu>
     </form>
   </dialog>
+
+  <!--
+    The rest alarm.
+
+    A plain div rather than a <dialog>: a modal dialog steals focus and traps
+    it, and this can appear while the user is typing in another panel — or in
+    another tab entirely, in which case it has to be waiting rather than to have
+    hijacked something. role="alertdialog" gets it announced without that.
+  -->
+  <div id="restAlarm" class="rest-alarm" role="alertdialog" aria-modal="false"
+    aria-labelledby="restAlarmTitle" aria-describedby="restAlarmBody" hidden>
+    <div class="rest-alarm-card">
+      <div class="rest-alarm-plant" id="restAlarmPlant" aria-hidden="true"></div>
+      <h2 id="restAlarmTitle" data-i18n="rest.alarm_title">Rest is over</h2>
+      <p id="restAlarmBody" class="rest-alarm-body"></p>
+      <div class="rest-alarm-actions">
+        <button id="restAlarmDismiss" class="primary-button" type="button"
+          data-i18n="rest.alarm_dismiss">Dismiss</button>
+        <button id="restAlarmExtend" class="secondary-button" type="button"
+          data-i18n="rest.alarm_extend">Rest 5 more minutes</button>
+        <button id="restAlarmFocus" class="ghost-button" type="button"
+          data-i18n="rest.alarm_focus">Start focusing</button>
+      </div>
+    </div>
+  </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>

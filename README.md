@@ -32,7 +32,7 @@ Name a new project and both are picked for you.
 - **Countdown & stopwatch** focus modes. You still choose how long a countdown runs, but that goal is not written onto the record it leaves behind: a finished session is just when it ran and for how long, so ending one early costs you nothing but the time you didn't spend.
 - **Forest visualizer** — day / week / month views of the trees you've grown, each steppable backwards, so yesterday's forest is one tap away. Every session plants a tree, sized by the time it actually took.
 - **Rest is a project too**, so rests can be added by hand like any other record.
-- **Separate rest stopwatch** for tracking breaks as you take them.
+- **Rest timer with shortcuts** — 5, 10 or 15 minutes, or any length you type, and a **stubborn alarm** when it lands: a looping tone that is scheduled on the audio clock ahead of time (so a throttled background tab still makes the noise), a notification that stays until it is answered rather than fading, vibration where the browser allows it, a flashing tab title, and a full-bleed sheet on the page. It rings for two minutes and then falls quiet, but the sheet and the notification stay until you dismiss them. Choose sound, buzz, both or silent — a separate setting from the timer chime, because muting a cue you work through says nothing about wanting to sleep through the end of a break. Prefer the old behaviour? **Open-ended** runs the rest as a plain stopwatch.
 - **To‑do list** with drag‑to‑reorder, synced when signed in.
 - **Editable, searchable focus history** with today/total stats.
 - **Sound cues** with an adjustable volume, and remaining time shown in the browser tab.
@@ -56,7 +56,7 @@ Local storage works with zero setup. Google sync is optional (see below).
 GitHub Pages serves static files only, so cross‑device sync uses Supabase for the database and auth.
 
 1. Create a Supabase project.
-2. Open **SQL Editor**, paste all of `docs/supabase-schema.sql`, and **Run** it (creates the tables + per‑user row‑level security). The file is safe to re‑run, and doing so is how you upgrade an existing database — the projects table and the `project_id` columns are added by the same script.
+2. Open **SQL Editor**, paste all of `docs/supabase-schema.sql`, and **Run** it (creates the tables + per‑user row‑level security). The file is safe to re‑run, and doing so is how you upgrade an existing database — the projects table, the `project_id` columns and the rest timer's `end_at` / `duration_minutes` are all added by the same script. Skipping it costs only cross‑device rest countdowns (each client drops the two columns on the first rejection and keeps working); the alarm is scheduled locally, so it still fires on the device that set it.
 3. **Project Settings → API**: copy the Project URL and the anon/publishable key.
 4. Put them in `src/supabase-config.js`:
 

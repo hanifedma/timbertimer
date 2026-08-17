@@ -1,4 +1,4 @@
-const CACHE_NAME = "timbertimer-v76";
+const CACHE_NAME = "timbertimer-v77";
 const CACHE_PREFIX = "timbertimer-";
 // Every entry must resolve: cache.addAll() rejects the whole install if any
 // single request 404s, which would silently disable the worker.
@@ -46,6 +46,46 @@ self.addEventListener("activate", (event) => {
         })
       );
     })
+  );
+});
+
+/**
+ * Tapping the rest alarm.
+ *
+ * The notification is posted through this worker rather than by the page so it
+ * survives the page being discarded — which is exactly the case it exists for.
+ * That means the tap arrives here, and the app may not be running at all, so
+ * this either focuses the tab that is already open or opens one.
+ *
+ * The notification is closed either way. It is the app's job to decide whether
+ * the alarm is over, and the app is what the user is now looking at.
+ */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clients) => {
+        const scope = new URL(self.registration.scope);
+        const existing = clients.find((client) => {
+          return new URL(client.url).origin === scope.origin;
+        });
+
+        if (existing) {
+          // Tell the page before focusing it, so the sheet is already up when
+          // it comes forward rather than appearing a moment later.
+          existing.postMessage({ type: "rest-alarm-click" });
+          return existing.focus();
+        }
+
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(scope.href);
+        }
+
+        return undefined;
+      })
+      .catch(() => undefined)
   );
 });
 
