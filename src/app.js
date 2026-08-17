@@ -116,8 +116,6 @@
     "rest.finish": { en: "Finish rest", ko: "휴식 완료" },
     "rest.record_title": { en: "Rest", ko: "휴식" },
     "rest.length": { en: "Rest length", ko: "휴식 길이" },
-    "rest.mode_timer": { en: "Timer", ko: "타이머" },
-    "rest.mode_open": { en: "Open-ended", ko: "제한 없음" },
     "rest.extend": { en: "+5 min", ko: "+5분" },
     "rest.ends_at": { en: "Ends at {time}", ko: "{time}에 종료" },
     "rest.alarm_title": { en: "Rest is over", ko: "휴식이 끝났어요" },
@@ -126,7 +124,11 @@
     "rest.alarm_extend": { en: "Rest 5 more minutes", ko: "5분 더 쉬기" },
     "rest.alarm_focus": { en: "Start focusing", ko: "집중 시작하기" },
     "rest.alert_label": { en: "Rest alarm", ko: "휴식 알람" },
-    "rest.alert_both": { en: "Sound + buzz", ko: "소리 + 진동" },
+    // "Both" rather than "Sound + buzz": four pills share one row, and the
+    // longest label is what decides whether any of them wraps. The group is
+    // labelled "Rest alarm" and the other three name the parts, so what "both"
+    // means is never in question.
+    "rest.alert_both": { en: "Both", ko: "둘 다" },
     "rest.alert_sound": { en: "Sound", ko: "소리" },
     "rest.alert_vibrate": { en: "Buzz", ko: "진동" },
     "rest.alert_silent": { en: "Silent", ko: "무음" },

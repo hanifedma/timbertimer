@@ -1614,7 +1614,13 @@ body.is-reordering .note-item {
   margin-top: 14px;
 }
 
-/* Four choices rather than the duration row's three-plus-custom. */
+/*
+ * Four equal choices rather than the duration row's three-plus-custom.
+ *
+ * This deliberately outranks the responsive rules that collapse .duration-row,
+ * because those exist to give a *numeric input* room and these are four short
+ * words. They still need somewhere to go on a phone, hence the pair below.
+ */
 .rest-alert-field .duration-row {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -1622,6 +1628,35 @@ body.is-reordering .note-item {
 .rest-alert-field .pill-button {
   padding: 0 6px;
   font-size: 0.86rem;
+  /* One line each: a wrapped pill drags the whole row taller than its
+     neighbours and is what made this look broken in the first place. */
+  white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+
+  /* Two by two beats four cramped columns; still one glance. */
+  .rest-alert-field .duration-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 780px) {
+
+  /*
+   * The shared .duration-row collapses to one column on a phone, which turns
+   * three two-character presets into three full-width rows and pushes Start
+   * rest off the screen. "5m" needs nothing like that much room, so the three
+   * stay across and only the number box takes a row of its own.
+   */
+  #restDurationField .duration-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  #restDurationField .custom-duration {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) minmax(72px, 104px);
+  }
 }
 
 /* --- The rest alarm ------------------------------------------------------ */
@@ -1667,15 +1702,17 @@ body.is-reordering .note-item {
   animation: rest-alarm-pulse 1.6s ease-in-out infinite;
 }
 
+/*
+ * position: relative is load-bearing, not decoration. buildTreeSVG emits
+ * `.tree-svg`, which is `position: absolute; inset: 0` — so without a
+ * positioned ancestor here the tree resolves against the fixed overlay and is
+ * drawn at the size of the entire screen, straight over the buttons.
+ */
 .rest-alarm-plant {
+  position: relative;
   width: 96px;
   height: 96px;
   margin: 0 auto 12px;
-}
-
-.rest-alarm-plant svg {
-  width: 100%;
-  height: 100%;
 }
 
 .rest-alarm-card h2 {

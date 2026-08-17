@@ -239,11 +239,21 @@
 
           <!-- Hidden while a rest runs: its length is fixed by then. -->
           <div id="restSetup" class="rest-setup">
-            <div class="mode-toggle rest-mode-toggle" role="group" aria-label="Rest mode">
-              <button id="restModeTimerButton" class="pill-button is-selected" type="button"
-                data-i18n="rest.mode_timer">Timer</button>
-              <button id="restModeOpenButton" class="pill-button" type="button"
-                data-i18n="rest.mode_open">Open-ended</button>
+            <!--
+              The same two words, the same icons and the same class as the focus
+              toggle above. A rest countdown and a focus countdown are the same
+              idea, so calling one "Timer" and the other "Countdown" would invent
+              a distinction that is not there.
+            -->
+            <div class="timer-mode-toggle rest-mode-toggle" role="group" aria-label="Rest mode">
+              <button id="restModeTimerButton" class="pill-button is-selected" type="button">
+                <span class="btn-emoji" aria-hidden="true">⏳</span>
+                <span data-i18n="mode.countdown">Countdown</span>
+              </button>
+              <button id="restModeOpenButton" class="pill-button" type="button">
+                <span class="btn-emoji" aria-hidden="true">⏱️</span>
+                <span data-i18n="mode.stopwatch">Stopwatch</span>
+              </button>
             </div>
 
             <div id="restDurationField" class="field">
@@ -261,14 +271,22 @@
           </div>
 
           <div class="timer-actions">
-            <button id="restStartButton" class="secondary-button" type="button">
-              <span class="btn-emoji" aria-hidden="true">▶️</span>
-              <span data-i18n="rest.start">Start rest</span>
-            </button>
-            <button id="restResetButton" class="ghost-button" type="button" disabled>
-              <span class="btn-emoji" aria-hidden="true">🍂</span>
-              <span data-i18n="rest.finish">Finish rest</span>
-            </button>
+            <!--
+              Paired the way the focus card pairs Start and Finish: they are one
+              either/or choice, and stacking them full-width read as two
+              unrelated commands while making the panel needlessly tall.
+            -->
+            <div class="timer-primary-actions">
+              <button id="restStartButton" class="secondary-button" type="button">
+                <span class="btn-emoji" aria-hidden="true">▶️</span>
+                <span data-i18n="rest.start">Start rest</span>
+              </button>
+              <button id="restResetButton" class="ghost-button" type="button" disabled>
+                <span class="btn-emoji" aria-hidden="true">🍂</span>
+                <span data-i18n="rest.finish">Finish rest</span>
+              </button>
+            </div>
+            <!-- Its own row: it appears only mid-rest, and is a third option. -->
             <button id="restExtendButton" class="ghost-button" type="button" hidden>
               <span class="btn-emoji" aria-hidden="true">➕</span>
               <span data-i18n="rest.extend">+5 min</span>
@@ -284,7 +302,7 @@
             <span data-i18n="rest.alert_label">Rest alarm</span>
             <div class="duration-row" role="group" aria-label="Rest alarm">
               <button class="pill-button is-selected" type="button" data-rest-alert="both"
-                data-i18n="rest.alert_both">Sound + buzz</button>
+                data-i18n="rest.alert_both">Both</button>
               <button class="pill-button" type="button" data-rest-alert="sound"
                 data-i18n="rest.alert_sound">Sound</button>
               <button class="pill-button" type="button" data-rest-alert="vibrate"
