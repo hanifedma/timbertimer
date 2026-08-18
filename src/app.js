@@ -33,7 +33,6 @@
   // the same on the other. Ten rather than five is the default because it is
   // the one most people actually want, and the shorter shortcut sits beside it.
   const DEFAULT_REST_DURATION = 10;
-  const REST_EXTEND_MINUTES = 5;
   // The same ceiling the focus form has, and the database's own.
   const MAX_TIMER_MINUTES = 600;
 
@@ -46,6 +45,8 @@
   // (which gets one timer callback a second at best) always has more queued;
   // short enough that stopping the alarm is instant.
   const REST_ALARM_BLOCK_MS = 6600;
+  // Three rising beeps and a gap. The block above is a whole number of these.
+  const REST_ALARM_CYCLE_SECONDS = 2.2;
   const REST_ALARM_NOTIFICATION_TAG = "timbertimer-rest-alarm";
 
   // --- Projects ------------------------------------------------------------
@@ -116,26 +117,17 @@
     "rest.finish": { en: "Finish rest", ko: "휴식 완료" },
     "rest.record_title": { en: "Rest", ko: "휴식" },
     "rest.length": { en: "Rest length", ko: "휴식 길이" },
-    "rest.extend": { en: "+5 min", ko: "+5분" },
     "rest.ends_at": { en: "Ends at {time}", ko: "{time}에 종료" },
     "rest.alarm_title": { en: "Rest is over", ko: "휴식이 끝났어요" },
     "rest.alarm_body": { en: "Your {time} rest has finished.", ko: "{time} 휴식이 끝났습니다." },
     "rest.alarm_dismiss": { en: "Dismiss", ko: "확인" },
-    "rest.alarm_extend": { en: "Rest 5 more minutes", ko: "5분 더 쉬기" },
     "rest.alarm_focus": { en: "Start focusing", ko: "집중 시작하기" },
     "rest.alert_label": { en: "Rest alarm", ko: "휴식 알람" },
-    // "Both" rather than "Sound + buzz": four pills share one row, and the
-    // longest label is what decides whether any of them wraps. The group is
-    // labelled "Rest alarm" and the other three name the parts, so what "both"
-    // means is never in question.
-    "rest.alert_both": { en: "Both", ko: "둘 다" },
     "rest.alert_sound": { en: "Sound", ko: "소리" },
-    "rest.alert_vibrate": { en: "Buzz", ko: "진동" },
     "rest.alert_silent": { en: "Silent", ko: "무음" },
     "rest.notify_body": { en: "Your {time} rest has finished. Time to get back to it.", ko: "{time} 휴식이 끝났습니다. 다시 시작해 볼까요." },
     "toast.rest_planted": { en: "Rest planted a wilted tree.", ko: "휴식이 시든 나무를 심었어요." },
     "toast.rest_discarded": { en: "Rest was too short to plant.", ko: "휴식이 너무 짧아 심지 않았어요." },
-    "toast.rest_extended": { en: "Five more minutes.", ko: "5분 더 쉬어요." },
     "toast.rest_notify_blocked": { en: "Notifications are blocked, so the rest alarm can only sound while this tab is open.", ko: "알림이 차단되어 있어, 이 탭이 열려 있을 때만 휴식 알람이 울립니다." },
     "notes.kicker": { en: "Tasks", ko: "할 일" },
     "notes.title": { en: "To-Do", ko: "투두" },
@@ -404,7 +396,6 @@
     restDurationButtons: Array.from(document.querySelectorAll("[data-rest-duration]")),
     restStartButton: document.getElementById("restStartButton"),
     restResetButton: document.getElementById("restResetButton"),
-    restExtendButton: document.getElementById("restExtendButton"),
     restAlertButtons: Array.from(document.querySelectorAll("[data-rest-alert]")),
     restStage: document.getElementById("restStage"),
     restPlant: document.getElementById("restPlant"),
@@ -412,7 +403,6 @@
     restAlarmPlant: document.getElementById("restAlarmPlant"),
     restAlarmBody: document.getElementById("restAlarmBody"),
     restAlarmDismiss: document.getElementById("restAlarmDismiss"),
-    restAlarmExtend: document.getElementById("restAlarmExtend"),
     restAlarmFocus: document.getElementById("restAlarmFocus"),
     weekRange: document.getElementById("weekRange"),
     weekTreeCount: document.getElementById("weekTreeCount"),
@@ -568,11 +558,10 @@
     // The rest alarm while it is going off: { durationMinutes, firedAt, loud }.
     restAlarm: null,
     // Handles for the things the alarm has to be able to take back: the
-    // scheduled audio, the vibration loop, the ring cap, and the title flash.
+    // scheduled audio, the ring cap, and the title flash.
     restAlarmNodes: [],
     restAlarmLoopId: null,
     restAlarmStopId: null,
-    restAlarmVibrateId: null,
     restAlarmFlashId: null,
     restCompleting: false,
     // Set once the rest columns are found to be missing, so the countdown
@@ -738,7 +727,6 @@
     els.soundToggleButton.addEventListener("click", toggleTimerSound);
     els.restStartButton.addEventListener("click", startRestTimer);
     els.restResetButton.addEventListener("click", finishRestTimer);
-    els.restExtendButton.addEventListener("click", extendRestTimer);
 
     els.restModeTimerButton.addEventListener("click", () => setRestMode("countdown"));
     els.restModeOpenButton.addEventListener("click", () => setRestMode("stopwatch"));
@@ -758,18 +746,6 @@
     });
 
     els.restAlarmDismiss.addEventListener("click", () => dismissRestAlarm());
-    els.restAlarmExtend.addEventListener("click", () => {
-      // "Five more minutes" here starts a *fresh* five-minute rest rather than
-      // reviving the one that ended: by the time this alarm exists its rest has
-      // been recorded and its tree planted, and un-planting it to bolt five
-      // minutes onto the end would rewrite a record the user can already see.
-      // Two rests back to back is also the honest description of what happened.
-      dismissRestAlarm();
-      // Passed rather than set: this must not become the length the panel
-      // offers from now on. The user asked for five more minutes once, not to
-      // change what "rest" means to them.
-      startRestTimer({ minutes: REST_EXTEND_MINUTES });
-    });
     els.restAlarmFocus.addEventListener("click", () => {
       dismissRestAlarm();
       els.sessionTitle.focus();
@@ -2270,33 +2246,6 @@
     showToast(t("toast.rest_planted"));
   }
 
-  // Another five minutes, measured from now rather than from the end that just
-  // passed — the user is asking for five more minutes of rest starting when
-  // they asked, not five minutes that half expired while the alarm rang.
-  async function extendRestTimer() {
-    const rest = state.restTimer;
-    if (!rest || !rest.endAt) return;
-
-    dismissRestAlarm({ silent: true });
-    state.restCompleting = false;
-
-    const base = Math.max(rest.endAt, Date.now());
-    state.restTimer = {
-      ...rest,
-      endAt: base + REST_EXTEND_MINUTES * 60000,
-      durationMinutes: Math.min(
-        rest.durationMinutes + REST_EXTEND_MINUTES,
-        MAX_TIMER_MINUTES
-      ),
-    };
-
-    persistRestTimer();
-    renderRestTimer();
-    requestWakeLock();
-    if (await saveRestTimerToCloud()) markRestSynced();
-    showToast(t("toast.rest_extended"));
-  }
-
   /**
    * A rest countdown has reached its end.
    *
@@ -2577,7 +2526,6 @@
     // The length is fixed once it is running, so a picker that could no longer
     // change anything is taken away rather than left there disabled.
     els.restSetup.hidden = isRunning;
-    els.restExtendButton.hidden = !(rest && rest.endAt);
     renderRestModeToggle();
 
     // The tree fills over the rest's own length, so a five-minute break grows
@@ -4819,17 +4767,31 @@
    * length is that the user intends to be pulled out of it.
    */
   function loadRestAlert() {
-    const saved = localStorage.getItem(STORAGE_REST_ALERT);
-    return restAlertFor(saved === null ? "both" : saved);
+    return restAlertFor(localStorage.getItem(STORAGE_REST_ALERT));
   }
 
+  /**
+   * Sound or silence.
+   *
+   * The Android app also offers vibration; this does not, because
+   * navigator.vibrate exists on no desktop browser and is refused by mobile
+   * ones while the tab is hidden — which is exactly when a rest alarm fires.
+   *
+   * The two retired values are still read, because they are sitting in the
+   * localStorage of anyone who chose them: "both" wanted noise and gets it,
+   * "vibrate" wanted no noise and is honoured by staying quiet rather than
+   * being handed a sound it deliberately turned off.
+   */
   function restAlertFor(wire) {
-    const known = ["both", "sound", "vibrate", "silent"].includes(wire) ? wire : "both";
-    return {
-      wire: known,
-      sound: known === "both" || known === "sound",
-      vibrate: known === "both" || known === "vibrate",
-    };
+    // Silent unless sound was explicitly chosen, which also makes it the
+    // default: an alarm that makes a noise nobody asked for is the kind of
+    // thing a page gets closed over. The sheet and the notification still
+    // arrive, so a rest ends visibly either way — it just does not shout.
+    //
+    // "both" is a retired value still sitting in the storage of anyone who
+    // picked it back when vibration was offered, and it wanted noise.
+    const sound = wire === "sound" || wire === "both";
+    return { wire: sound ? "sound" : "silent", sound };
   }
 
   function setRestAlert(wire) {
@@ -4837,8 +4799,8 @@
     localStorage.setItem(STORAGE_REST_ALERT, state.restAlert.wire);
     renderRestAlertControl();
     // Auditioned as it is chosen, the way the volume slider is. A setting whose
-    // whole subject is "how loud and how insistent" cannot be judged from four
-    // words, and the one time it normally plays is the one time nobody can be
+    // whole subject is "how loud and how insistent" cannot be judged from one
+    // word, and the one time it normally plays is the one time nobody can be
     // experimenting with it.
     previewRestAlarm();
   }
@@ -4855,27 +4817,20 @@
           // scheduleRestAlarmBlock reads state.restAlarm as its "still wanted"
           // guard, so a preview borrows it for exactly one block.
           state.restAlarm = { durationMinutes: 0, firedAt: Date.now(), loud: true, preview: true };
-          scheduleRestAlarmBlock();
+          scheduleRestAlarmBlock(REST_ALARM_CYCLE_SECONDS);
           state.restAlarm = wasAlarm;
           window.setTimeout(() => {
             // Only if a real alarm has not started in the meantime — a rest can
             // run out during the two seconds a preview lasts, and stopping that
             // would be the preview silencing the thing it was demonstrating.
             if (!state.restAlarm) stopRestAlarmSound();
-          }, 2400);
+          }, REST_ALARM_CYCLE_SECONDS * 1000 + 200);
         };
         if (context.state === "suspended") {
           context.resume().then(play).catch(() => undefined);
         } else {
           play();
         }
-      }
-    }
-    if (state.restAlert.vibrate && navigator.vibrate) {
-      try {
-        navigator.vibrate([600, 250, 300, 250, 600]);
-      } catch (error) {
-        // Refused; nothing to undo.
       }
     }
   }
@@ -5205,14 +5160,17 @@
   // has to survive the things a browser normally does to a page nobody is
   // looking at.
   //
-  // Four defences, because no single one is reliable on its own:
+  // Three defences, because no single one is reliable on its own:
   //
   //   the sound      scheduled *ahead of time* on the audio clock, so a
   //                  throttled or descheduled tab still makes the noise
   //   a notification requireInteraction, so it stays until it is answered
-  //   vibration      Android browsers only, and free where it works
   //   the page       a full-bleed sheet and a flashing title, for the tab
   //                  that is still open
+  //
+  // There is no vibration here, unlike the Android app: navigator.vibrate
+  // exists on no desktop browser and is refused by mobile ones while the tab
+  // is hidden, which is exactly when this fires.
   //
   // Nothing here can run away: everything is owned by this page and stops when
   // it is closed, so the failure mode is silence rather than a browser that
@@ -5224,7 +5182,6 @@
     state.restAlarm = { durationMinutes, firedAt: Date.now(), loud: true };
 
     startRestAlarmSound();
-    startRestAlarmVibration();
     showRestAlarmNotification(durationMinutes);
     renderRestAlarm();
     startRestAlarmTitleFlash();
@@ -5243,7 +5200,6 @@
     if (!state.restAlarm || !state.restAlarm.loud) return;
     state.restAlarm = { ...state.restAlarm, loud: false };
     stopRestAlarmSound();
-    stopRestAlarmVibration();
     renderRestAlarm();
   }
 
@@ -5253,7 +5209,6 @@
     if (!state.restAlarm) return;
     state.restAlarm = null;
     stopRestAlarmSound();
-    stopRestAlarmVibration();
     stopRestAlarmTitleFlash();
     closeRestAlarmNotification();
     renderRestAlarm();
@@ -5286,8 +5241,11 @@
       // Each block is shorter than the one it queues, so there is always
       // another already in the audio clock's hands before the current one ends.
       window.clearInterval(state.restAlarmLoopId);
+      // Wrapped rather than passed directly: setInterval hands its callback a
+      // drift argument in some engines, which would arrive as a block length
+      // and quietly resize the alarm.
       state.restAlarmLoopId = window.setInterval(
-        scheduleRestAlarmBlock,
+        () => scheduleRestAlarmBlock(),
         REST_ALARM_BLOCK_MS
       );
     };
@@ -5309,7 +5267,10 @@
   // Deliberately not the session chime. That one resolves — it is a full stop,
   // and a full stop is not a summons. This rises and does not settle, and sits
   // high enough to carry across a room.
-  function scheduleRestAlarmBlock() {
+  // [seconds] is how much to queue: a whole block while ringing, and exactly
+  // one cycle for the settings audition, which is what keeps a preview from
+  // having to be cut off part-way through a beep.
+  function scheduleRestAlarmBlock(seconds) {
     const context = state.audioContext;
     if (!context || !state.restAlarm || !state.restAlarm.loud) return;
 
@@ -5321,9 +5282,9 @@
     master.connect(context.destination);
     state.restAlarmNodes.push(master);
 
-    const blockSeconds = REST_ALARM_BLOCK_MS / 1000;
+    const cycle = REST_ALARM_CYCLE_SECONDS;
+    const blockSeconds = seconds || REST_ALARM_BLOCK_MS / 1000;
     const startTime = context.currentTime + 0.05;
-    const cycle = 2.2;
 
     for (let index = 0; index * cycle < blockSeconds; index += 1) {
       const cycleStart = startTime + index * cycle;
@@ -5372,39 +5333,6 @@
     state.restAlarmNodes = [];
   }
 
-  // Android browsers only, and silently absent everywhere else. Chrome also
-  // requires the page to have been interacted with, which starting the rest
-  // satisfies — and refuses while the tab is hidden, which is why this is a
-  // supplement to the notification rather than a replacement for it.
-  function startRestAlarmVibration() {
-    if (!state.restAlert.vibrate || !navigator.vibrate) return;
-
-    const pattern = [600, 250, 300, 250, 600, 900];
-    const buzz = () => {
-      try {
-        navigator.vibrate(pattern);
-      } catch (error) {
-        // Refused (usually: the tab is hidden). Nothing else to do.
-      }
-    };
-
-    buzz();
-    window.clearInterval(state.restAlarmVibrateId);
-    state.restAlarmVibrateId = window.setInterval(buzz, 2900);
-  }
-
-  function stopRestAlarmVibration() {
-    window.clearInterval(state.restAlarmVibrateId);
-    state.restAlarmVibrateId = null;
-    if (navigator.vibrate) {
-      try {
-        navigator.vibrate(0);
-      } catch (error) {
-        // Nothing to cancel.
-      }
-    }
-  }
-
   /**
    * The one part of this that works with the tab closed.
    *
@@ -5425,8 +5353,6 @@
       renotify: true,
       icon: "./assets/canopy-logo-192.png",
       badge: "./assets/canopy-logo-192.png",
-      // The browser's own vibration, for the case where the page's is refused.
-      vibrate: state.restAlert.vibrate ? [600, 250, 300, 250, 600] : undefined,
       silent: !state.restAlert.sound,
     };
 

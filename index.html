@@ -286,28 +286,25 @@
                 <span data-i18n="rest.finish">Finish rest</span>
               </button>
             </div>
-            <!-- Its own row: it appears only mid-rest, and is a third option. -->
-            <button id="restExtendButton" class="ghost-button" type="button" hidden>
-              <span class="btn-emoji" aria-hidden="true">➕</span>
-              <span data-i18n="rest.extend">+5 min</span>
-            </button>
           </div>
 
           <!--
             How the alarm announces itself. Its own control rather than a
             reading of the sound toggle above: that governs a cue, this governs
             an alarm, and silencing one says nothing about the other.
+
+            Sound or silence, and no vibration option — unlike the Android app,
+            which offers one. navigator.vibrate does not exist on any desktop
+            browser and is refused by mobile ones whenever the tab is hidden,
+            which is precisely when a rest alarm fires. A control that does
+            nothing for most people, most of the time, is worse than no control.
           -->
           <div class="field rest-alert-field">
             <span data-i18n="rest.alert_label">Rest alarm</span>
             <div class="duration-row" role="group" aria-label="Rest alarm">
-              <button class="pill-button is-selected" type="button" data-rest-alert="both"
-                data-i18n="rest.alert_both">Both</button>
               <button class="pill-button" type="button" data-rest-alert="sound"
                 data-i18n="rest.alert_sound">Sound</button>
-              <button class="pill-button" type="button" data-rest-alert="vibrate"
-                data-i18n="rest.alert_vibrate">Buzz</button>
-              <button class="pill-button" type="button" data-rest-alert="silent"
+              <button class="pill-button is-selected" type="button" data-rest-alert="silent"
                 data-i18n="rest.alert_silent">Silent</button>
             </div>
           </div>
@@ -685,8 +682,6 @@
       <div class="rest-alarm-actions">
         <button id="restAlarmDismiss" class="primary-button" type="button"
           data-i18n="rest.alarm_dismiss">Dismiss</button>
-        <button id="restAlarmExtend" class="secondary-button" type="button"
-          data-i18n="rest.alarm_extend">Rest 5 more minutes</button>
         <button id="restAlarmFocus" class="ghost-button" type="button"
           data-i18n="rest.alarm_focus">Start focusing</button>
       </div>

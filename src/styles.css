@@ -1615,14 +1615,14 @@ body.is-reordering .note-item {
 }
 
 /*
- * Four equal choices rather than the duration row's three-plus-custom.
+ * Two equal choices rather than the duration row's three-plus-custom.
  *
  * This deliberately outranks the responsive rules that collapse .duration-row,
- * because those exist to give a *numeric input* room and these are four short
- * words. They still need somewhere to go on a phone, hence the pair below.
+ * because those exist to give a *numeric input* room and these are two short
+ * words that fit side by side at any width.
  */
 .rest-alert-field .duration-row {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .rest-alert-field .pill-button {
@@ -1631,14 +1631,6 @@ body.is-reordering .note-item {
   /* One line each: a wrapped pill drags the whole row taller than its
      neighbours and is what made this look broken in the first place. */
   white-space: nowrap;
-}
-
-@media (max-width: 860px) {
-
-  /* Two by two beats four cramped columns; still one glance. */
-  .rest-alert-field .duration-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 780px) {
