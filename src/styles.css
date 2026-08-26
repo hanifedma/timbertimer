@@ -975,6 +975,54 @@ body.is-reordering .note-item {
   flex: 1;
 }
 
+/* Two lists, one card: a thin rule stands in for a second panel so the split
+   reads as "two lists" without doubling the chrome around them. */
+.notes-group + .notes-divider {
+  margin: 18px 0;
+  height: 1px;
+  border: none;
+  background: var(--line);
+}
+
+.notes-group--today .panel-kicker {
+  color: var(--accent);
+}
+
+/* Today is meant to be short — a handful of things, not a backlog — so it
+   takes less room before scrolling than the general list below it. */
+.notes-group--today .notes-list {
+  max-height: 180px;
+}
+
+.note-move {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 0.86rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+.note-move:hover {
+  opacity: 1;
+}
+
+.notes-past-hint {
+  margin: 0;
+  padding: 10px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .week-grove {
   margin-top: 16px;
   padding: 14px;

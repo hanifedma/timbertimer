@@ -9,6 +9,10 @@
   const STORAGE_SOUND_VOLUME = "timbertimer:sound-volume:v1";
   const STORAGE_TREE_PREF = "timbertimer:tree-pref:v1";
   const STORAGE_NOTES = "timbertimer:notes:v1";
+  // Two lists sharing one table: which one a note belongs to. "general" is the
+  // default so notes saved before this existed stay exactly where they were.
+  const NOTE_LIST_GENERAL = "general";
+  const NOTE_LIST_TODAY = "today";
   const STORAGE_NOTES_ORDER = "timbertimer:notes-order:v1";
   const STORAGE_THEME = "timbertimer:theme:v1";
   const THEME_COLORS = { dark: "#000000", light: "#f2f2f7" };
@@ -134,6 +138,18 @@
     "notes.placeholder": { en: "Add a task…", ko: "할 일 추가…" },
     "notes.add": { en: "Add task", ko: "할 일 추가" },
     "notes.empty": { en: "No tasks yet.", ko: "아직 할 일이 없어요." },
+    "notes.today_kicker": { en: "Today I will focus on", ko: "오늘 집중할 일" },
+    "notes.today_title": { en: "Today", ko: "오늘" },
+    "notes.today_placeholder": { en: "What will you focus on today?", ko: "오늘 무엇에 집중할까요?" },
+    "notes.today_empty": { en: "Nothing planned for today yet.", ko: "아직 오늘 할 일이 없어요." },
+    "notes.today_empty_past": { en: "Nothing was planned that day.", ko: "그날은 계획된 일이 없었어요." },
+    "notes.move_to_today": { en: "Move to Today", ko: "오늘로 옮기기" },
+    "notes.move_to_general": { en: "Move to To-Do", ko: "투두로 옮기기" },
+    "notes.back_to_today": { en: "Today", ko: "오늘" },
+    "notes.viewing_past": {
+      en: "Viewing a past day — add tasks from Today.",
+      ko: "지난 날을 보고 있어요 — 할 일은 오늘 화면에서 추가하세요.",
+    },
     "notes.mark_complete": { en: "Mark complete", ko: "완료로 표시" },
     "notes.mark_incomplete": { en: "Mark incomplete", ko: "미완료로 표시" },
     "notes.delete": { en: "Delete task", ko: "할 일 삭제" },
@@ -413,6 +429,14 @@
     notesList: document.getElementById("notesList"),
     notesForm: document.getElementById("notesForm"),
     notesInput: document.getElementById("notesInput"),
+    todayNotesList: document.getElementById("todayNotesList"),
+    todayNotesForm: document.getElementById("todayNotesForm"),
+    todayNotesInput: document.getElementById("todayNotesInput"),
+    todayNotesPrevButton: document.getElementById("todayNotesPrevButton"),
+    todayNotesNextButton: document.getElementById("todayNotesNextButton"),
+    todayNotesDateLabel: document.getElementById("todayNotesDateLabel"),
+    todayNotesTodayButton: document.getElementById("todayNotesTodayButton"),
+    todayNotesPastHint: document.getElementById("todayNotesPastHint"),
     prevWeekButton: document.getElementById("prevWeekButton"),
     thisWeekButton: document.getElementById("thisWeekButton"),
     nextWeekButton: document.getElementById("nextWeekButton"),
@@ -544,12 +568,22 @@
     activeSoundMasters: [],
     finishSoonSoundTimerId: null,
     weekStart: startOfWeek(new Date()),
+    // Which day the Today to-do list is showing. Defaults to the real today,
+    // and can be stepped back to look at a day that has since gone blank.
+    todayNotesAnchor: startOfDay(new Date()),
+    // The last "today" the ticker saw, so it can tell a real midnight rollover
+    // (advance the anchor, if it was following today live) apart from someone
+    // having deliberately stepped back to browse an earlier day.
+    todayNotesKnownDateKey: localDateKey(new Date()),
     // One day is the default period for the forest and the project summary, and
     // like the week and the month it can be stepped back through.
     groveView: "day",
     dayStart: startOfDay(new Date()),
     monthStart: startOfMonth(new Date()),
     timer: null,
+    // Debounce handle for pushing a mid-session rename to the cloud; see
+    // renameRunningTimer.
+    renameTimerSyncId: null,
     restTimer: null,
     // What the *next* rest will be, kept apart from the one that is running.
     restMode: loadRestMode(),
@@ -579,6 +613,12 @@
     // Set if the notes table predates the sort_order column, so ordering
     // gracefully falls back to this device's saved order.
     notesSortColumnMissing: false,
+    // Set if the notes table predates the list column (today/general split),
+    // so every note is treated as general until the migration runs.
+    notesListColumnMissing: false,
+    // Set if the notes table predates for_date (the today list's day), so a
+    // today note falls back to its created_at date instead of losing its day.
+    notesForDateColumnMissing: false,
     cloudTimerSyncing: false,
     timerCompleting: false,
     activeTimerSyncWarningShown: false,
@@ -661,21 +701,51 @@
     });
 
     els.sessionTitle.addEventListener("input", () => {
+      // While a stopwatch is running, the field renames *that* session instead
+      // of picking a name for the next one — auto-matching a project from the
+      // title (below) is a start-time convenience, not something a running
+      // session should do behind the user's back on every keystroke.
+      if (state.timer) {
+        if (state.timer.mode === "stopwatch") renameRunningTimer(els.sessionTitle.value);
+        return;
+      }
       rememberSessionName();
       applyProjectForTitle(els.sessionTitle.value);
     });
 
+    // Leaving the name empty while running would otherwise save a blank title;
+    // restore the project's name, the same fallback Start uses.
+    els.sessionTitle.addEventListener("blur", () => {
+      if (!state.timer || state.timer.mode !== "stopwatch") return;
+      if (!els.sessionTitle.value.trim()) {
+        const fallback = projectDisplayName(getProject(state.timer.projectId));
+        els.sessionTitle.value = fallback;
+        renameRunningTimer(fallback);
+      }
+      flushRunningTimerRename();
+    });
+
     // The tree belongs to the project now, so picking one here re-plants every
-    // record of that project.
+    // record of that project — including the one now running, if it's this
+    // project's.
     els.treePicker.addEventListener("change", async () => {
+      if (!sessionEditsAllowed()) return;
       state.selectedTreeId = els.treePicker.value;
       const project = getProject(state.selectedProjectId);
       if (project.missing) return;
       await saveProject({ ...project, tree: state.selectedTreeId });
+      if (state.timer && state.timer.projectId === project.id) {
+        state.timer.selectedTreeId = state.selectedTreeId;
+        persistTimer();
+      }
       renderAll();
     });
 
     els.projectPicker.addEventListener("change", () => {
+      if (state.timer) {
+        if (state.timer.mode === "stopwatch") reprojectRunningTimer(els.projectPicker.value);
+        return;
+      }
       setSelectedProject(els.projectPicker.value);
     });
 
@@ -779,8 +849,20 @@
       const text = els.notesInput.value.trim();
       if (!text) return;
       els.notesInput.value = "";
-      await addNote(text);
+      await addNote(text, NOTE_LIST_GENERAL);
     });
+
+    els.todayNotesForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = els.todayNotesInput.value.trim();
+      if (!text) return;
+      els.todayNotesInput.value = "";
+      await addNote(text, NOTE_LIST_TODAY);
+    });
+
+    els.todayNotesPrevButton.addEventListener("click", () => shiftTodayNotesDay(-1));
+    els.todayNotesNextButton.addEventListener("click", () => shiftTodayNotesDay(1));
+    els.todayNotesTodayButton.addEventListener("click", () => resetTodayNotesToToday());
 
     els.groveTodayButton.addEventListener("click", () => setGroveView("day"));
     els.groveWeekButton.addEventListener("click", () => setGroveView("week"));
@@ -1129,33 +1211,85 @@
     return result;
   }
 
+  // A note predating the today/general split (or read from a database that
+  // hasn't run the `list` migration) has no list of its own; it was always
+  // general, so that's the default rather than something a person chooses.
+  function noteList(note) {
+    return note.list === NOTE_LIST_TODAY ? NOTE_LIST_TODAY : NOTE_LIST_GENERAL;
+  }
+
+  // The day a "today" note belongs to — not necessarily the day it renders on
+  // now, since a past day's list stays put rather than following the note
+  // forward. A general note has no day of its own, and a today note written
+  // before for_date existed (or read from a database that hasn't run that
+  // migration) is placed on the day it was created rather than lost.
+  function noteDateKey(note) {
+    if (note.list !== NOTE_LIST_TODAY) return null;
+    return note.for_date || localDateKey(note.created_at || Date.now());
+  }
+
   // Write the whole list back with its position, so every signed-in device
   // shows the same order. Upsert also inserts notes that aren't saved yet.
+  // Position is tracked per list (each starts its own count at 0) so the two
+  // lists don't shuffle each other just because they share one table.
   async function syncCloudNotes() {
     if (!canUseCloud()) return;
 
-    const base = state.notes.map((note) => ({
-      id: note.id,
-      user_id: state.user.id,
-      text: note.text,
-      done: note.done,
-      created_at: note.created_at,
-      updated_at: note.updated_at || new Date().toISOString(),
-    }));
-    const withOrder = base.map((row, index) => ({ ...row, sort_order: index }));
+    const listCounters = { [NOTE_LIST_GENERAL]: 0, [NOTE_LIST_TODAY]: 0 };
+    const rows = state.notes.map((note) => {
+      const list = noteList(note);
+      const row = {
+        id: note.id,
+        user_id: state.user.id,
+        text: note.text,
+        done: note.done,
+        created_at: note.created_at,
+        updated_at: note.updated_at || new Date().toISOString(),
+      };
+      if (!state.notesSortColumnMissing) row.sort_order = listCounters[list];
+      if (!state.notesListColumnMissing) row.list = list;
+      if (!state.notesForDateColumnMissing) row.for_date = noteDateKey(note);
+      listCounters[list] += 1;
+      return row;
+    });
 
-    let { error } = await state.supabase.from("notes").upsert(withOrder);
-    if (error) {
-      // Most likely the sort_order column is missing; still save the notes.
+    let { error } = await state.supabase.from("notes").upsert(rows);
+
+    // An older database predates one or more of these columns; drop whichever
+    // is still being sent and retry, so the lists still save on a project
+    // that hasn't run the migration in docs/supabase-schema.sql yet.
+    if (error && !state.notesSortColumnMissing) {
       state.notesSortColumnMissing = true;
-      ({ error } = await state.supabase.from("notes").upsert(base));
+      rows.forEach((row) => delete row.sort_order);
+      ({ error } = await state.supabase.from("notes").upsert(rows));
+    }
+    if (error && !state.notesForDateColumnMissing) {
+      state.notesForDateColumnMissing = true;
+      rows.forEach((row) => delete row.for_date);
+      ({ error } = await state.supabase.from("notes").upsert(rows));
+    }
+    if (error && !state.notesListColumnMissing) {
+      state.notesListColumnMissing = true;
+      rows.forEach((row) => delete row.list);
+      ({ error } = await state.supabase.from("notes").upsert(rows));
     }
     if (error) console.warn(error);
   }
 
-  async function addNote(text) {
+  async function addNote(text, list = NOTE_LIST_GENERAL) {
     const now = new Date().toISOString();
-    const note = { id: createId(), text, done: false, created_at: now, updated_at: now };
+    // Always today's actual date, regardless of which day the panel happens
+    // to be showing — adding is only ever offered while that day is on
+    // screen, but this is the truth even if something else calls addNote.
+    const note = {
+      id: createId(),
+      text,
+      done: false,
+      list,
+      for_date: list === NOTE_LIST_TODAY ? localDateKey(new Date()) : null,
+      created_at: now,
+      updated_at: now,
+    };
     state.notes.unshift(note);
     if (canUseCloud()) {
       await syncCloudNotes(); // inserts the note and renumbers positions
@@ -1163,6 +1297,24 @@
       saveLocalNotes();
     }
     saveNotesOrder();
+    renderNotes();
+  }
+
+  // Moves a note to the other list. Its place in the flat array (and so its
+  // rough position relative to the rest of that list) is left alone — only
+  // which list (and, moving into Today, which day) it renders on changes; the
+  // next save recomputes per-list order.
+  async function moveNote(id, targetList) {
+    const note = state.notes.find((n) => n.id === id);
+    if (!note || noteList(note) === targetList) return;
+    note.list = targetList;
+    note.for_date = targetList === NOTE_LIST_TODAY ? localDateKey(new Date()) : null;
+    note.updated_at = new Date().toISOString();
+    if (canUseCloud()) {
+      await syncCloudNotes();
+    } else {
+      saveLocalNotes();
+    }
     renderNotes();
   }
 
@@ -1197,9 +1349,12 @@
     const { data, error } = await fetchCloudNotes();
     if (error || !data) return;
     const incoming = state.notesSortColumnMissing ? applyStoredNotesOrder(data) : data;
-    // Compare ids in order too, so a reorder made on another device lands here.
+    // Compare ids in order too, so a reorder, a move to the other list, or a
+    // note read back onto a different day, made on another device, lands here.
     const sig = (notes) =>
-      JSON.stringify(notes.map((n) => ({ id: n.id, text: n.text, done: n.done, updated_at: n.updated_at })));
+      JSON.stringify(notes.map((n) => ({
+        id: n.id, text: n.text, done: n.done, list: noteList(n), date: noteDateKey(n), updated_at: n.updated_at,
+      })));
     if (sig(incoming) !== sig(state.notes)) {
       state.notes = incoming;
       renderNotes();
@@ -1207,26 +1362,82 @@
   }
 
   function renderNotes() {
-    const undone = state.notes.filter((n) => !n.done);
-    const done = state.notes.filter((n) => n.done);
+    renderTodayNotesNav();
+    const todayAnchorKey = localDateKey(state.todayNotesAnchor);
+    const viewingToday = todayAnchorKey === localDateKey(new Date());
+    renderNoteList(
+      state.notes.filter((n) => noteList(n) === NOTE_LIST_TODAY && noteDateKey(n) === todayAnchorKey),
+      els.todayNotesList,
+      viewingToday ? "notes.today_empty" : "notes.today_empty_past",
+      NOTE_LIST_TODAY
+    );
+    renderNoteList(
+      state.notes.filter((n) => noteList(n) === NOTE_LIST_GENERAL),
+      els.notesList,
+      "notes.empty",
+      NOTE_LIST_GENERAL
+    );
+    refreshIcons();
+  }
+
+  // Only the Today list is scoped to a single day: the general list's date
+  // navigator sits above this, on the panel itself, rather than per-list.
+  function renderTodayNotesNav() {
+    const anchorKey = localDateKey(state.todayNotesAnchor);
+    const todayKey = localDateKey(new Date());
+    const viewingToday = anchorKey === todayKey;
+
+    els.todayNotesDateLabel.textContent = viewingToday
+      ? t("notes.today_title")
+      : new Intl.DateTimeFormat(localeTag(), { weekday: "short", month: "short", day: "numeric" })
+          .format(state.todayNotesAnchor);
+    // Nothing has been planned in the future, so there is nowhere forward to
+    // go from today — the same rule the forest's own day nav follows.
+    els.todayNotesNextButton.disabled = viewingToday;
+    els.todayNotesTodayButton.hidden = viewingToday;
+    // Adding is only offered for the real today: a task "for today" typed
+    // while looking at last Tuesday would not mean what it says.
+    els.todayNotesForm.hidden = !viewingToday;
+    els.todayNotesPastHint.hidden = viewingToday;
+  }
+
+  function shiftTodayNotesDay(direction) {
+    state.todayNotesAnchor = addDays(state.todayNotesAnchor, direction);
+    // Stepping forward can never pass today; the button is disabled there
+    // anyway, but a stray call (e.g. a race with the midnight rollover) should
+    // still be harmless rather than pushing the anchor into the future.
+    if (state.todayNotesAnchor > startOfDay(new Date())) {
+      state.todayNotesAnchor = startOfDay(new Date());
+    }
+    renderNotes();
+  }
+
+  function resetTodayNotesToToday() {
+    state.todayNotesAnchor = startOfDay(new Date());
+    renderNotes();
+  }
+
+  function renderNoteList(notesForList, listEl, emptyKey, list) {
+    if (!listEl) return;
+    const undone = notesForList.filter((n) => !n.done);
+    const done = notesForList.filter((n) => n.done);
     const ordered = [...undone, ...done];
-    els.notesList.replaceChildren();
+    listEl.replaceChildren();
 
     if (!ordered.length) {
       const empty = document.createElement("li");
       empty.className = "notes-empty";
-      empty.textContent = t("notes.empty");
-      els.notesList.appendChild(empty);
+      empty.textContent = t(emptyKey);
+      listEl.appendChild(empty);
       return;
     }
 
     const fragment = document.createDocumentFragment();
-    ordered.forEach((note) => fragment.appendChild(createNoteEl(note)));
-    els.notesList.appendChild(fragment);
-    refreshIcons();
+    ordered.forEach((note) => fragment.appendChild(createNoteEl(note, list)));
+    listEl.appendChild(fragment);
   }
 
-  function createNoteEl(note) {
+  function createNoteEl(note, list) {
     const li = document.createElement("li");
     li.className = "note-item" + (note.done ? " is-done" : "");
     li.dataset.noteId = note.id;
@@ -1247,6 +1458,19 @@
     textEl.className = "note-text";
     textEl.textContent = note.text;
 
+    // One button always means "send this to the other list" — simpler than a
+    // pair of differently-labelled buttons, and there's only ever one place
+    // for a task to go from here.
+    const targetList = list === NOTE_LIST_TODAY ? NOTE_LIST_GENERAL : NOTE_LIST_TODAY;
+    const moveBtn = document.createElement("button");
+    moveBtn.type = "button";
+    moveBtn.className = "note-move";
+    const moveLabel = t(targetList === NOTE_LIST_TODAY ? "notes.move_to_today" : "notes.move_to_general");
+    moveBtn.title = moveLabel;
+    moveBtn.setAttribute("aria-label", moveLabel);
+    moveBtn.textContent = targetList === NOTE_LIST_TODAY ? "☀️" : "📋";
+    moveBtn.addEventListener("click", () => moveNote(note.id, targetList));
+
     const delBtn = document.createElement("button");
     delBtn.type = "button";
     delBtn.className = "note-delete";
@@ -1260,7 +1484,7 @@
     handle.addEventListener("pointerdown", (event) => startNoteDrag(event, li));
     handle.addEventListener("contextmenu", (event) => event.preventDefault());
 
-    li.append(handle, checkbox, textEl, delBtn);
+    li.append(handle, checkbox, textEl, moveBtn, delBtn);
     return li;
   }
 
@@ -1268,8 +1492,11 @@
     if (event.button > 0) return; // primary button / touch / pen only
     event.preventDefault();       // suppress text selection and the native menu
 
-    const list = els.notesList;
-    const orderBefore = noteOrderFromDom();
+    // Derived from the row rather than hardcoded: there are two lists now, and
+    // a drag only ever reorders within the one it started in.
+    const list = li.closest(".notes-list");
+    if (!list) return;
+    const orderBefore = noteOrderFromDom(list);
     li.classList.add("is-dragging");
     document.body.classList.add("is-reordering");
 
@@ -1297,7 +1524,7 @@
       li.classList.remove("is-dragging");
       document.body.classList.remove("is-reordering");
       // Clicking the handle without moving is not a reorder; skip the write.
-      if (noteOrderFromDom().join() !== orderBefore.join()) commitNoteOrderFromDom();
+      if (noteOrderFromDom(list).join() !== orderBefore.join()) commitNoteOrderFromDom(list);
     };
 
     document.addEventListener("pointermove", onMove, { passive: false });
@@ -1305,20 +1532,20 @@
     document.addEventListener("pointercancel", onEnd);
   }
 
-  function noteOrderFromDom() {
-    return Array.from(els.notesList.querySelectorAll(".note-item"))
+  function noteOrderFromDom(listEl) {
+    return Array.from(listEl.querySelectorAll(".note-item"))
       .map((el) => el.dataset.noteId);
   }
 
-  // Read the order back off the DOM, then store and repaint.
-  function commitNoteOrderFromDom() {
-    const ids = noteOrderFromDom();
+  // Read the order back off the DOM, then store and repaint. Only the ids that
+  // were in this particular list are touched — the other list's notes, and
+  // this list's position relative to them, are left exactly where they were.
+  function commitNoteOrderFromDom(listEl) {
+    const ids = noteOrderFromDom(listEl);
     const byId = new Map(state.notes.map((n) => [n.id, n]));
-    const seen = new Set(ids);
-    state.notes = [
-      ...ids.map((id) => byId.get(id)).filter(Boolean),
-      ...state.notes.filter((n) => !seen.has(n.id)),
-    ];
+    const idSet = new Set(ids);
+    let cursor = 0;
+    state.notes = state.notes.map((note) => (idSet.has(note.id) ? byId.get(ids[cursor++]) : note));
     persistNotesOrder();
     renderNotes();
   }
@@ -1707,6 +1934,52 @@
     state.selectedTreeId = project.tree;
   }
 
+  // --- Editing a stopwatch while it runs ------------------------------------
+  // A running stopwatch can be renamed, moved to another project, or
+  // replanted, and the change follows it — into this record when it's
+  // planted, and onto every other signed-in device while it's still running.
+  // A countdown cannot: see sessionEditsAllowed for why.
+
+  // Local state updates every keystroke (so the field and the timer never
+  // disagree — see the focus guard in renderTimer), but the network call is
+  // debounced so a whole word typed doesn't turn into a request per letter.
+  function renameRunningTimer(rawTitle) {
+    if (!state.timer || state.timer.mode !== "stopwatch") return;
+    state.timer.title = rawTitle.slice(0, 80);
+    persistTimer();
+    updateDocumentTitle();
+    clearTimeout(state.renameTimerSyncId);
+    state.renameTimerSyncId = setTimeout(flushRunningTimerRename, 600);
+  }
+
+  function flushRunningTimerRename() {
+    clearTimeout(state.renameTimerSyncId);
+    state.renameTimerSyncId = null;
+    // An empty title fails the cloud row's own constraint; wait for the blur
+    // handler's fallback (or the next real keystroke) rather than sync it.
+    if (state.timer && state.timer.title.trim()) saveActiveTimerToCloud();
+  }
+
+  // Moves the running session to a different project: what the eventual
+  // record is filed under, and — because the tree belongs to the project —
+  // what species it grows for the rest of this run.
+  async function reprojectRunningTimer(projectId) {
+    if (!state.timer || state.timer.mode !== "stopwatch") return;
+    if (projectId === state.timer.projectId) return;
+    const project = getProject(projectId);
+    state.timer.projectId = project.id;
+    state.timer.selectedTreeId = project.tree;
+    state.selectedProjectId = project.id;
+    localStorage.setItem(STORAGE_SELECTED_PROJECT, project.id);
+    state.selectedTreeId = project.tree;
+    rememberTaskProject(state.timer.title, project.id);
+    persistTimer();
+    renderProjectPickers();
+    renderTreePicker();
+    renderTimer();
+    await saveActiveTimerToCloud();
+  }
+
   function projectRecordCount(id) {
     return state.sessions.filter((record) => resolveProjectId(record) === id).length;
   }
@@ -1723,7 +1996,7 @@
       state.selectedProjectId = DEFAULT_PROJECT_ID;
     }
     fillProjectSelect(els.projectPicker, state.selectedProjectId);
-    els.projectPicker.disabled = Boolean(state.timer);
+    els.projectPicker.disabled = !sessionEditsAllowed();
     applyProjectVars(els.projectDot, getProject(state.selectedProjectId));
   }
 
@@ -2114,9 +2387,13 @@
       const endedAt = new Date(startedAtMs + actualMinutes * 60000).toISOString();
       const now = new Date().toISOString();
       const projectId = timer.projectId || DEFAULT_PROJECT_ID;
+      // A live-edited title can be left blank (see renameRunningTimer); the
+      // same fallback the start button uses keeps a blank name from failing
+      // the record's own not-null constraint.
+      const title = (timer.title || "").trim() || projectDisplayName(getProject(projectId));
       const record = {
         id: createId(),
-        title: timer.title,
+        title,
         project_id: projectId,
         actual_minutes: actualMinutes,
         started_at: timer.startedAt,
@@ -2382,6 +2659,20 @@
       if (state.view === "calendar" && minuteStamp !== state.calMinuteStamp) {
         renderCalendar();
       }
+
+      // Midnight rolling past is what makes the Today list "new and blank"
+      // without any explicit reset — but only for someone who was actually
+      // looking at today live. Someone who had stepped back to browse an
+      // earlier day stays exactly where they left it.
+      const todayKey = localDateKey(new Date());
+      if (todayKey !== state.todayNotesKnownDateKey) {
+        const wasViewingToday = localDateKey(state.todayNotesAnchor) === state.todayNotesKnownDateKey;
+        state.todayNotesKnownDateKey = todayKey;
+        if (wasViewingToday) {
+          state.todayNotesAnchor = startOfDay(new Date());
+          renderNotes();
+        }
+      }
     }, 1000);
   }
 
@@ -2412,8 +2703,17 @@
 
     // Reflect an active timer's identity in the UI. This matters across devices:
     // when a timer started elsewhere is adopted here, show its name and tree.
+    // A running stopwatch's task name can be edited (see renameRunningTimer),
+    // so for one this has to work in both directions: normally the timer's
+    // title wins and is pushed into the field, but while the field is focused
+    // the reverse holds — a concurrent cloud refresh must not overwrite what
+    // is mid-keystroke, so the field wins and re-asserts itself onto the timer
+    // instead. A countdown's field is disabled, so it can never be the one
+    // holding focus and this only ever pushes into it.
     if (timer) {
-      if (els.sessionTitle.value !== timer.title) {
+      if (timer.mode === "stopwatch" && document.activeElement === els.sessionTitle) {
+        timer.title = els.sessionTitle.value;
+      } else if (els.sessionTitle.value !== timer.title) {
         els.sessionTitle.value = timer.title;
         rememberSessionName(timer.title);
       }
@@ -4526,7 +4826,10 @@
     const project = getProject(state.timer?.projectId || state.selectedProjectId);
     fillTreeSelect(els.treePicker, { includeWilted: project.tree === WILTED_TREE.id });
     els.treePicker.value = state.selectedTreeId;
-    els.treePicker.disabled = Boolean(state.timer) || project.missing;
+    // A project that no longer exists (deleted elsewhere) has nothing to save
+    // a tree change onto; beyond that the picker follows the same rule the
+    // rest of the session's identity does — see sessionEditsAllowed.
+    els.treePicker.disabled = project.missing || !sessionEditsAllowed();
   }
 
   function readStoredTimer() {
@@ -4712,10 +5015,25 @@
     });
   }
 
+  // Whether the task name, project and tree can be changed right now.
+  //
+  // A stopwatch is open-ended: it is measured against nothing, so what the
+  // session *is* can still be decided while it runs. A countdown was started
+  // against a specific goal, and its identity is fixed the moment it begins —
+  // the same rule it has always had.
+  function sessionEditsAllowed() {
+    return !state.timer || state.timer.mode === "stopwatch";
+  }
+
   function setFormDisabled(disabled) {
+    const sessionEditable = sessionEditsAllowed();
     Array.from(els.focusForm.elements).forEach((element) => {
-      // Managing projects stays available while a session runs.
+      // Managing projects stays available while any session runs.
       if (element.hasAttribute("data-keep-enabled")) return;
+      if (element.hasAttribute("data-session-editable")) {
+        element.disabled = disabled && !sessionEditable;
+        return;
+      }
       element.disabled = disabled;
     });
     els.durationButtons.forEach((button) => {

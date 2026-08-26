@@ -145,7 +145,7 @@
           <label class="field">
             <span data-i18n="field.session">Task</span>
             <input id="sessionTitle" name="sessionTitle" type="text" maxlength="80" value="Deep focus"
-              list="sessionTitleSuggestions" autocomplete="off" />
+              list="sessionTitleSuggestions" autocomplete="off" data-session-editable />
           </label>
           <datalist id="sessionTitleSuggestions"></datalist>
 
@@ -153,7 +153,8 @@
             <span data-i18n="field.project">Project</span>
             <div class="project-field">
               <span id="projectDot" class="project-dot" aria-hidden="true"></span>
-              <select id="projectPicker" data-i18n-aria="field.project" aria-label="Project"></select>
+              <select id="projectPicker" data-i18n-aria="field.project" aria-label="Project"
+                data-session-editable></select>
               <button id="manageProjectsButton" class="icon-only emoji-btn" type="button" data-keep-enabled
                 data-i18n-title="project.manage" data-i18n-aria="project.manage">🎨</button>
             </div>
@@ -161,7 +162,7 @@
 
           <div class="field">
             <span data-i18n="field.tree_project">Tree (per project)</span>
-            <select id="treePicker" aria-label="Tree type"></select>
+            <select id="treePicker" aria-label="Tree type" data-session-editable></select>
           </div>
 
           <div id="durationField" class="field">
@@ -313,22 +314,58 @@
 
       <div class="records-col">
 
-        <section class="notes-panel" aria-labelledby="notesTitle">
-          <div class="section-head">
-            <div>
-              <div class="panel-kicker" data-i18n="notes.kicker">Tasks</div>
-              <h2 id="notesTitle" data-i18n="notes.title">To-Do</h2>
+        <div class="notes-panel">
+          <section class="notes-group notes-group--today" aria-labelledby="todayNotesTitle">
+            <div class="section-head">
+              <div>
+                <div class="panel-kicker" data-i18n="notes.today_kicker">Today I will focus on</div>
+                <h2 id="todayNotesTitle" data-i18n="notes.today_title">Today</h2>
+              </div>
             </div>
-          </div>
-          <ul id="notesList" class="notes-list" aria-live="polite" aria-label="Task list"></ul>
-          <form id="notesForm" class="notes-form">
-            <input id="notesInput" type="text" maxlength="500" data-i18n-ph="notes.placeholder"
-              placeholder="Add a task…" autocomplete="off" />
-            <button class="icon-only" type="submit" data-i18n-title="notes.add">
-              <i data-lucide="corner-down-left"></i>
-            </button>
-          </form>
-        </section>
+            <div class="week-range-nav" aria-label="Navigate day">
+              <button id="todayNotesPrevButton" class="icon-only range-nav-btn" type="button"
+                data-i18n-title="grove.prev">
+                <i data-lucide="chevron-left"></i>
+              </button>
+              <p id="todayNotesDateLabel">Today</p>
+              <button id="todayNotesNextButton" class="icon-only range-nav-btn" type="button"
+                data-i18n-title="grove.next" disabled>
+                <i data-lucide="chevron-right"></i>
+              </button>
+              <button id="todayNotesTodayButton" class="secondary-button week-today" type="button"
+                data-i18n="notes.back_to_today" hidden>Today</button>
+            </div>
+            <ul id="todayNotesList" class="notes-list" aria-live="polite" aria-label="Today's task list"></ul>
+            <form id="todayNotesForm" class="notes-form">
+              <input id="todayNotesInput" type="text" maxlength="500" data-i18n-ph="notes.today_placeholder"
+                placeholder="What will you focus on today?" autocomplete="off" />
+              <button class="icon-only" type="submit" data-i18n-title="notes.add">
+                <i data-lucide="corner-down-left"></i>
+              </button>
+            </form>
+            <p id="todayNotesPastHint" class="notes-past-hint" data-i18n="notes.viewing_past" hidden>
+              Viewing a past day — add tasks from Today.</p>
+          </section>
+
+          <div class="notes-divider" role="separator" aria-hidden="true"></div>
+
+          <section class="notes-group notes-group--general" aria-labelledby="notesTitle">
+            <div class="section-head">
+              <div>
+                <div class="panel-kicker" data-i18n="notes.kicker">Tasks</div>
+                <h2 id="notesTitle" data-i18n="notes.title">To-Do</h2>
+              </div>
+            </div>
+            <ul id="notesList" class="notes-list" aria-live="polite" aria-label="Task list"></ul>
+            <form id="notesForm" class="notes-form">
+              <input id="notesInput" type="text" maxlength="500" data-i18n-ph="notes.placeholder"
+                placeholder="Add a task…" autocomplete="off" />
+              <button class="icon-only" type="submit" data-i18n-title="notes.add">
+                <i data-lucide="corner-down-left"></i>
+              </button>
+            </form>
+          </section>
+        </div>
 
         <section id="recordsPanel" class="records-panel" aria-labelledby="recordsTitle">
           <div class="section-head">

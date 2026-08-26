@@ -342,6 +342,32 @@ alter table public.notes
 create index if not exists notes_user_sort_idx
   on public.notes (user_id, sort_order);
 
+-- Migration: two to-do lists sharing one table — "general" (the existing
+-- list) and "today". Existing notes default to "general" so nothing about
+-- them changes. Safe to re-run.
+alter table public.notes
+  add column if not exists list text not null default 'general';
+
+alter table public.notes
+  drop constraint if exists notes_list_check;
+alter table public.notes
+  add constraint notes_list_check
+  check (list in ('general', 'today'));
+
+create index if not exists notes_user_list_sort_idx
+  on public.notes (user_id, list, sort_order);
+
+-- Migration: the "today" list is scoped to the day it was written on, so a
+-- new day starts blank and a past day's list is still there to look back at.
+-- Null on a "general" note, which has no day of its own; a "today" note
+-- written before this migration has no day either, and the app falls back to
+-- the date it was created on for those rather than losing them.
+alter table public.notes
+  add column if not exists for_date date;
+
+create index if not exists notes_user_list_date_idx
+  on public.notes (user_id, list, for_date, sort_order);
+
 create index if not exists notes_user_created_idx
   on public.notes (user_id, created_at desc);
 
