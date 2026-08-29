@@ -3568,9 +3568,16 @@
         const endMin = clamp((to - dayStart) / 60000, startMin, 1440);
         perDay[index].push({
           entry,
-          // One piece of a record that runs past midnight: editable, but there
-          // is no single block here to drag.
-          partial: entry.start < dayStart || entry.end > dayEnd,
+          // Which of this piece's two edges are the calendar's cut rather than
+          // the record's own. A session that ran past midnight has a real start
+          // on the first day and a real end on the second; only the midnight
+          // side of each is scenery, and each real side stays draggable from the
+          // day it falls on.
+          clippedStart: entry.start < dayStart,
+          clippedEnd: entry.end > dayEnd,
+          // Still worth its own name: it answers "is the whole record here?",
+          // which is what moving one needs and resizing one does not.
+          get partial() { return this.clippedStart || this.clippedEnd; },
           startMin,
           // Very short records still need a tappable block.
           endMin: Math.min(1440, Math.max(endMin, startMin + 5)),
@@ -3731,17 +3738,25 @@
     node.title = `${projectDisplayName(project)} · ${title.textContent} — ${formatMinutes(segment.minutes)}`;
     node.append(title, projectName, time);
 
-    if (record && !segment.partial) {
-      ["start", "end"].forEach((edge) => {
+    if (record) {
+      // A grip per edge the record actually owns. Both halves of a session that
+      // crossed midnight used to get none at all, which left the one thing you
+      // would most want to correct — the night it ran long — the one thing you
+      // could not drag.
+      const edges = [];
+      if (!segment.clippedStart) edges.push("start");
+      if (!segment.clippedEnd) edges.push("end");
+      edges.forEach((edge) => {
         const handle = document.createElement("span");
         handle.className = `cal-resize is-${edge}`;
         handle.dataset.edge = edge;
         handle.setAttribute("aria-hidden", "true");
         node.appendChild(handle);
       });
-    } else if (segment.partial) {
-      node.dataset.partial = "true";
     }
+    // Still flagged, because moving needs the whole record and this is half of
+    // one. Only the edges above are live on a partial block.
+    if (segment.partial) node.dataset.partial = "true";
 
     return node;
   }
@@ -3813,13 +3828,23 @@
     let record = null;
 
     if (eventNode) {
-      // Neither the timer that is still running nor one piece of a record that
-      // crosses midnight is a whole block, so neither can be dragged.
-      if (eventNode.dataset.running === "true" || eventNode.dataset.partial === "true") return;
+      // A timer that is still running has no end to drag yet.
+      if (eventNode.dataset.running === "true") return;
       record = state.sessions.find((item) => item.id === eventNode.dataset.id);
       if (!record) return;
       const handle = event.target.closest(".cal-resize");
-      mode = handle ? (handle.dataset.edge === "start" ? "resize-start" : "resize-end") : "move";
+      if (handle) {
+        // Handles are only rendered on edges the record owns, so grabbing one
+        // is always a legitimate resize — including on half of a session that
+        // crossed midnight.
+        mode = handle.dataset.edge === "start" ? "resize-start" : "resize-end";
+      } else if (eventNode.dataset.partial === "true") {
+        // Moving needs the whole record under the pointer, and the other half
+        // of this one is on another day.
+        return;
+      } else {
+        mode = "move";
+      }
     }
 
     const point = calendarPointToTime(event.clientX, event.clientY, eventNode ? dayNode : null);
