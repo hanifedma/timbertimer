@@ -2359,6 +2359,7 @@
       if (!claimed) {
         stopActiveTimerSounds();
         state.timer = null;
+        clearSessionNameAfterFinish();
         state.finishSoonSoundTimerId = null;
         persistTimer();
         await loadSessions();
@@ -2409,6 +2410,7 @@
       playCompletionSound();
 
       state.timer = null;
+      clearSessionNameAfterFinish();
       state.finishSoonSoundTimerId = null;
       persistTimer();
       await createRecord(record);
@@ -2571,6 +2573,7 @@
           }
 
           state.timer = null;
+          clearSessionNameAfterFinish();
           persistTimer();
           return;
         }
@@ -4237,6 +4240,7 @@
 
       if (state.timer && state.timer.cloudSynced) {
         state.timer = null;
+        clearSessionNameAfterFinish();
         persistTimer();
         await loadSessions();
         renderAll();
@@ -4800,7 +4804,11 @@
     // Skip rests: "Rest" is a record but never a session name you'd focus under.
     const latestFocus = sortedSessions().find((record) => !isRestRecord(record));
     const latestTitle = latestFocus ? latestFocus.title : "Deep focus";
-    els.sessionTitle.value = savedTitle || latestTitle;
+    // Presence, not content: a stored empty name is an answer — the last
+    // session finished and cleared it — and seeding over it with the task that
+    // just ended is exactly what emptying it was meant to prevent. Only someone
+    // who has never named a session at all gets one from history.
+    els.sessionTitle.value = savedTitle === null ? latestTitle : savedTitle;
     rememberSessionName(els.sessionTitle.value);
     // The task name decides the project; failing that, pick up where the last
     // session left off.
@@ -4813,9 +4821,27 @@
     syncSelectedTree();
   }
 
+  // Blank is a real value here, not a missing one. It used to be replaced with
+  // "Deep focus", which meant the field could never be left empty: clearing it
+  // typed the default back in, and a finished session had no way to hand the
+  // next one a clean slate. Nothing downstream needs it filled — Start already
+  // falls back to the project's name for a session begun with nothing typed.
   function rememberSessionName(value) {
-    const title = (value || els.sessionTitle.value || "Deep focus").trim() || "Deep focus";
-    localStorage.setItem(STORAGE_SESSION_NAME, title);
+    const source = value === undefined ? els.sessionTitle.value : value;
+    localStorage.setItem(STORAGE_SESSION_NAME, (source || "").trim());
+  }
+
+  /**
+   * Empties the task name once a session has ended.
+   *
+   * A focus session only ever ends by being recorded — here, or on another
+   * device that claimed it first; there is no path that throws one away. So the
+   * name it ran under has done its job, and keeping it would make starting the
+   * next task begin with deleting the last one's name.
+   */
+  function clearSessionNameAfterFinish() {
+    els.sessionTitle.value = "";
+    rememberSessionName("");
   }
 
   // Only read now: the old per-title tree choices are folded into the projects
