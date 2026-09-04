@@ -188,7 +188,7 @@
     "account.continue_google": { en: "Continue with Google", ko: "Google로 계속하기" },
     "account.other_way": { en: "Trouble signing in? Use the redirect", ko: "로그인이 안 되나요? 리디렉션 사용" },
     "account.sign_out": { en: "Sign out", ko: "로그아웃" },
-    "account.delete_all": { en: "Delete all records", ko: "모든 기록 삭제" },
+    "account.delete_all": { en: "Delete all records and projects", ko: "모든 기록과 프로젝트 삭제" },
     "badge.local": { en: "Local", ko: "로컬" },
     "badge.ready": { en: "Ready", ko: "대기" },
     "badge.synced": { en: "Synced", ko: "동기화됨" },
@@ -213,7 +213,7 @@
     },
     "toast.sound_on": { en: "Timer sound on.", ko: "타이머 소리를 켰어요." },
     "toast.sound_off": { en: "Timer sound off.", ko: "타이머 소리를 껐어요." },
-    "toast.all_deleted": { en: "All records deleted.", ko: "모든 기록을 삭제했어요." },
+    "toast.all_deleted": { en: "All records and projects deleted.", ko: "모든 기록과 프로젝트를 삭제했어요." },
     "toast.cloud_load_fail": { en: "Cloud sync could not load. Local records are still available.", ko: "클라우드 동기화를 불러오지 못했어요. 로컬 기록은 그대로 사용할 수 있어요." },
     "toast.cloud_not_ready": { en: "Cloud table is not ready. Using local records.", ko: "클라우드 테이블이 준비되지 않았어요. 로컬 기록을 사용해요." },
     "toast.cloud_save_fail": { en: "Cloud save failed. Saved locally.", ko: "클라우드 저장에 실패했어요. 로컬에 저장했어요." },
@@ -221,8 +221,8 @@
     "toast.cloud_delete_fail": { en: "Cloud delete failed.", ko: "클라우드 삭제에 실패했어요." },
     "toast.cloud_delete_all_fail": { en: "Failed to delete cloud records.", ko: "클라우드 기록 삭제에 실패했어요." },
     "toast.cloud_timer_sql": { en: "Cloud timer sync needs the updated Supabase SQL.", ko: "클라우드 타이머 동기화에는 최신 Supabase SQL이 필요해요." },
-    "confirm.delete_all_cloud": { en: "Delete all cloud records? This cannot be undone.", ko: "모든 클라우드 기록을 삭제할까요? 되돌릴 수 없어요." },
-    "confirm.delete_all_local": { en: "Delete all local records? This cannot be undone.", ko: "모든 로컬 기록을 삭제할까요? 되돌릴 수 없어요." },
+    "confirm.delete_all_cloud": { en: "Delete every cloud record and every project you made? Your to-do lists are kept. This cannot be undone.", ko: "모든 클라우드 기록과 직접 만든 프로젝트를 삭제할까요? 할 일 목록은 그대로 남아요. 되돌릴 수 없어요." },
+    "confirm.delete_all_local": { en: "Delete every local record and every project you made? Your to-do lists are kept. This cannot be undone.", ko: "모든 로컬 기록과 직접 만든 프로젝트를 삭제할까요? 할 일 목록은 그대로 남아요. 되돌릴 수 없어요." },
     "confirm.delete_record": { en: 'Delete "{title}"?', ko: '"{title}"을(를) 삭제할까요?' },
     "title.focus": { en: "Focus", ko: "집중" },
     "title.rest": { en: "Rest", ko: "휴식" },
@@ -1814,6 +1814,9 @@
     }
 
     if (state.selectedProjectId === id) setSelectedProject(target, { silent: true });
+    // A session running under it moves too, the same way its finished records
+    // just did.
+    await reprojectOrphanedTimer();
     return true;
   }
 
@@ -3085,13 +3088,28 @@
     return button;
   }
 
+  // The instant a record is filed under — the day it *started*.
+  //
+  // A session begun at 23:30 and finished at 00:40 belongs to the evening the
+  // user sat down for it, not to the morning they happened to stop in: it is
+  // the day they would name if asked when they did it, and it is the only
+  // answer that does not move a whole night's work into a day it had nothing
+  // to do with.
+  //
+  // The calendar is the one place that ignores this, and rightly: a grid of
+  // clock time draws the block where it actually ran, across both days. Every
+  // tally that has to pick a single day picks this one.
+  function recordFiledAt(record) {
+    return record.started_at || record.ended_at;
+  }
+
   function renderStats() {
     // Focus stats count time spent focusing; rests have their own project and
     // are excluded.
     const focus = state.sessions.filter((record) => !isRestRecord(record));
     const today = localDateKey(new Date());
     const todayMinutes = focus
-      .filter((record) => localDateKey(record.ended_at || record.started_at) === today)
+      .filter((record) => localDateKey(recordFiledAt(record)) === today)
       .reduce((sum, record) => sum + Number(record.actual_minutes || 0), 0);
     const totalMinutes = focus.reduce((sum, record) => sum + Number(record.actual_minutes || 0), 0);
 
@@ -3155,7 +3173,7 @@
   function recordsInRange(start, end) {
     return state.sessions
       .filter((record) => {
-        const plantedAt = new Date(record.ended_at || record.started_at);
+        const plantedAt = new Date(recordFiledAt(record));
         return plantedAt >= start && plantedAt < end;
       })
       .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime());
@@ -5324,6 +5342,15 @@
     refreshIcons();
   }
 
+  // The clean slate: every record, and every project the user made with them —
+  // a project with no records left is a label for something that is no longer
+  // there. The two built-ins stay, because nothing works without them: a rest
+  // has to have somewhere to go, and a session started before anything has been
+  // chosen has to land somewhere.
+  //
+  // The to-do lists are deliberately untouched. A note is not a record of what
+  // happened; it is a list of what has not happened yet, and clearing the
+  // history is no reason to lose next week's shopping.
   async function deleteAllData() {
     const confirmed = window.confirm(
       t(canUseCloud() ? "confirm.delete_all_cloud" : "confirm.delete_all_local")
@@ -5346,8 +5373,72 @@
     }
 
     state.sessions = [];
+    await deleteUserProjects();
+    await reprojectOrphanedTimer();
     renderAll();
     showToast(t("toast.all_deleted"));
+  }
+
+  // Every project the user made, gone; the two built-ins kept.
+  //
+  // After the records rather than before, and that order is the whole point.
+  // removeProject moves a project's records onto the default one so nothing is
+  // orphaned — sensible on its own, and pure waste here, where it would rewrite
+  // every row in the history moments before deleting it. Worse, a request that
+  // failed halfway would leave the history half-moved. With the records already
+  // gone there is nothing to move.
+  async function deleteUserProjects() {
+    if (state.projects.some((project) => !BUILTIN_PROJECT_IDS.includes(project.id))) {
+      state.projects = state.projects.filter((project) => BUILTIN_PROJECT_IDS.includes(project.id));
+      saveLocalProjects();
+
+      if (canUseCloud() && !state.projectsCloudMissing) {
+        const { error } = await state.supabase
+          .from("projects")
+          .delete()
+          .eq("user_id", state.user.id)
+          .not("id", "in", `(${BUILTIN_PROJECT_IDS.join(",")})`);
+        if (error) console.warn(error);
+      }
+
+      // Seeds either built-in back if it was somehow missing, so the picker can
+      // never come back empty. With no sessions left there is nothing else for
+      // it to rebuild.
+      await reconcileProjects();
+    }
+
+    // Outside that guard on purpose: whatever was selected is very likely one
+    // of the projects just deleted, but it can also be a stale id left by a
+    // device that deleted it first. renderProjectPickers forgives a selection
+    // pointing at nothing on screen; the stored one would come back on the
+    // next load.
+    if (!BUILTIN_PROJECT_IDS.includes(state.selectedProjectId)) {
+      setSelectedProject(DEFAULT_PROJECT_ID, { silent: true });
+    }
+  }
+
+  // A session running under a project that has just been deleted moves to the
+  // default one — the same rule its finished records follow.
+  //
+  // Not reprojectRunningTimer: that is the user editing a stopwatch, and it
+  // declines to touch a countdown on purpose, because a countdown's tree is
+  // settled when it starts. This is repair, and it has to cover both — a
+  // session left pointing at a project nothing can look up records itself under
+  // a name that no longer exists and lands in the forest as a grey stub.
+  async function reprojectOrphanedTimer() {
+    if (!state.timer) return;
+    if (state.projects.some((project) => project.id === state.timer.projectId)) return;
+
+    const fallback = getProject(DEFAULT_PROJECT_ID);
+    state.timer.projectId = fallback.id;
+    state.timer.selectedTreeId = fallback.tree;
+    // The tree picker follows the running session's project, and whoever reset
+    // the selection did it while this timer still pointed at the dead one — so
+    // it settled on the grey placeholder's fallback species. Ask again now that
+    // there is a real answer.
+    syncSelectedTree();
+    persistTimer();
+    await saveActiveTimerToCloud();
   }
 
   function getAudioContext() {
