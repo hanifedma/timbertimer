@@ -3171,8 +3171,9 @@
     }
 
     // The length is fixed once it is running, so a picker that could no longer
-    // change anything is taken away rather than left there disabled.
-    els.restSetup.hidden = isRunning;
+    // change anything is taken away rather than left there disabled; and a
+    // stopwatch rest has no length to pick.
+    els.restSetup.hidden = isRunning || !isCountdown;
     renderRestModeToggle();
 
     // The tree fills over the rest's own length, so a five-minute break grows

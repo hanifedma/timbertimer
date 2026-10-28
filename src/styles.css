@@ -1647,24 +1647,14 @@ body.is-reordering .note-item {
   display: none;
 }
 
-/*
- * What kind of rest and how long, on one row while the card is wide enough and
- * stacked once it is not. In stopwatch mode the length is hidden and the
- * switch takes the whole row.
- */
+/* What kind of rest: the card's first row, above the timer meta and the tree. */
+.rest-mode-toggle {
+  margin-bottom: 14px;
+}
+
+/* How long, under the clock. */
 .rest-setup {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
   margin-top: 14px;
-}
-
-.rest-setup .segmented {
-  flex: 1 1 270px;
-}
-
-.rest-setup .stepper {
-  flex: 1 1 150px;
 }
 
 /* The wall-clock time the rest lands on, under its countdown. */

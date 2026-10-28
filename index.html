@@ -227,6 +227,22 @@
         </div>
 
         <div class="rest-card" aria-live="polite">
+          <!--
+            What kind of rest, at the top of the card the way the focus card
+            has its own mode switch at the top. It stays in place, disabled,
+            while a rest runs, so nothing below it jumps when one starts.
+          -->
+          <div class="segmented rest-mode-toggle" role="group" aria-label="Rest mode">
+            <button id="restModeTimerButton" class="segment is-selected" type="button" aria-pressed="true">
+              <span class="btn-emoji" aria-hidden="true">⏳</span>
+              <span data-i18n="mode.countdown">Countdown</span>
+            </button>
+            <button id="restModeOpenButton" class="segment" type="button" aria-pressed="false">
+              <span class="btn-emoji" aria-hidden="true">⏱️</span>
+              <span data-i18n="mode.stopwatch">Stopwatch</span>
+            </button>
+          </div>
+
           <div class="timer-meta">
             <span id="restState">Rest</span>
             <span id="restModeLabel">Remaining</span>
@@ -240,26 +256,15 @@
           <div id="restEndsAt" class="rest-ends-at" hidden></div>
 
           <!--
-            Hidden while a rest runs: its length is fixed by then.
+            How long a countdown rest lasts. Hidden while a rest runs (its
+            length is fixed by then) and in stopwatch mode (it has none).
 
-            Two controls, side by side where there is room: what kind of rest,
-            and how long. The length is a stepper rather than a row of presets
-            plus a custom box — the presets were only ever 5, 10 and 15, which
-            the stepper reaches in a tap or two, and the number in its middle
-            still takes any length typed into it.
+            A stepper rather than a row of presets plus a custom box — the
+            presets were only ever 5, 10 and 15, which the stepper reaches in a
+            tap or two, and the number in its middle still takes any length
+            typed into it.
           -->
           <div id="restSetup" class="rest-setup">
-            <div class="segmented rest-mode-toggle" role="group" aria-label="Rest mode">
-              <button id="restModeTimerButton" class="segment is-selected" type="button" aria-pressed="true">
-                <span class="btn-emoji" aria-hidden="true">⏳</span>
-                <span data-i18n="mode.countdown">Countdown</span>
-              </button>
-              <button id="restModeOpenButton" class="segment" type="button" aria-pressed="false">
-                <span class="btn-emoji" aria-hidden="true">⏱️</span>
-                <span data-i18n="mode.stopwatch">Stopwatch</span>
-              </button>
-            </div>
-
             <div id="restDurationField" class="stepper" role="group" data-i18n-aria="rest.length"
               aria-label="Rest length">
               <button id="restDurationDown" class="stepper-button" type="button"
