@@ -145,7 +145,8 @@
           <label class="field">
             <span data-i18n="field.session">Task</span>
             <input id="sessionTitle" name="sessionTitle" type="text" maxlength="80" value="Deep focus"
-              list="sessionTitleSuggestions" autocomplete="off" data-session-editable />
+              list="sessionTitleSuggestions" autocomplete="off" data-session-editable
+              data-i18n-ph="field.task_hint" placeholder="What are you working on? · @ for a project" />
           </label>
           <datalist id="sessionTitleSuggestions"></datalist>
 
@@ -238,36 +239,38 @@
           <div id="restDisplay" class="rest-display">10:00</div>
           <div id="restEndsAt" class="rest-ends-at" hidden></div>
 
-          <!-- Hidden while a rest runs: its length is fixed by then. -->
+          <!--
+            Hidden while a rest runs: its length is fixed by then.
+
+            Two controls, side by side where there is room: what kind of rest,
+            and how long. The length is a stepper rather than a row of presets
+            plus a custom box — the presets were only ever 5, 10 and 15, which
+            the stepper reaches in a tap or two, and the number in its middle
+            still takes any length typed into it.
+          -->
           <div id="restSetup" class="rest-setup">
-            <!--
-              The same two words, the same icons and the same class as the focus
-              toggle above. A rest countdown and a focus countdown are the same
-              idea, so calling one "Timer" and the other "Countdown" would invent
-              a distinction that is not there.
-            -->
-            <div class="timer-mode-toggle rest-mode-toggle" role="group" aria-label="Rest mode">
-              <button id="restModeTimerButton" class="pill-button is-selected" type="button">
+            <div class="segmented rest-mode-toggle" role="group" aria-label="Rest mode">
+              <button id="restModeTimerButton" class="segment is-selected" type="button" aria-pressed="true">
                 <span class="btn-emoji" aria-hidden="true">⏳</span>
                 <span data-i18n="mode.countdown">Countdown</span>
               </button>
-              <button id="restModeOpenButton" class="pill-button" type="button">
+              <button id="restModeOpenButton" class="segment" type="button" aria-pressed="false">
                 <span class="btn-emoji" aria-hidden="true">⏱️</span>
                 <span data-i18n="mode.stopwatch">Stopwatch</span>
               </button>
             </div>
 
-            <div id="restDurationField" class="field">
-              <span data-i18n="rest.length">Rest length</span>
-              <div class="duration-row" role="group" aria-label="Rest length presets">
-                <button class="pill-button" type="button" data-rest-duration="5">5m</button>
-                <button class="pill-button is-selected" type="button" data-rest-duration="10">10m</button>
-                <button class="pill-button" type="button" data-rest-duration="15">15m</button>
-                <label class="custom-duration">
-                  <span data-i18n="field.custom">Custom</span>
-                  <input id="restDurationInput" type="number" min="1" max="600" step="1" value="10" />
-                </label>
-              </div>
+            <div id="restDurationField" class="stepper" role="group" data-i18n-aria="rest.length"
+              aria-label="Rest length">
+              <button id="restDurationDown" class="stepper-button" type="button"
+                data-i18n-aria="rest.shorter" aria-label="Shorter">−</button>
+              <label class="stepper-value">
+                <input id="restDurationInput" type="number" min="1" max="600" step="1" value="10"
+                  inputmode="numeric" data-i18n-aria="rest.length" aria-label="Rest length" />
+                <span data-i18n="rest.minutes_unit">min</span>
+              </label>
+              <button id="restDurationUp" class="stepper-button" type="button"
+                data-i18n-aria="rest.longer" aria-label="Longer">+</button>
             </div>
           </div>
 
@@ -287,26 +290,28 @@
                 <span data-i18n="rest.finish">Finish rest</span>
               </button>
             </div>
-          </div>
 
-          <!--
-            How the alarm announces itself. Its own control rather than a
-            reading of the sound toggle above: that governs a cue, this governs
-            an alarm, and silencing one says nothing about the other.
+            <!--
+              How the alarm announces itself, laid out exactly like the focus
+              card's sound control: a switch, and a volume slider that is there
+              while it is on. Its own setting rather than a reading of that one:
+              that governs a cue, this governs an alarm, and silencing one says
+              nothing about the other. Silent until turned on.
 
-            Sound or silence, and no vibration option — unlike the Android app,
-            which offers one. navigator.vibrate does not exist on any desktop
-            browser and is refused by mobile ones whenever the tab is hidden,
-            which is precisely when a rest alarm fires. A control that does
-            nothing for most people, most of the time, is worse than no control.
-          -->
-          <div class="field rest-alert-field">
-            <span data-i18n="rest.alert_label">Rest alarm</span>
-            <div class="duration-row" role="group" aria-label="Rest alarm">
-              <button class="pill-button" type="button" data-rest-alert="sound"
-                data-i18n="rest.alert_sound">Sound</button>
-              <button class="pill-button is-selected" type="button" data-rest-alert="silent"
-                data-i18n="rest.alert_silent">Silent</button>
+              No vibration option, unlike the Android app. navigator.vibrate does
+              not exist on desktop browsers and is refused by mobile ones whenever
+              the tab is hidden, which is precisely when a rest alarm fires.
+            -->
+            <div class="sound-group">
+              <button id="restAlarmToggleButton" class="secondary-button" type="button" aria-pressed="false">
+                <span class="btn-emoji" aria-hidden="true">🔕</span>
+                <span>Alarm off</span>
+              </button>
+              <div id="restVolumeRow" class="volume-row" hidden>
+                <input id="restVolumeSlider" type="range" min="0" max="200" step="5" value="100"
+                  class="volume-slider" data-i18n-aria="rest.alarm_volume" aria-label="Rest alarm volume" />
+                <span id="restVolumeLabel" class="volume-label">100%</span>
+              </div>
             </div>
           </div>
         </div>
@@ -598,7 +603,7 @@
       <label class="field">
         <span data-i18n="field.session">Task</span>
         <input id="recordTitleInput" type="text" maxlength="80" list="sessionTitleSuggestions"
-          data-i18n-ph="field.task_placeholder" placeholder="Task name (optional)" />
+          data-i18n-ph="field.task_placeholder" placeholder="Task name (optional) · @ for a project" />
       </label>
 
       <div class="field">

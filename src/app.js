@@ -26,6 +26,7 @@
   const STORAGE_REST_MODE = "timbertimer:rest-mode:v1";
   const STORAGE_REST_DURATION = "timbertimer:rest-duration:v1";
   const STORAGE_REST_ALERT = "timbertimer:rest-alert:v1";
+  const STORAGE_REST_ALARM_VOLUME = "timbertimer:rest-alarm-volume:v1";
   const DEFAULT_DURATION = 30;
   // A record can now span at most one day: the calendar edits real start/end
   // times, and the database check constraints allow the same ceiling.
@@ -55,11 +56,20 @@
 
   // --- Projects ------------------------------------------------------------
   // Every record belongs to a project, and the project owns both the colour and
-  // the tree species its records are drawn with. Two projects exist from the
-  // start and cannot be deleted: the default focus project, and Rest.
-  const DEFAULT_PROJECT_ID = "focus";
+  // the tree species its records are drawn with. Only Rest exists from the start
+  // and cannot be deleted.
+  //
+  // A session filed under nothing points at NO_PROJECT_ID. The id is "focus"
+  // because that is what the built-in Focus project used to be called, and
+  // every record, running timer and deleted project's history already falls
+  // back to it: an account that still has a Focus project sees those under it,
+  // and one that doesn't (every new account, or one that deleted it) sees them
+  // as "No project". Nothing has to be migrated either way.
+  const NO_PROJECT_ID = "focus";
   const REST_PROJECT_ID = "rest";
-  const BUILTIN_PROJECT_IDS = [DEFAULT_PROJECT_ID, REST_PROJECT_ID];
+  const BUILTIN_PROJECT_IDS = [REST_PROJECT_ID];
+  // What a session with no name and no project is called.
+  const DEFAULT_TASK_TITLE = "Deep focus";
   // Records made before projects existed are mapped to a project derived from
   // their title, using this id prefix, so history keeps working untouched.
   const LEGACY_PROJECT_PREFIX = "t:";
@@ -126,9 +136,14 @@
     "rest.alarm_body": { en: "Your {time} rest has finished.", ko: "{time} 휴식이 끝났습니다." },
     "rest.alarm_dismiss": { en: "Dismiss", ko: "확인" },
     "rest.alarm_focus": { en: "Start focusing", ko: "집중 시작하기" },
-    "rest.alert_label": { en: "Rest alarm", ko: "휴식 알람" },
-    "rest.alert_sound": { en: "Sound", ko: "소리" },
-    "rest.alert_silent": { en: "Silent", ko: "무음" },
+    "rest.alarm_on": { en: "Alarm on", ko: "알람 켜짐" },
+    "rest.alarm_off": { en: "Alarm off", ko: "알람 꺼짐" },
+    "rest.alarm_volume": { en: "Rest alarm volume", ko: "휴식 알람 음량" },
+    "rest.shorter": { en: "Shorter rest", ko: "휴식 줄이기" },
+    "rest.longer": { en: "Longer rest", ko: "휴식 늘리기" },
+    "rest.minutes_unit": { en: "min", ko: "분" },
+    "toast.rest_alarm_on": { en: "Rest alarm on.", ko: "휴식 알람을 켰어요." },
+    "toast.rest_alarm_off": { en: "Rest alarm off — it ends silently.", ko: "휴식 알람을 껐어요. 조용히 끝나요." },
     "rest.notify_body": { en: "Your {time} rest has finished. Time to get back to it.", ko: "{time} 휴식이 끝났습니다. 다시 시작해 볼까요." },
     "toast.rest_planted": { en: "Rest planted a wilted tree.", ko: "휴식이 시든 나무를 심었어요." },
     "toast.rest_discarded": { en: "Rest was too short to plant.", ko: "휴식이 너무 짧아 심지 않았어요." },
@@ -245,7 +260,8 @@
     // Projects
     "field.project": { en: "Project", ko: "프로젝트" },
     "field.tree_project": { en: "Tree (per project)", ko: "나무 (프로젝트별)" },
-    "field.task_placeholder": { en: "Task name (optional)", ko: "작업 이름 (선택)" },
+    "field.task_placeholder": { en: "Task name (optional) · @ for a project", ko: "작업 이름 (선택) · @로 프로젝트" },
+    "field.task_hint": { en: "What are you working on? · @ for a project", ko: "무엇을 하나요? · @로 프로젝트" },
     "field.ended": { en: "Ended", ko: "종료 시각" },
     "project.kicker": { en: "Projects", ko: "프로젝트" },
     "project.manage": { en: "Manage projects", ko: "프로젝트 관리" },
@@ -264,6 +280,8 @@
     "toast.project_saved": { en: "Project saved.", ko: "프로젝트를 저장했어요." },
     "toast.project_deleted": { en: "Project deleted.", ko: "프로젝트를 삭제했어요." },
     "toast.project_builtin": { en: "Built-in projects cannot be deleted.", ko: "기본 프로젝트는 삭제할 수 없어요." },
+    "toast.project_created": { en: 'Project "{name}" created.', ko: '"{name}" 프로젝트를 만들었어요.' },
+    "mention.create": { en: 'Create project "{name}"', ko: '"{name}" 프로젝트 만들기' },
     "toast.cloud_projects_fail": { en: "Cloud project sync failed. Saved on this device.", ko: "프로젝트 동기화에 실패했어요. 이 기기에 저장했어요." },
     "confirm.move_record": {
       en: 'Move "{title}" here?\n\n{from}\n→  {to}',
@@ -409,10 +427,14 @@
     restModeOpenButton: document.getElementById("restModeOpenButton"),
     restDurationField: document.getElementById("restDurationField"),
     restDurationInput: document.getElementById("restDurationInput"),
-    restDurationButtons: Array.from(document.querySelectorAll("[data-rest-duration]")),
+    restDurationDown: document.getElementById("restDurationDown"),
+    restDurationUp: document.getElementById("restDurationUp"),
     restStartButton: document.getElementById("restStartButton"),
     restResetButton: document.getElementById("restResetButton"),
-    restAlertButtons: Array.from(document.querySelectorAll("[data-rest-alert]")),
+    restAlarmToggleButton: document.getElementById("restAlarmToggleButton"),
+    restVolumeRow: document.getElementById("restVolumeRow"),
+    restVolumeSlider: document.getElementById("restVolumeSlider"),
+    restVolumeLabel: document.getElementById("restVolumeLabel"),
     restStage: document.getElementById("restStage"),
     restPlant: document.getElementById("restPlant"),
     restAlarm: document.getElementById("restAlarm"),
@@ -589,6 +611,7 @@
     restMode: loadRestMode(),
     restDuration: loadRestDuration(),
     restAlert: loadRestAlert(),
+    restAlarmVolume: loadRestAlarmVolume(),
     // The rest alarm while it is going off: { durationMinutes, firedAt, loud }.
     restAlarm: null,
     // Handles for the things the alarm has to be able to take back: the
@@ -634,6 +657,9 @@
 
   async function init() {
     bindEvents();
+    // A per-device task → project map used to override history here. History
+    // alone decides now (see projectForTitle), so the stale map is dropped.
+    try { localStorage.removeItem(STORAGE_TASK_PROJECT); } catch { /* storage blocked */ }
     // Translate static text up front (English by default, Korean if saved).
     document.documentElement.lang = state.lang;
     applyStaticI18n();
@@ -666,8 +692,10 @@
     }
     await hydrateTimer();
     // The active timer fixes the project (and therefore the tree); otherwise the
-    // picker follows whichever project is selected.
+    // task name follows the project it was last done under, now that the
+    // signed-in history is here to say which that is.
     if (state.timer?.projectId) state.selectedProjectId = state.timer.projectId;
+    else followTitleProject();
     syncSelectedTree();
     await hydrateRestTimer();
     renderAll();
@@ -684,8 +712,9 @@
     // A running timer fixes the species; otherwise re-resolve from the current
     // name so a freshly-loaded (e.g. just-signed-in) history takes effect.
     // The active timer fixes the project (and therefore the tree); otherwise the
-    // picker follows whichever project is selected.
+    // task name follows the project it was last done under in this history.
     if (state.timer?.projectId) state.selectedProjectId = state.timer.projectId;
+    else followTitleProject();
     syncSelectedTree();
     await hydrateRestTimer();
     await loadNotes();
@@ -717,12 +746,42 @@
     // restore the project's name, the same fallback Start uses.
     els.sessionTitle.addEventListener("blur", () => {
       if (!state.timer || state.timer.mode !== "stopwatch") return;
+      // "task @Errands" typed out over a running stopwatch, never picked.
+      const typed = takeTypedProjectMention(els.sessionTitle.value);
+      if (typed) {
+        els.sessionTitle.value = typed.title;
+        renameRunningTimer(typed.title);
+        reprojectRunningTimer(typed.projectId);
+      }
       if (!els.sessionTitle.value.trim()) {
-        const fallback = projectDisplayName(getProject(state.timer.projectId));
+        const fallback = fallbackTaskTitle(getProject(state.timer.projectId));
         els.sessionTitle.value = fallback;
         renameRunningTimer(fallback);
       }
       flushRunningTimerRename();
+    });
+
+    // "@" in the task name picks (or makes) a project.
+    attachProjectMention(els.sessionTitle, {
+      isEnabled: sessionEditsAllowed,
+      apply(title, projectId) {
+        if (state.timer) {
+          // Only a stopwatch can be renamed and moved while it runs.
+          if (state.timer.mode !== "stopwatch") return;
+          renameRunningTimer(title);
+          reprojectRunningTimer(projectId);
+          return;
+        }
+        rememberSessionName(title);
+        setSelectedProject(projectId);
+      },
+    });
+    attachProjectMention(els.recordTitleInput, {
+      isEnabled: () => true,
+      apply(title, projectId) {
+        fillProjectSelect(els.recordProjectInput, projectId);
+        renderRecordDialogProject();
+      },
     });
 
     // The tree belongs to the project now, so picking one here re-plants every
@@ -801,19 +860,32 @@
     els.restModeTimerButton.addEventListener("click", () => setRestMode("countdown"));
     els.restModeOpenButton.addEventListener("click", () => setRestMode("stopwatch"));
 
-    els.restAlertButtons.forEach((button) => {
-      button.addEventListener("click", () => setRestAlert(button.dataset.restAlert));
+    els.restAlarmToggleButton.addEventListener("click", () => {
+      setRestAlert(state.restAlert.sound ? "silent" : "sound");
     });
 
-    els.restDurationButtons.forEach((button) => {
-      button.addEventListener("click", () => {
-        setRestDuration(Number(button.dataset.restDuration));
+    els.restVolumeSlider.addEventListener("input", () => {
+      state.restAlarmVolume = clamp(Number(els.restVolumeSlider.value) / 100, 0, 2);
+      saveRestAlarmVolume();
+      // An alarm already ringing follows the slider, so it can be turned down
+      // without being dismissed.
+      state.restAlarmNodes.forEach((node) => {
+        if (node.gain && !node.frequency) node.gain.value = state.restAlarmVolume;
       });
+      renderRestAlertControl();
     });
+
+    // Auditioned once let go, the way the timer volume is.
+    els.restVolumeSlider.addEventListener("change", previewRestAlarm);
+
+    els.restDurationDown.addEventListener("click", () => stepRestDuration(-1));
+    els.restDurationUp.addEventListener("click", () => stepRestDuration(1));
 
     els.restDurationInput.addEventListener("input", () => {
       setRestDuration(cleanMinutes(els.restDurationInput.value, state.restDuration, 1));
     });
+    // A box left empty or out of range shows the length actually in effect.
+    els.restDurationInput.addEventListener("blur", renderRestTimer);
 
     els.restAlarmDismiss.addEventListener("click", () => dismissRestAlarm());
     els.restAlarmFocus.addEventListener("click", () => {
@@ -1638,6 +1710,7 @@
 
       if (!error) {
         state.projects = (data || []).map(normalizeProject);
+        sortProjects();
         return;
       }
 
@@ -1648,21 +1721,24 @@
     }
 
     state.projects = loadLocalProjects();
+    sortProjects();
   }
 
   function sortProjects() {
     state.projects.sort((a, b) => {
-      const rank = (p) => (p.id === DEFAULT_PROJECT_ID ? 0 : p.id === REST_PROJECT_ID ? 2 : 1);
+      const rank = (p) => (p.id === REST_PROJECT_ID ? 1 : 0);
       if (rank(a) !== rank(b)) return rank(a) - rank(b);
       if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
       return a.name.localeCompare(b.name);
     });
   }
 
-  // Make sure every project a record points at exists, seeding the built-ins on
-  // a fresh install and rebuilding projects for records made before projects
-  // existed. Deterministic ids and colours mean two devices converge on the
-  // same result without coordinating.
+  // Make sure every project a record points at exists, seeding Rest on a fresh
+  // install and rebuilding projects for records made before projects existed.
+  // Deterministic ids and colours mean two devices converge on the same result
+  // without coordinating. No Focus project is seeded any more: a new account
+  // starts with Rest alone, and sessions go under "No project" until the user
+  // makes one (see NO_PROJECT_ID).
   async function reconcileProjects() {
     const before = state.projects.length;
     const byId = new Map(state.projects.map((p) => [p.id, p]));
@@ -1676,13 +1752,6 @@
       created.push(normalized);
     };
 
-    ensure({
-      id: DEFAULT_PROJECT_ID,
-      name: "Focus",
-      color: PROJECT_COLORS[0],
-      tree: "pine",
-      sort_order: 0,
-    });
     ensure({
       id: REST_PROJECT_ID,
       name: "Rest",
@@ -1768,13 +1837,17 @@
     return normalized;
   }
 
-  // Deleting a project moves its records to the default project rather than
-  // orphaning them, so nothing silently disappears from the history.
+  // Deleting a project moves its records to "No project" rather than orphaning
+  // them, so nothing silently disappears from the history. An old Focus project
+  // *is* that slot under a name, so deleting it moves nothing: its records stay
+  // where they are and simply read as "No project" from then on.
   async function removeProject(id) {
     if (BUILTIN_PROJECT_IDS.includes(id)) return false;
 
-    const target = DEFAULT_PROJECT_ID;
-    const affected = state.sessions.filter((record) => resolveProjectId(record) === id);
+    const target = NO_PROJECT_ID;
+    const affected = id === target
+      ? []
+      : state.sessions.filter((record) => resolveProjectId(record) === id);
 
     if (affected.length) {
       const affectedIds = new Set(affected.map((record) => record.id));
@@ -1840,13 +1913,13 @@
     return LEGACY_PROJECT_PREFIX + (String(title || "").trim().toLowerCase() || "deep focus");
   }
 
-  // Never returns null: a record pointing at a project that was deleted
-  // elsewhere still renders, in a neutral grey.
+  // Never returns null: a session under no project, or a record pointing at a
+  // project that was deleted elsewhere, still renders, in a neutral grey.
   function getProject(id) {
     const found = state.projects.find((project) => project.id === id);
     if (found) return found;
     return {
-      id: id || DEFAULT_PROJECT_ID,
+      id: id || NO_PROJECT_ID,
       name: t("project.none"),
       color: MISSING_PROJECT_COLOR,
       tree: "pine",
@@ -1860,54 +1933,63 @@
   }
 
   // Built-in names are stored in English so a record means the same thing in
-  // every language; only the untouched defaults are shown translated.
+  // every language; only the untouched defaults are shown translated. An old
+  // Focus project keeps its translation too.
   function projectDisplayName(project) {
+    if (project.missing) return t("project.none");
     if (project.id === REST_PROJECT_ID && project.name === "Rest") return t("project.rest_name");
-    if (project.id === DEFAULT_PROJECT_ID && project.name === "Focus") return t("project.default_name");
+    if (project.id === NO_PROJECT_ID && project.name === "Focus") return t("project.default_name");
     return project.name;
   }
 
-  // Empty when nothing has been chosen yet, so startup can pick up the project
-  // of the most recent session instead of forcing the default one.
+  // What a session is called when its name is left empty: the project's name,
+  // so picking a project and pressing Start is enough — but never the words
+  // "No project", which describe the absence of one rather than naming a task.
+  function fallbackTaskTitle(project) {
+    return project.missing ? DEFAULT_TASK_TITLE : projectDisplayName(project);
+  }
+
+  // Whether a session can be filed under this id: a project that exists, or
+  // "No project", which never exists as a row of its own.
+  function isAssignableProject(id) {
+    return id === NO_PROJECT_ID || state.projects.some((project) => project.id === id);
+  }
+
   // --- Task ↔ project ------------------------------------------------------
-  // A task name belongs to a project: track "wash dishes" under Errands once,
-  // and choosing that task picks Errands again by itself. What you last chose
-  // on this device wins; otherwise the answer comes from your history, which
-  // syncs, so the pairing follows you across devices.
+  // A task name follows the project it was last done under: track "wash
+  // dishes" under Errands, and typing that task picks Errands again by itself.
+  // File it under Home next time and Home is what it picks after that. The
+  // answer comes from history alone — the most recent record with that name —
+  // and history syncs, so every device agrees. Starting a session and then
+  // cancelling it, or correcting an old record, does not change it.
 
   function taskKey(title) {
     return String(title || "").trim().toLowerCase();
-  }
-
-  function loadTaskProjects() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_TASK_PROJECT) || "{}"); }
-    catch { return {}; }
-  }
-
-  function rememberTaskProject(title, projectId) {
-    const key = taskKey(title);
-    if (!key || !projectId) return;
-    const map = loadTaskProjects();
-    if (map[key] === projectId) return;
-    map[key] = projectId;
-    localStorage.setItem(STORAGE_TASK_PROJECT, JSON.stringify(map));
   }
 
   function projectForTitle(title) {
     const key = taskKey(title);
     if (!key) return null;
 
-    const saved = loadTaskProjects()[key];
-    if (saved && state.projects.some((project) => project.id === saved)) return saved;
-
     let match = null;
     state.sessions.forEach((record) => {
       if (taskKey(record.title) !== key) return;
-      if (!match || new Date(record.started_at) > new Date(match.started_at)) match = record;
+      if (!match || recordIsLater(record, match)) match = record;
     });
     if (!match) return null;
     const id = resolveProjectId(match);
-    return state.projects.some((project) => project.id === id) ? id : null;
+    // A record whose project was deleted elsewhere says nothing useful about
+    // where the task belongs now, so the current choice is left alone.
+    return isAssignableProject(id) ? id : null;
+  }
+
+  // Most recent first by when it started; two that started together are told
+  // apart by when they ended.
+  function recordIsLater(a, b) {
+    const startA = new Date(a.started_at).getTime();
+    const startB = new Date(b.started_at).getTime();
+    if (startA !== startB) return startA > startB;
+    return new Date(a.ended_at).getTime() > new Date(b.ended_at).getTime();
   }
 
   // Follow the task name that was just typed or picked, if it has a project.
@@ -1915,6 +1997,241 @@
     const id = projectForTitle(title);
     if (!id || id === state.selectedProjectId) return;
     setSelectedProject(id);
+  }
+
+  // The same, quietly, for the name already in the field when a history
+  // arrives — on startup, or after signing in — before anything is painted.
+  function followTitleProject() {
+    const id = projectForTitle(els.sessionTitle.value);
+    if (id && id !== state.selectedProjectId) setSelectedProject(id, { silent: true });
+  }
+
+  // --- "@project" in a task name -------------------------------------------
+  // Typing "@" in a task name lists the projects, narrowed by what follows it,
+  // with "Create project …" for a name that doesn't exist yet. Picking one
+  // files the session there and takes the "@…" back out of the name, so
+  // "task1 @Errands" is the task "task1" under Errands.
+
+  // The mention being typed: an "@" at the start or after a space, running to
+  // the caret. An address's "@" (bob@example.com) is not one, and neither is
+  // "@" followed by a space.
+  function findProjectMention(text, caret) {
+    const before = text.slice(0, caret);
+    const at = before.lastIndexOf("@");
+    if (at < 0) return null;
+    if (at > 0 && !/\s/.test(before[at - 1])) return null;
+    const query = before.slice(at + 1);
+    if (/^\s/.test(query) || query.length > 60) return null;
+    return { start: at, end: caret, query };
+  }
+
+  // What the menu offers for a query: matching projects, names that start with
+  // it first, and a "Create" row unless a project already has exactly that
+  // name. Null when there is nothing to offer.
+  function projectMentionOptions(query) {
+    const needle = query.trim().toLowerCase();
+    const leading = [];
+    const elsewhere = [];
+    state.projects.forEach((project) => {
+      const name = projectDisplayName(project).toLowerCase();
+      if (!needle || name.startsWith(needle)) leading.push(project);
+      else if (name.includes(needle)) elsewhere.push(project);
+    });
+    const projects = [...leading, ...elsewhere];
+    const exact = projects.some((project) => projectDisplayName(project).toLowerCase() === needle);
+    const createName = needle && !exact ? query.trim() : "";
+    if (!projects.length && !createName) return null;
+    return { projects, createName };
+  }
+
+  // The name with the mention taken out, and where the caret goes.
+  function stripProjectMention(text, mention) {
+    const left = text.slice(0, mention.start).replace(/\s+$/, "");
+    const right = text.slice(mention.end).replace(/^\s+/, "");
+    const joiner = left && right ? " " : "";
+    return { text: left + joiner + right, caret: left.length + joiner.length };
+  }
+
+  // A mention typed out in full and never picked from the menu — "task1
+  // @Errands", then Start — still counts, as long as it names a project that
+  // exists. Anything else is left in the name as typed: a session is not the
+  // place to create a project nobody chose to create.
+  function takeTypedProjectMention(text) {
+    const mention = findProjectMention(text, text.length);
+    if (!mention) return null;
+    const needle = mention.query.trim().toLowerCase();
+    if (!needle) return null;
+    const project = state.projects.find((item) => projectDisplayName(item).toLowerCase() === needle);
+    if (!project) return null;
+    return { title: stripProjectMention(text, mention).text, projectId: project.id };
+  }
+
+  // A project made from the menu, coloured and planted from its name the way
+  // the project sheet would. An existing one of that name is reused instead.
+  async function createProjectNamed(rawName) {
+    const name = rawName.trim().slice(0, 60);
+    const existing = state.projects.find(
+      (project) => projectDisplayName(project).toLowerCase() === name.toLowerCase()
+    );
+    if (existing) return existing.id;
+    const saved = await saveProject({
+      id: createId(),
+      name,
+      color: freeColorForProjectName(name),
+      tree: defaultTreeForName(name),
+      sort_order: state.projects.length,
+    });
+    if (els.projectsDialog.open) renderProjectsList();
+    showToast(t("toast.project_created", { name }));
+    return saved.id;
+  }
+
+  // Wires the menu onto one task-name field. [isEnabled] says whether the field
+  // may change its project right now; [apply] receives the cleaned name and
+  // the chosen project's id, the name first so a caller that follows the name
+  // to a project can be overruled by the choice that was just made.
+  function attachProjectMention(input, { isEnabled, apply }) {
+    const menu = document.createElement("div");
+    menu.className = "mention-menu";
+    menu.id = `${input.id}Mentions`;
+    menu.setAttribute("role", "listbox");
+    menu.hidden = true;
+    input.parentElement.classList.add("has-mention");
+    input.insertAdjacentElement("afterend", menu);
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-controls", menu.id);
+    input.setAttribute("aria-expanded", "false");
+    const datalistId = input.getAttribute("list");
+
+    let mention = null;
+    let rows = [];
+    let active = 0;
+
+    const close = () => {
+      if (menu.hidden) return;
+      menu.hidden = true;
+      mention = null;
+      rows = [];
+      input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
+      // The browser's own name suggestions step aside while this is open, or
+      // the two lists pile up over each other.
+      if (datalistId) input.setAttribute("list", datalistId);
+    };
+
+    const highlight = (index) => {
+      active = index;
+      rows.forEach((row, i) => row.el.classList.toggle("is-active", i === index));
+      const current = rows[index];
+      if (!current) {
+        input.removeAttribute("aria-activedescendant");
+        return;
+      }
+      input.setAttribute("aria-activedescendant", current.el.id);
+      current.el.scrollIntoView({ block: "nearest" });
+    };
+
+    const choose = async (row) => {
+      const found = mention;
+      close();
+      if (!found || !row) return;
+      const next = stripProjectMention(input.value, found);
+      input.value = next.text;
+      try { input.setSelectionRange(next.caret, next.caret); } catch { /* not focusable */ }
+      const projectId = row.projectId || (await createProjectNamed(row.createName));
+      apply(next.text, projectId);
+    };
+
+    const refresh = () => {
+      const found = isEnabled() && !input.disabled
+        ? findProjectMention(input.value, input.selectionStart ?? input.value.length)
+        : null;
+      const options = found ? projectMentionOptions(found.query) : null;
+      if (!options) {
+        close();
+        return;
+      }
+      mention = found;
+      const fragment = document.createDocumentFragment();
+      rows = [];
+      const addRow = (row, build) => {
+        const el = document.createElement("div");
+        el.className = "mention-option";
+        el.id = `${menu.id}-${rows.length}`;
+        el.setAttribute("role", "option");
+        build(el);
+        // Pressing down would take the focus off the field, and with it the
+        // caret the mention is measured from.
+        el.addEventListener("pointerdown", (event) => event.preventDefault());
+        el.addEventListener("click", (event) => {
+          // The field sits in a <label>, which would otherwise pass this
+          // click on to the input as well.
+          event.preventDefault();
+          choose(row);
+        });
+        row.el = el;
+        rows.push(row);
+        fragment.appendChild(el);
+      };
+      options.projects.forEach((project) => {
+        addRow({ projectId: project.id }, (el) => {
+          applyProjectVars(el, project);
+          const dot = document.createElement("span");
+          dot.className = "legend-dot";
+          const name = document.createElement("span");
+          name.className = "mention-option-name";
+          name.textContent = projectDisplayName(project);
+          el.append(dot, name);
+        });
+      });
+      if (options.createName) {
+        addRow({ createName: options.createName }, (el) => {
+          el.classList.add("is-create");
+          const plus = document.createElement("span");
+          plus.className = "mention-option-plus";
+          plus.textContent = "+";
+          plus.setAttribute("aria-hidden", "true");
+          const name = document.createElement("span");
+          name.className = "mention-option-name";
+          name.textContent = t("mention.create", { name: options.createName });
+          el.append(plus, name);
+        });
+      }
+      menu.replaceChildren(fragment);
+      if (datalistId) input.removeAttribute("list");
+      menu.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+      // A lone "Create" row is offered, not preselected: Enter in "meet @sam
+      // about it" should do what Enter always does, not make a project.
+      highlight(options.projects.length ? 0 : -1);
+    };
+
+    input.addEventListener("input", refresh);
+    input.addEventListener("click", refresh);
+    input.addEventListener("keyup", (event) => {
+      if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) refresh();
+    });
+    input.addEventListener("blur", close);
+    input.addEventListener("keydown", (event) => {
+      if (menu.hidden || event.isComposing || event.keyCode === 229) return;
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const down = event.key === "ArrowDown";
+        if (active < 0) highlight(down ? 0 : rows.length - 1);
+        else highlight((active + (down ? 1 : -1) + rows.length) % rows.length);
+      } else if ((event.key === "Enter" || event.key === "Tab") && rows[active]) {
+        // Taken here so Enter picks a project instead of saving the record
+        // dialog underneath (see bindEnterToSave).
+        event.preventDefault();
+        event.stopPropagation();
+        choose(rows[active]);
+      } else if (event.key === "Escape") {
+        // Closes the menu, not the dialog it may be sitting in.
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+      }
+    });
   }
 
   function loadSelectedProjectId() {
@@ -1975,7 +2292,6 @@
     state.selectedProjectId = project.id;
     localStorage.setItem(STORAGE_SELECTED_PROJECT, project.id);
     state.selectedTreeId = project.tree;
-    rememberTaskProject(state.timer.title, project.id);
     persistTimer();
     renderProjectPickers();
     renderTreePicker();
@@ -1995,33 +2311,34 @@
   // --- Project pickers and dialogs -----------------------------------------
 
   function renderProjectPickers() {
-    if (!state.projects.some((project) => project.id === state.selectedProjectId)) {
-      state.selectedProjectId = DEFAULT_PROJECT_ID;
+    // A running session keeps whatever it is filed under, even a project
+    // deleted a moment ago on another device — reprojectOrphanedTimer moves it.
+    const pickerId = state.timer ? state.timer.projectId : state.selectedProjectId;
+    if (!state.timer && !isAssignableProject(state.selectedProjectId)) {
+      state.selectedProjectId = NO_PROJECT_ID;
     }
-    fillProjectSelect(els.projectPicker, state.selectedProjectId);
+    fillProjectSelect(els.projectPicker, state.timer ? pickerId : state.selectedProjectId);
     els.projectPicker.disabled = !sessionEditsAllowed();
-    applyProjectVars(els.projectDot, getProject(state.selectedProjectId));
+    applyProjectVars(els.projectDot, getProject(els.projectPicker.value));
   }
 
+  // "No project" leads the list unless an old Focus project fills that slot.
+  // A record can still point at a project deleted elsewhere; it reads as "No
+  // project" everywhere, so it is shown — and saved — as that.
   function fillProjectSelect(select, selectedId) {
     const fragment = document.createDocumentFragment();
-    state.projects.forEach((project) => {
+    const addOption = (id, label) => {
       const option = document.createElement("option");
-      option.value = project.id;
-      option.textContent = projectDisplayName(project);
+      option.value = id;
+      option.textContent = label;
       fragment.appendChild(option);
-    });
-    select.replaceChildren(fragment);
-
-    // A record can still point at a project that no longer exists; keep it
-    // selectable so editing it doesn't silently move it.
-    if (selectedId && !state.projects.some((project) => project.id === selectedId)) {
-      const option = document.createElement("option");
-      option.value = selectedId;
-      option.textContent = t("project.none");
-      select.appendChild(option);
+    };
+    if (!state.projects.some((project) => project.id === NO_PROJECT_ID)) {
+      addOption(NO_PROJECT_ID, t("project.none"));
     }
-    select.value = selectedId;
+    state.projects.forEach((project) => addOption(project.id, projectDisplayName(project)));
+    select.replaceChildren(fragment);
+    select.value = isAssignableProject(selectedId) ? selectedId : NO_PROJECT_ID;
   }
 
   function openProjectsDialog() {
@@ -2187,7 +2504,12 @@
       t("confirm.delete_project", {
         name: projectDisplayName(project),
         n: projectRecordCount(id),
-        target: projectDisplayName(getProject(DEFAULT_PROJECT_ID)),
+        // An old Focus project's own records stay put and read as "No
+        // project" once it is gone; anything else's move to wherever that
+        // slot is — the Focus project if it still exists, else nowhere.
+        target: id === NO_PROJECT_ID
+          ? t("project.none")
+          : projectDisplayName(getProject(NO_PROJECT_ID)),
       })
     );
     if (!confirmed) return;
@@ -2202,7 +2524,6 @@
 
   async function createRecord(record) {
     const normalized = normalizeRecord(record);
-    rememberTaskProject(normalized.title, normalized.project_id);
 
     if (canUseCloud()) {
       let { data, error } = await state.supabase
@@ -2249,7 +2570,6 @@
       ...changes,
       updated_at: new Date().toISOString(),
     });
-    rememberTaskProject(next.title, next.project_id);
 
     if (canUseCloud()) {
       let { data, error } = await state.supabase
@@ -2309,10 +2629,17 @@
   async function startOrResumeTimer() {
     if (state.timer) return;
 
+    // "task1 @Errands" typed out in full and never picked from the menu.
+    const typed = takeTypedProjectMention(els.sessionTitle.value);
+    if (typed) {
+      els.sessionTitle.value = typed.title;
+      setSelectedProject(typed.projectId, { silent: true });
+    }
+
     const project = getProject(state.selectedProjectId);
     // An empty task name falls back to the project's, so picking a project and
     // pressing start is enough.
-    const title = els.sessionTitle.value.trim() || projectDisplayName(project);
+    const title = els.sessionTitle.value.trim() || fallbackTaskTitle(project);
     rememberSessionName(title);
     state.finishSoonSoundTimerId = null;
 
@@ -2338,7 +2665,6 @@
       cloudSynced: false,
     };
 
-    rememberTaskProject(title, project.id);
     persistTimer();
     if (!isStopwatch) primeCompletionSound();
     renderTimer();
@@ -2390,11 +2716,11 @@
       // editor and a calendar drag already follow.
       const endedAt = new Date(startedAtMs + actualMinutes * 60000).toISOString();
       const now = new Date().toISOString();
-      const projectId = timer.projectId || DEFAULT_PROJECT_ID;
+      const projectId = timer.projectId || NO_PROJECT_ID;
       // A live-edited title can be left blank (see renameRunningTimer); the
       // same fallback the start button uses keeps a blank name from failing
       // the record's own not-null constraint.
-      const title = (timer.title || "").trim() || projectDisplayName(getProject(projectId));
+      const title = (timer.title || "").trim() || fallbackTaskTitle(getProject(projectId));
       const record = {
         id: createId(),
         title,
@@ -2848,17 +3174,14 @@
 
     els.restModeTimerButton.classList.toggle("is-selected", isCountdown);
     els.restModeOpenButton.classList.toggle("is-selected", !isCountdown);
+    els.restModeTimerButton.setAttribute("aria-pressed", String(isCountdown));
+    els.restModeOpenButton.setAttribute("aria-pressed", String(!isCountdown));
     els.restModeTimerButton.disabled = running;
     els.restModeOpenButton.disabled = running;
     els.restDurationField.hidden = !isCountdown;
 
-    els.restDurationButtons.forEach((button) => {
-      button.classList.toggle(
-        "is-selected",
-        Number(button.dataset.restDuration) === state.restDuration
-      );
-      button.disabled = running;
-    });
+    els.restDurationDown.disabled = running || state.restDuration <= 1;
+    els.restDurationUp.disabled = running || state.restDuration >= MAX_TIMER_MINUTES;
     els.restDurationInput.disabled = running;
     if (document.activeElement !== els.restDurationInput) {
       els.restDurationInput.value = String(state.restDuration);
@@ -2879,6 +3202,16 @@
     renderRestTimer();
   }
 
+  // The stepper moves in fives, landing on the next round length either way:
+  // 10 → 15 or 5, 7 → 10 or 5, and down from 5 to a one-minute breather.
+  function stepRestDuration(direction) {
+    const current = state.restDuration;
+    const next = direction > 0
+      ? Math.floor(current / 5) * 5 + 5
+      : Math.ceil(current / 5) * 5 - 5;
+    setRestDuration(Math.max(1, next));
+  }
+
   function renderRestAlarm() {
     const alarm = state.restAlarm;
     els.restAlarm.hidden = !alarm;
@@ -2897,11 +3230,19 @@
     }
   }
 
+  // The same switch-and-slider the focus card's sound control is.
   function renderRestAlertControl() {
-    if (!els.restAlertButtons) return;
-    els.restAlertButtons.forEach((button) => {
-      button.classList.toggle("is-selected", button.dataset.restAlert === state.restAlert.wire);
-    });
+    const on = state.restAlert.sound;
+    const label = on ? t("rest.alarm_on") : t("rest.alarm_off");
+    els.restAlarmToggleButton.innerHTML =
+      `<span class="btn-emoji" aria-hidden="true">${on ? "🔔" : "🔕"}</span><span>${label}</span>`;
+    els.restAlarmToggleButton.setAttribute("aria-pressed", String(on));
+    els.restAlarmToggleButton.title = label;
+
+    els.restVolumeRow.hidden = !on;
+    const pct = Math.round(state.restAlarmVolume * 100);
+    els.restVolumeSlider.value = pct;
+    els.restVolumeLabel.textContent = `${pct}%`;
   }
 
   // Resting grows a wilted tree instead of a healthy one — it starts as a small
@@ -3266,10 +3607,14 @@
       const project = getRecordProject(record);
       const minutes = Number(record.actual_minutes || 0);
       if (minutes <= 0) return;
-      const entry = totals.get(project.id) || { project, minutes: 0, count: 0 };
+      // Everything that reads as "No project" — never filed, or filed under a
+      // project deleted elsewhere — is one slice, not one grey slice per id.
+      // (Not NO_PROJECT_ID: an old Focus project still uses that id.)
+      const key = project.missing ? ":none" : project.id;
+      const entry = totals.get(key) || { project, minutes: 0, count: 0 };
       entry.minutes += minutes;
       entry.count += 1;
-      totals.set(project.id, entry);
+      totals.set(key, entry);
     });
     return [...totals.values()].sort((a, b) => b.minutes - a.minutes);
   }
@@ -4543,14 +4888,21 @@
       return;
     }
 
+    // "task1 @Errands" typed out in full and never picked from the menu.
+    const typed = takeTypedProjectMention(els.recordTitleInput.value);
+    if (typed) {
+      els.recordTitleInput.value = typed.title;
+      fillProjectSelect(els.recordProjectInput, typed.projectId);
+    }
+
     const id = els.recordIdInput.value || createId();
-    const projectId = els.recordProjectInput.value || DEFAULT_PROJECT_ID;
+    const projectId = els.recordProjectInput.value || NO_PROJECT_ID;
     const actualMinutes = clamp(
       Math.round((endedAtInput.getTime() - startedAt.getTime()) / 60000),
       0,
       MAX_RECORD_MINUTES
     );
-    const title = els.recordTitleInput.value.trim() || projectDisplayName(getProject(projectId));
+    const title = els.recordTitleInput.value.trim() || fallbackTaskTitle(getProject(projectId));
     const changes = {
       id,
       title,
@@ -4834,7 +5186,7 @@
     if (paired) {
       state.selectedProjectId = paired;
     } else if (!state.projects.some((project) => project.id === state.selectedProjectId)) {
-      state.selectedProjectId = latestFocus ? resolveProjectId(latestFocus) : DEFAULT_PROJECT_ID;
+      state.selectedProjectId = latestFocus ? resolveProjectId(latestFocus) : NO_PROJECT_ID;
     }
     syncSelectedTree();
   }
@@ -4924,7 +5276,7 @@
         mode: "stopwatch",
         status: "running",
         title: (timer.title || "Deep focus").trim() || "Deep focus",
-        projectId: timer.projectId || timer.project_id || DEFAULT_PROJECT_ID,
+        projectId: timer.projectId || timer.project_id || NO_PROJECT_ID,
         selectedTreeId: timer.selectedTreeId || null,
         durationMinutes: 0,
         durationSeconds: 0,
@@ -4954,7 +5306,7 @@
       mode: "countdown",
       status: "running",
       title: (timer.title || "Deep focus").trim() || "Deep focus",
-      projectId: timer.projectId || timer.project_id || DEFAULT_PROJECT_ID,
+      projectId: timer.projectId || timer.project_id || NO_PROJECT_ID,
       selectedTreeId: timer.selectedTreeId || null,
       durationMinutes,
       durationSeconds,
@@ -5047,12 +5399,12 @@
       updated_at: new Date().toISOString(),
     };
     // Older databases predate the column; the timer still syncs without it.
-    if (!state.activeTimerProjectMissing) row.project_id = timer.projectId || DEFAULT_PROJECT_ID;
+    if (!state.activeTimerProjectMissing) row.project_id = timer.projectId || NO_PROJECT_ID;
     return row;
   }
 
   function fromCloudActiveTimer(row) {
-    const projectId = row.project_id || DEFAULT_PROJECT_ID;
+    const projectId = row.project_id || NO_PROJECT_ID;
     return normalizeTimer({
       mode: row.mode || "countdown",
       title: row.title,
@@ -5114,6 +5466,9 @@
     state.soundEnabled = !state.soundEnabled;
     saveSoundPreference();
     renderSoundToggle();
+    // The slider belongs to the switch: without this it stayed hidden after
+    // turning sound back on, until something unrelated repainted the page.
+    renderVolumeControl();
 
     if (state.soundEnabled) {
       playCompletionSound({ preview: true });
@@ -5181,10 +5536,20 @@
     return { wire: sound ? "sound" : "silent", sound };
   }
 
+  function loadRestAlarmVolume() {
+    const saved = parseFloat(localStorage.getItem(STORAGE_REST_ALARM_VOLUME));
+    return Number.isFinite(saved) ? clamp(saved, 0, 2) : 1;
+  }
+
+  function saveRestAlarmVolume() {
+    localStorage.setItem(STORAGE_REST_ALARM_VOLUME, String(state.restAlarmVolume));
+  }
+
   function setRestAlert(wire) {
     state.restAlert = restAlertFor(wire);
     localStorage.setItem(STORAGE_REST_ALERT, state.restAlert.wire);
     renderRestAlertControl();
+    showToast(t(state.restAlert.sound ? "toast.rest_alarm_on" : "toast.rest_alarm_off"));
     // Auditioned as it is chosen, the way the volume slider is. A setting whose
     // whole subject is "how loud and how insistent" cannot be judged from one
     // word, and the one time it normally plays is the one time nobody can be
@@ -5379,10 +5744,11 @@
     showToast(t("toast.all_deleted"));
   }
 
-  // Every project the user made, gone; the two built-ins kept.
+  // Every project the user made, gone — an old Focus project included; Rest
+  // kept.
   //
   // After the records rather than before, and that order is the whole point.
-  // removeProject moves a project's records onto the default one so nothing is
+  // removeProject moves a project's records onto "No project" so nothing is
   // orphaned — sensible on its own, and pure waste here, where it would rewrite
   // every row in the history moments before deleting it. Worse, a request that
   // failed halfway would leave the history half-moved. With the records already
@@ -5401,9 +5767,8 @@
         if (error) console.warn(error);
       }
 
-      // Seeds either built-in back if it was somehow missing, so the picker can
-      // never come back empty. With no sessions left there is nothing else for
-      // it to rebuild.
+      // Seeds Rest back if it was somehow missing. With no sessions left there
+      // is nothing else for it to rebuild.
       await reconcileProjects();
     }
 
@@ -5413,12 +5778,12 @@
     // pointing at nothing on screen; the stored one would come back on the
     // next load.
     if (!BUILTIN_PROJECT_IDS.includes(state.selectedProjectId)) {
-      setSelectedProject(DEFAULT_PROJECT_ID, { silent: true });
+      setSelectedProject(NO_PROJECT_ID, { silent: true });
     }
   }
 
-  // A session running under a project that has just been deleted moves to the
-  // default one — the same rule its finished records follow.
+  // A session running under a project that has just been deleted moves to "No
+  // project" — the same rule its finished records follow.
   //
   // Not reprojectRunningTimer: that is the user editing a stopwatch, and it
   // declines to touch a countdown on purpose, because a countdown's tree is
@@ -5427,9 +5792,9 @@
   // a name that no longer exists and lands in the forest as a grey stub.
   async function reprojectOrphanedTimer() {
     if (!state.timer) return;
-    if (state.projects.some((project) => project.id === state.timer.projectId)) return;
+    if (isAssignableProject(state.timer.projectId)) return;
 
-    const fallback = getProject(DEFAULT_PROJECT_ID);
+    const fallback = getProject(NO_PROJECT_ID);
     state.timer.projectId = fallback.id;
     state.timer.selectedTreeId = fallback.tree;
     // The tree picker follows the running session's project, and whoever reset
@@ -5735,10 +6100,10 @@
     if (!context || !state.restAlarm || !state.restAlarm.loud) return;
 
     const master = context.createGain();
-    // Its own level, floored at full: someone who turned the chime down did so
-    // to be less disturbed while working, which says nothing about whether they
-    // want to be woken from a break.
-    master.gain.value = Math.max(1, state.soundVolume);
+    // Its own level, set by the rest card's slider: someone who turned the
+    // chime down did so to be less disturbed while working, which says nothing
+    // about whether they want to be woken from a break.
+    master.gain.value = state.restAlarmVolume;
     master.connect(context.destination);
     state.restAlarmNodes.push(master);
 

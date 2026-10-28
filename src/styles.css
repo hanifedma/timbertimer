@@ -1634,19 +1634,37 @@ body.is-reordering .note-item {
 
 /* --- Rest ---------------------------------------------------------------- */
 
-.rest-mode-toggle {
-  margin-top: 14px;
+/* The clock and the time it lands on sit centred under the tree, the way the
+   focus card's clock does. */
+.rest-display,
+.rest-ends-at {
+  text-align: center;
 }
 
 .rest-setup[hidden],
 #restDurationField[hidden],
-#restExtendButton[hidden],
 #restEndsAt[hidden] {
   display: none;
 }
 
-.rest-setup .field {
-  margin-top: 12px;
+/*
+ * What kind of rest and how long, on one row while the card is wide enough and
+ * stacked once it is not. In stopwatch mode the length is hidden and the
+ * switch takes the whole row.
+ */
+.rest-setup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.rest-setup .segmented {
+  flex: 1 1 270px;
+}
+
+.rest-setup .stepper {
+  flex: 1 1 150px;
 }
 
 /* The wall-clock time the rest lands on, under its countdown. */
@@ -1658,45 +1676,201 @@ body.is-reordering .note-item {
   font-variant-numeric: tabular-nums;
 }
 
-.rest-alert-field {
-  margin-top: 14px;
-}
-
 /*
- * Two equal choices rather than the duration row's three-plus-custom.
- *
- * This deliberately outranks the responsive rules that collapse .duration-row,
- * because those exist to give a *numeric input* room and these are two short
- * words that fit side by side at any width.
+ * A segmented switch: one rounded track with the choice lifted out of it.
+ * Quieter than two full pill buttons, which is the point — on the rest card
+ * this is a setting, not the main event.
  */
-.rest-alert-field .duration-row {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.segmented {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--fill-1);
 }
 
-.rest-alert-field .pill-button {
-  padding: 0 6px;
-  font-size: 0.86rem;
-  /* One line each: a wrapped pill drags the whole row taller than its
-     neighbours and is what made this look broken in the first place. */
+.segment {
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: calc(var(--control) - 8px);
+  padding: 0 8px;
+  border: 0;
+  border-radius: calc(var(--radius) - 3px);
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.88rem;
+  font-weight: 500;
   white-space: nowrap;
 }
 
-@media (max-width: 780px) {
+.segment > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-  /*
-   * The shared .duration-row collapses to one column on a phone, which turns
-   * three two-character presets into three full-width rows and pushes Start
-   * rest off the screen. "5m" needs nothing like that much room, so the three
-   * stay across and only the number box takes a row of its own.
-   */
-  #restDurationField .duration-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+@media (max-width: 400px) {
 
-  #restDurationField .custom-duration {
-    grid-column: 1 / -1;
-    grid-template-columns: minmax(0, 1fr) minmax(72px, 104px);
+  /* Two words fit a phone's half-width; the emoji in front of them does not. */
+  .segment .btn-emoji {
+    display: none;
   }
+}
+
+.segment:hover:not(:disabled):not(.is-selected) {
+  color: var(--ink);
+}
+
+.segment.is-selected {
+  color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+/* − [ 10 min ] +  — the rest's length. */
+.stepper {
+  display: grid;
+  grid-template-columns: var(--control) minmax(0, 1fr) var(--control);
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--fill-1);
+  overflow: hidden;
+}
+
+.stepper-button {
+  height: 100%;
+  min-height: var(--control);
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.stepper-button:hover:not(:disabled) {
+  background: var(--fill-2);
+}
+
+.stepper-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.stepper-value input {
+  width: 3.4ch;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.stepper-value input:focus {
+  box-shadow: none;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 4px;
+}
+
+.stepper-value input::-webkit-inner-spin-button,
+.stepper-value input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* The focus card's sound switch, reused for the rest alarm: the switch keeps
+   its width and the slider takes what is left. */
+.sound-group > .secondary-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* --- "@project" in a task name ------------------------------------------- */
+
+.has-mention {
+  position: relative;
+}
+
+.mention-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: 2px;
+  max-height: min(264px, 46vh);
+  margin-top: 4px;
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overscroll-behavior: contain;
+}
+
+.mention-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: calc(var(--radius) - 4px);
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+.mention-option:hover,
+.mention-option.is-active {
+  background: var(--fill-2);
+}
+
+.mention-option .legend-dot {
+  flex: 0 0 auto;
+}
+
+.mention-option-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mention-option.is-create {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.mention-option-plus {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 10px;
+  font-weight: 700;
 }
 
 /* --- The rest alarm ------------------------------------------------------ */
@@ -1828,6 +2002,7 @@ body.rest-alarm-open {
 
 .sound-group {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
@@ -1840,8 +2015,11 @@ body.rest-alarm-open {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
-  min-width: 80px;
+  /* Beside the switch while there is room for a usable slider; on its own
+     line under it on a narrow phone rather than squeezed to a stub. */
+  flex: 1 1 140px;
+  min-width: 0;
+  min-height: 32px;
 }
 
 .volume-slider {
