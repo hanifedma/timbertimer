@@ -844,6 +844,14 @@
       if (state.masterGainNode) {
         state.masterGainNode.gain.value = state.soundVolume;
       }
+      // The slider stays on screen while sound is off; reaching for it means
+      // wanting to hear something, so it turns sound back on the way a muted
+      // player's volume does.
+      if (!state.soundEnabled) {
+        state.soundEnabled = true;
+        saveSoundPreference();
+        renderSoundToggle();
+      }
       renderVolumeControl();
     });
 
@@ -872,6 +880,13 @@
       state.restAlarmNodes.forEach((node) => {
         if (node.gain && !node.frequency) node.gain.value = state.restAlarmVolume;
       });
+      // Moving the slider of a silent alarm turns it on, as the timer's does.
+      // Set directly rather than through setRestAlert, which would preview
+      // now and again when the slider is let go.
+      if (!state.restAlert.sound) {
+        state.restAlert = restAlertFor("sound");
+        localStorage.setItem(STORAGE_REST_ALERT, state.restAlert.wire);
+      }
       renderRestAlertControl();
     });
 
@@ -3239,7 +3254,7 @@
     els.restAlarmToggleButton.setAttribute("aria-pressed", String(on));
     els.restAlarmToggleButton.title = label;
 
-    els.restVolumeRow.hidden = !on;
+    els.restVolumeRow.classList.toggle("is-muted", !on);
     const pct = Math.round(state.restAlarmVolume * 100);
     els.restVolumeSlider.value = pct;
     els.restVolumeLabel.textContent = `${pct}%`;
@@ -5466,8 +5481,8 @@
     state.soundEnabled = !state.soundEnabled;
     saveSoundPreference();
     renderSoundToggle();
-    // The slider belongs to the switch: without this it stayed hidden after
-    // turning sound back on, until something unrelated repainted the page.
+    // The slider follows the switch, dimming and brightening with it, rather
+    // than waiting for something unrelated to repaint the page.
     renderVolumeControl();
 
     if (state.soundEnabled) {
@@ -5645,10 +5660,10 @@
     localStorage.setItem(STORAGE_SOUND_VOLUME, String(state.soundVolume));
   }
 
+  // Always on screen, dimmed while sound is off, so the level can be seen and
+  // set whether or not it is currently heard.
   function renderVolumeControl() {
-    els.volumeRow.hidden = !state.soundEnabled;
-    if (!state.soundEnabled) return;
-
+    els.volumeRow.classList.toggle("is-muted", !state.soundEnabled);
     const pct = Math.round(state.soundVolume * 100);
     els.volumeSlider.value = pct;
     els.volumeLabel.textContent = `${pct}%`;

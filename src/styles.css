@@ -2060,6 +2060,11 @@ body.rest-alarm-open {
   box-shadow: 0 0 0 3px var(--accent-line);
 }
 
+/* Sound off: the level is still shown and can still be set, just quieter. */
+.volume-row.is-muted {
+  opacity: 0.45;
+}
+
 .volume-label {
   width: 34px;
   color: var(--soft);

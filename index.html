@@ -293,8 +293,8 @@
 
             <!--
               How the alarm announces itself, laid out exactly like the focus
-              card's sound control: a switch, and a volume slider that is there
-              while it is on. Its own setting rather than a reading of that one:
+              card's sound control: a switch, and a volume slider that is always
+              there, dimmed while the alarm is off. Its own setting rather than a reading of that one:
               that governs a cue, this governs an alarm, and silencing one says
               nothing about the other. Silent until turned on.
 
@@ -307,7 +307,7 @@
                 <span class="btn-emoji" aria-hidden="true">🔕</span>
                 <span>Alarm off</span>
               </button>
-              <div id="restVolumeRow" class="volume-row" hidden>
+              <div id="restVolumeRow" class="volume-row is-muted">
                 <input id="restVolumeSlider" type="range" min="0" max="200" step="5" value="100"
                   class="volume-slider" data-i18n-aria="rest.alarm_volume" aria-label="Rest alarm volume" />
                 <span id="restVolumeLabel" class="volume-label">100%</span>
