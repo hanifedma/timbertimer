@@ -1751,43 +1751,52 @@ body.is-reordering .note-item {
 
 .stepper-value {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 500;
+  cursor: text;
 }
 
+/*
+ * The minutes, in a box that looks typeable: a quiet fill at rest, an edge on
+ * hover, the focus ring once it is being typed in. Content-box width so three
+ * digits always fit inside the padding instead of being clipped by it.
+ */
 .stepper-value input {
-  width: 3.4ch;
+  box-sizing: content-box;
+  width: 3.2ch;
   min-width: 0;
   min-height: 0;
-  padding: 0;
-  border: 0;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   color: var(--ink);
-  background: transparent;
+  background: var(--fill-2);
   font-size: 1rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  text-align: right;
-  appearance: textfield;
-  -moz-appearance: textfield;
+  line-height: 1.2;
+  text-align: center;
+  cursor: text;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.stepper-value input:hover:not(:disabled) {
+  border-color: var(--line-strong);
 }
 
 .stepper-value input:focus {
-  box-shadow: none;
-  text-decoration: underline;
-  text-decoration-color: var(--accent);
-  text-underline-offset: 4px;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-.stepper-value input::-webkit-inner-spin-button,
-.stepper-value input::-webkit-outer-spin-button {
-  margin: 0;
-  appearance: none;
-  -webkit-appearance: none;
+.stepper-value input:disabled {
+  background: transparent;
 }
 
 /* The focus card's sound switch, reused for the rest alarm: the switch keeps

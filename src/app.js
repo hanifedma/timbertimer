@@ -896,11 +896,45 @@
     els.restDurationDown.addEventListener("click", () => stepRestDuration(-1));
     els.restDurationUp.addEventListener("click", () => stepRestDuration(1));
 
+    // The minutes box reads as exactly the number it sets: digits only, no
+    // leading zeros, never past the ceiling. Empty is allowed while retyping;
+    // leaving the box puts the length actually in effect back.
     els.restDurationInput.addEventListener("input", () => {
-      setRestDuration(cleanMinutes(els.restDurationInput.value, state.restDuration, 1));
+      const input = els.restDurationInput;
+      let digits = input.value.replace(/\D/g, "").replace(/^0+/, "").slice(0, 3);
+      if (Number(digits) > MAX_TIMER_MINUTES) digits = String(MAX_TIMER_MINUTES);
+      if (digits !== input.value) input.value = digits;
+      if (digits) setRestDuration(Number(digits));
     });
-    // A box left empty or out of range shows the length actually in effect.
-    els.restDurationInput.addEventListener("blur", renderRestTimer);
+    // Clicking in selects the number, so typing replaces it rather than
+    // landing beside it ("012"). The mouseup that follows a click would
+    // otherwise collapse the selection straight back to a caret.
+    let restDurationJustFocused = false;
+    els.restDurationInput.addEventListener("focus", () => {
+      els.restDurationInput.select();
+      restDurationJustFocused = true;
+    });
+    els.restDurationInput.addEventListener("mouseup", (event) => {
+      if (restDurationJustFocused) event.preventDefault();
+      restDurationJustFocused = false;
+    });
+    els.restDurationInput.addEventListener("keydown", (event) => {
+      if (event.isComposing) return;
+      if (event.key === "Enter" || event.key === "Escape") {
+        event.preventDefault();
+        els.restDurationInput.blur();
+      } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+        // A minute at a time from the keyboard; the buttons move in fives.
+        event.preventDefault();
+        setRestDuration(state.restDuration + (event.key === "ArrowUp" ? 1 : -1));
+        els.restDurationInput.value = String(state.restDuration);
+        els.restDurationInput.select();
+      }
+    });
+    els.restDurationInput.addEventListener("blur", () => {
+      restDurationJustFocused = false;
+      renderRestTimer();
+    });
 
     els.restAlarmDismiss.addEventListener("click", () => dismissRestAlarm());
     els.restAlarmFocus.addEventListener("click", () => {
