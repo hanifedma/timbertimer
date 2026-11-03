@@ -18,6 +18,10 @@
   const THEME_COLORS = { dark: "#000000", light: "#f2f2f7" };
   const STORAGE_LANG = "timbertimer:lang:v1";
   const STORAGE_PROJECTS = "timbertimer:projects:v1";
+  // Per account: projects and records saved while the cloud could not take
+  // them, kept until it does (the user id is appended).
+  const STORAGE_PENDING_PROJECTS = "timbertimer:pending-projects:v1:";
+  const STORAGE_PENDING_SESSIONS = "timbertimer:pending-sessions:v1:";
   const STORAGE_SELECTED_PROJECT = "timbertimer:project:v1";
   const STORAGE_TASK_PROJECT = "timbertimer:task-project:v1";
   const STORAGE_CAL_DAYS = "timbertimer:cal-days:v1";
@@ -231,7 +235,7 @@
     "toast.all_deleted": { en: "All records and projects deleted.", ko: "모든 기록과 프로젝트를 삭제했어요." },
     "toast.cloud_load_fail": { en: "Cloud sync could not load. Local records are still available.", ko: "클라우드 동기화를 불러오지 못했어요. 로컬 기록은 그대로 사용할 수 있어요." },
     "toast.cloud_not_ready": { en: "Cloud table is not ready. Using local records.", ko: "클라우드 테이블이 준비되지 않았어요. 로컬 기록을 사용해요." },
-    "toast.cloud_save_fail": { en: "Cloud save failed. Saved locally.", ko: "클라우드 저장에 실패했어요. 로컬에 저장했어요." },
+    "toast.cloud_save_fail": { en: "Cloud save failed. Kept on this device; it will sync next time.", ko: "클라우드 저장에 실패했어요. 이 기기에 보관했다가 다음에 동기화할게요." },
     "toast.cloud_update_fail": { en: "Cloud update failed.", ko: "클라우드 업데이트에 실패했어요." },
     "toast.cloud_delete_fail": { en: "Cloud delete failed.", ko: "클라우드 삭제에 실패했어요." },
     "toast.cloud_delete_all_fail": { en: "Failed to delete cloud records.", ko: "클라우드 기록 삭제에 실패했어요." },
@@ -282,7 +286,7 @@
     "toast.project_builtin": { en: "Built-in projects cannot be deleted.", ko: "기본 프로젝트는 삭제할 수 없어요." },
     "toast.project_created": { en: 'Project "{name}" created.', ko: '"{name}" 프로젝트를 만들었어요.' },
     "mention.create": { en: 'Create project "{name}"', ko: '"{name}" 프로젝트 만들기' },
-    "toast.cloud_projects_fail": { en: "Cloud project sync failed. Saved on this device.", ko: "프로젝트 동기화에 실패했어요. 이 기기에 저장했어요." },
+    "toast.cloud_projects_fail": { en: "Cloud project sync failed. Kept on this device; it will sync next time.", ko: "프로젝트 동기화에 실패했어요. 이 기기에 보관했다가 다음에 동기화할게요." },
     "confirm.move_record": {
       en: 'Move "{title}" here?\n\n{from}\n→  {to}',
       ko: '"{title}"을(를) 여기로 옮길까요?\n\n{from}\n→  {to}',
@@ -554,6 +558,8 @@
     user: null,
     dataMode: "local",
     sessions: [],
+    // True once `sessions` holds the signed-in account's own history.
+    sessionsAreCloud: false,
     selectedDuration: DEFAULT_DURATION,
     soundEnabled: loadSoundPreference(),
     soundVolume: loadSoundVolume(),
@@ -585,6 +591,16 @@
     googleRenderToken: 0,
     activeTimerProjectMissing: false,
     sessionsProjectColumnMissing: false,
+    // One upload of the parked projects / records at a time.
+    projectsFlushing: false,
+    sessionsFlushing: false,
+    // Bumped by every edit to the running session made on this device, so a
+    // read of the shared row that was already in flight when the edit happened
+    // knows its answer is older than what is on screen.
+    timerEditSeq: 0,
+    // Saves of the shared timer row run one after another, so they land in the
+    // order they were made and the last one is always the newest.
+    timerSaveQueue: Promise.resolve(),
     notes: [],
     audioContext: null,
     activeSoundMasters: [],
@@ -1211,24 +1227,108 @@
 
   async function loadSessions() {
     if (canUseCloud()) {
+      // Anything kept back after a failed save goes up first, so the list that
+      // comes back already has it.
+      await flushPendingSessions();
       const { data, error } = await state.supabase
         .from("focus_sessions")
         .select("*")
         .order("started_at", { ascending: false });
 
       if (!error) {
-        state.sessions = data.map(normalizeRecord);
+        state.sessions = mergePendingSessions(data.map(normalizeRecord));
+        state.sessionsAreCloud = true;
         state.lastSessionsSig = sessionsSig(data);
         state.dataMode = "cloud";
         return;
       }
 
-      state.dataMode = "local";
       showToast(t("toast.cloud_not_ready"));
       console.warn(error);
+      // A failed read is just a failed read: this account's history already on
+      // screen stands, and the next read tries again. It is never swapped for
+      // the signed-out list, whose records are nobody's here — and whose old
+      // titles reconcileProjects would turn into projects in this account.
+      if (!state.sessionsAreCloud) state.sessions = [];
+      state.sessions = mergePendingSessions(state.sessions);
+      return;
     }
 
     state.sessions = loadLocalSessions();
+    state.sessionsAreCloud = false;
+  }
+
+  // --- Records not yet in the cloud ----------------------------------------
+  // A finished session whose upload failed is kept here, per account, shown
+  // with the rest of the history and sent again with the next load. Ids are
+  // made on this device, so sending one twice just writes the same row.
+
+  function pendingSessionsKey() {
+    return state.user ? STORAGE_PENDING_SESSIONS + state.user.id : null;
+  }
+
+  function readPendingSessions() {
+    const key = pendingSessionsKey();
+    if (!key) return [];
+    try {
+      const data = JSON.parse(localStorage.getItem(key) || "[]");
+      return Array.isArray(data) ? data.map(normalizeRecord) : [];
+    } catch (error) {
+      console.warn(error);
+      return [];
+    }
+  }
+
+  function writePendingSessions(records) {
+    const key = pendingSessionsKey();
+    if (!key) return;
+    if (records.length) localStorage.setItem(key, JSON.stringify(records));
+    else localStorage.removeItem(key);
+  }
+
+  function addPendingSessions(records) {
+    const ids = new Set(records.map((record) => record.id));
+    writePendingSessions([...readPendingSessions().filter((r) => !ids.has(r.id)), ...records]);
+  }
+
+  // Only the versions that were sent: one corrected meanwhile waits for its own.
+  function settlePendingSessions(sent) {
+    const sentAt = new Map(sent.map((record) => [record.id, record.updated_at]));
+    writePendingSessions(readPendingSessions().filter((r) => sentAt.get(r.id) !== r.updated_at));
+  }
+
+  function updatePendingSessions(change) {
+    const pending = readPendingSessions();
+    if (pending.length) writePendingSessions(pending.map(change).filter(Boolean));
+  }
+
+  function mergePendingSessions(records) {
+    const pending = readPendingSessions();
+    if (!pending.length) return records;
+    const ids = new Set(records.map((record) => record.id));
+    const missing = pending.filter((record) => !ids.has(record.id));
+    return missing.length ? [...records, ...missing].sort(sortByStartedDesc) : records;
+  }
+
+  async function flushPendingSessions() {
+    if (state.sessionsFlushing || !canUseCloud()) return;
+    const pending = readPendingSessions();
+    if (!pending.length) return;
+    state.sessionsFlushing = true;
+    try {
+      const send = () => state.supabase
+        .from("focus_sessions")
+        .upsert(pending.map((record) => toCloudRecord(record)), { onConflict: "id" });
+      let { error } = await send();
+      if (error && !state.sessionsProjectColumnMissing && isMissingSchema(error)) {
+        state.sessionsProjectColumnMissing = true;
+        ({ error } = await send());
+      }
+      if (!error) settlePendingSessions(pending);
+      else console.warn(error);
+    } finally {
+      state.sessionsFlushing = false;
+    }
   }
 
   // Cheap fingerprint of a records fetch: ids plus their update times, so any
@@ -1244,6 +1344,7 @@
   async function refreshCloudSessions() {
     if (!canUseCloud()) return;
     state.lastCloudSessionsSyncAt = Date.now();
+    await flushPendingSessions();
     const { data, error } = await state.supabase
       .from("focus_sessions")
       .select("*")
@@ -1252,7 +1353,7 @@
     const sig = sessionsSig(data);
     if (sig === state.lastSessionsSig) return;
     state.lastSessionsSig = sig;
-    state.sessions = data.map(normalizeRecord);
+    state.sessions = mergePendingSessions(data.map(normalizeRecord));
     state.dataMode = "cloud";
     await reconcileProjects();
     renderAll();
@@ -1758,19 +1859,105 @@
         .order("sort_order", { ascending: true });
 
       if (!error) {
-        state.projects = (data || []).map(normalizeProject);
+        // Anything saved here that the cloud has not confirmed yet stays in the
+        // list. Without this, a project read back while its own upload was in
+        // flight — or after that upload failed — dropped out, and the session
+        // filed under it showed as "No project".
+        state.projects = mergePendingProjects((data || []).map(normalizeProject));
         sortProjects();
+        flushPendingProjects();
         return;
       }
 
-      // The table only exists once the updated SQL has been run; until then the
-      // app keeps working from this device's projects.
-      state.projectsCloudMissing = true;
       console.warn(error);
+      // Any other failure is just a failed request: the list already on
+      // screen stands, and the next load asks again.
+      if (!isMissingSchema(error) && state.projects.length) {
+        state.projects = mergePendingProjects(state.projects);
+        sortProjects();
+        return;
+      }
+      // The table only exists once the updated SQL has been run; until then
+      // the app keeps working from this device's projects.
+      if (isMissingSchema(error)) state.projectsCloudMissing = true;
     }
 
     state.projects = loadLocalProjects();
     sortProjects();
+  }
+
+  // --- Projects not yet in the cloud -----------------------------------------
+  // A project is parked here from the moment it is saved until the cloud has
+  // it, so every list read back in between still contains it, and the save is
+  // retried on the next load. Per account, so one never surfaces in another.
+
+  function pendingProjectsKey() {
+    return state.user ? STORAGE_PENDING_PROJECTS + state.user.id : null;
+  }
+
+  function readPendingProjects() {
+    const key = pendingProjectsKey();
+    if (!key) return [];
+    try {
+      const data = JSON.parse(localStorage.getItem(key) || "[]");
+      return Array.isArray(data) ? data.map(normalizeProject) : [];
+    } catch (error) {
+      console.warn(error);
+      return [];
+    }
+  }
+
+  function writePendingProjects(projects) {
+    const key = pendingProjectsKey();
+    if (!key) return;
+    if (projects.length) localStorage.setItem(key, JSON.stringify(projects));
+    else localStorage.removeItem(key);
+  }
+
+  function addPendingProjects(projects) {
+    if (!projects.length) return;
+    const ids = new Set(projects.map((project) => project.id));
+    writePendingProjects([...readPendingProjects().filter((p) => !ids.has(p.id)), ...projects]);
+  }
+
+  // Only the versions that were actually sent: a project saved again while its
+  // upload was in flight keeps waiting for its own.
+  function settlePendingProjects(sent) {
+    const sentAt = new Map(sent.map((project) => [project.id, project.updated_at]));
+    writePendingProjects(readPendingProjects().filter((p) => sentAt.get(p.id) !== p.updated_at));
+  }
+
+  function forgetPendingProjects(predicate) {
+    writePendingProjects(readPendingProjects().filter((project) => !predicate(project)));
+  }
+
+  // What this device saved last is the newest thing it knows about a project,
+  // so it wins over the copy just read back.
+  function mergePendingProjects(projects) {
+    const pending = readPendingProjects();
+    if (!pending.length) return projects;
+    const byId = new Map(projects.map((project) => [project.id, project]));
+    pending.forEach((project) => byId.set(project.id, project));
+    return [...byId.values()];
+  }
+
+  async function flushPendingProjects() {
+    if (state.projectsFlushing || !canUseCloud() || state.projectsCloudMissing) return;
+    const pending = readPendingProjects();
+    if (!pending.length) return;
+    state.projectsFlushing = true;
+    try {
+      const { error } = await state.supabase
+        .from("projects")
+        .upsert(pending.map((project) => toCloudProject(project)), { onConflict: "user_id,id" });
+      if (!error) settlePendingProjects(pending);
+      else {
+        if (isMissingSchema(error)) state.projectsCloudMissing = true;
+        console.warn(error);
+      }
+    } finally {
+      state.projectsFlushing = false;
+    }
   }
 
   function sortProjects() {
@@ -1840,14 +2027,28 @@
     return species ? species.id : defaultTreeForName(title);
   }
 
+  // Returns true once the cloud has them.
   async function pushProjects(projects) {
-    if (!projects.length || !canUseCloud() || state.projectsCloudMissing) return;
+    if (!projects.length || !canUseCloud() || state.projectsCloudMissing) return false;
+    // Parked before the request, not after it fails: a list read back while
+    // the request is in flight has to contain these too.
+    addPendingProjects(projects);
     const rows = projects.map((project) => toCloudProject(project));
     const { error } = await state.supabase.from("projects").upsert(rows, { onConflict: "user_id,id" });
-    if (error) {
-      state.projectsCloudMissing = true;
-      console.warn(error);
+    if (!error) {
+      settlePendingProjects(projects);
+      return true;
     }
+    if (isMissingSchema(error)) {
+      state.projectsCloudMissing = true;
+      forgetPendingProjects(() => true);
+    } else {
+      // Another try shortly, so another device is not left waiting for the
+      // next poll to learn the project its sessions point at.
+      setTimeout(flushPendingProjects, 5000);
+    }
+    console.warn(error);
+    return false;
   }
 
   function toCloudProject(project) {
@@ -1873,14 +2074,10 @@
     saveLocalProjects();
 
     if (canUseCloud() && !state.projectsCloudMissing) {
-      const { error } = await state.supabase
-        .from("projects")
-        .upsert(toCloudProject(normalized), { onConflict: "user_id,id" });
-      if (error) {
-        state.projectsCloudMissing = true;
-        console.warn(error);
-        showToast(t("toast.cloud_projects_fail"));
-      }
+      // Kept on this device and retried on the next load when it does not
+      // land, which is what the toast promises.
+      const landed = await pushProjects([normalized]);
+      if (!landed) showToast(t("toast.cloud_projects_fail"));
     }
 
     return normalized;
@@ -1903,6 +2100,11 @@
       state.sessions = state.sessions.map((record) =>
         affectedIds.has(record.id) ? { ...record, project_id: target } : record
       );
+      // Ones not uploaded yet move with the rest, or they would go up still
+      // pointing at the project that no longer exists.
+      updatePendingSessions((record) =>
+        affectedIds.has(record.id) ? { ...record, project_id: target } : record
+      );
 
       if (canUseCloud() && !state.sessionsProjectColumnMissing) {
         const { error } = await state.supabase
@@ -1911,7 +2113,7 @@
           .eq("user_id", state.user.id)
           .in("id", affected.map((record) => record.id));
         if (error) {
-          state.sessionsProjectColumnMissing = true;
+          if (isMissingSchema(error)) state.sessionsProjectColumnMissing = true;
           console.warn(error);
         }
       } else if (!canUseCloud()) {
@@ -1925,6 +2127,8 @@
 
     state.projects = state.projects.filter((project) => project.id !== id);
     saveLocalProjects();
+    // Or the next load would put it straight back and upload it again.
+    forgetPendingProjects((project) => project.id === id);
 
     if (canUseCloud() && !state.projectsCloudMissing) {
       const { error } = await state.supabase
@@ -2117,14 +2321,20 @@
 
   // A project made from the menu, coloured and planted from its name the way
   // the project sheet would. An existing one of that name is reused instead.
-  async function createProjectNamed(rawName) {
+  //
+  // The id comes back at once. saveProject puts the project in the list (and
+  // parks it for the cloud) before its upload starts, so the session it was
+  // made for is filed under it straight away — waiting for the round trip let
+  // a Start pressed in between begin under whatever was selected before.
+  function createProjectNamed(rawName) {
     const name = rawName.trim().slice(0, 60);
     const existing = state.projects.find(
       (project) => projectDisplayName(project).toLowerCase() === name.toLowerCase()
     );
     if (existing) return existing.id;
-    const saved = await saveProject({
-      id: createId(),
+    const id = createId();
+    saveProject({
+      id,
       name,
       color: freeColorForProjectName(name),
       tree: defaultTreeForName(name),
@@ -2132,7 +2342,7 @@
     });
     if (els.projectsDialog.open) renderProjectsList();
     showToast(t("toast.project_created", { name }));
-    return saved.id;
+    return id;
   }
 
   // Wires the menu onto one task-name field. [isEnabled] says whether the field
@@ -2180,14 +2390,14 @@
       current.el.scrollIntoView({ block: "nearest" });
     };
 
-    const choose = async (row) => {
+    const choose = (row) => {
       const found = mention;
       close();
       if (!found || !row) return;
       const next = stripProjectMention(input.value, found);
       input.value = next.text;
       try { input.setSelectionRange(next.caret, next.caret); } catch { /* not focusable */ }
-      const projectId = row.projectId || (await createProjectNamed(row.createName));
+      const projectId = row.projectId || createProjectNamed(row.createName);
       apply(next.text, projectId);
     };
 
@@ -2315,6 +2525,7 @@
   function renameRunningTimer(rawTitle) {
     if (!state.timer || state.timer.mode !== "stopwatch") return;
     state.timer.title = rawTitle.slice(0, 80);
+    markTimerEdited();
     persistTimer();
     updateDocumentTitle();
     clearTimeout(state.renameTimerSyncId);
@@ -2338,6 +2549,7 @@
     const project = getProject(projectId);
     state.timer.projectId = project.id;
     state.timer.selectedTreeId = project.tree;
+    markTimerEdited();
     state.selectedProjectId = project.id;
     localStorage.setItem(STORAGE_SELECTED_PROJECT, project.id);
     state.selectedTreeId = project.tree;
@@ -2360,13 +2572,13 @@
   // --- Project pickers and dialogs -----------------------------------------
 
   function renderProjectPickers() {
-    // A running session keeps whatever it is filed under, even a project
-    // deleted a moment ago on another device — reprojectOrphanedTimer moves it.
-    const pickerId = state.timer ? state.timer.projectId : state.selectedProjectId;
-    if (!state.timer && !isAssignableProject(state.selectedProjectId)) {
-      state.selectedProjectId = NO_PROJECT_ID;
-    }
-    fillProjectSelect(els.projectPicker, state.timer ? pickerId : state.selectedProjectId);
+    // Shown, never rewritten. A selection that names no project right now
+    // reads "No project" (see fillProjectSelect) but is kept: rewriting it
+    // made a list that was briefly missing a project — one read back before a
+    // new project reached it — lose the choice for good. Start files the
+    // session under what this shows. A running session keeps whatever it is
+    // filed under; deleting its project moves it (reprojectOrphanedTimer).
+    fillProjectSelect(els.projectPicker, state.timer ? state.timer.projectId : state.selectedProjectId);
     els.projectPicker.disabled = !sessionEditsAllowed();
     applyProjectVars(els.projectDot, getProject(els.projectPicker.value));
   }
@@ -2581,9 +2793,10 @@
         .select()
         .single();
 
-      // Retry once without project_id, in case this database hasn't had the
-      // projects migration run against it yet.
-      if (error && !state.sessionsProjectColumnMissing) {
+      // Retry once without project_id when this database hasn't had the
+      // projects migration run against it yet. Only the server saying so
+      // counts: retrying on any failure saved the record with no project.
+      if (error && !state.sessionsProjectColumnMissing && isMissingSchema(error)) {
         state.sessionsProjectColumnMissing = true;
         ({ data, error } = await state.supabase
           .from("focus_sessions")
@@ -2593,11 +2806,15 @@
       }
 
       if (error) {
+        // Kept for this account and sent with the next load. It used to go
+        // into the signed-out list, where it never reached the cloud — and the
+        // history on screen was swapped for that list along the way.
         showToast(t("toast.cloud_save_fail"));
         console.warn(error);
-        addLocalRecord(normalized);
-        state.sessions = loadLocalSessions();
+        addPendingSessions([normalized]);
+        state.sessions = [normalized, ...state.sessions.filter((item) => item.id !== normalized.id)];
         renderAll();
+        setTimeout(flushPendingSessions, 5000);
         return normalized;
       }
 
@@ -2621,6 +2838,16 @@
     });
 
     if (canUseCloud()) {
+      // Not in the cloud yet, so there is no row to update: the copy waiting
+      // to go up is corrected instead, and sent.
+      if (readPendingSessions().some((record) => record.id === id)) {
+        addPendingSessions([next]);
+        state.sessions = state.sessions.map((item) => (item.id === id ? next : item));
+        renderAll();
+        flushPendingSessions();
+        return;
+      }
+
       let { data, error } = await state.supabase
         .from("focus_sessions")
         .update(toCloudRecord(next, true))
@@ -2628,7 +2855,7 @@
         .select()
         .single();
 
-      if (error && !state.sessionsProjectColumnMissing) {
+      if (error && !state.sessionsProjectColumnMissing && isMissingSchema(error)) {
         state.sessionsProjectColumnMissing = true;
         ({ data, error } = await state.supabase
           .from("focus_sessions")
@@ -2666,6 +2893,8 @@
         console.warn(error);
         return;
       }
+      // One still waiting to go up would otherwise be sent after all.
+      updatePendingSessions((item) => (item.id === record.id ? null : item));
     } else {
       saveLocalSessions(loadLocalSessions().filter((item) => item.id !== record.id));
     }
@@ -2685,7 +2914,12 @@
       setSelectedProject(typed.projectId, { silent: true });
     }
 
-    const project = getProject(state.selectedProjectId);
+    // Filed under what the picker shows: a selection that names no project any
+    // more (deleted on another device) reads "No project" there, so that is
+    // where the session goes.
+    const project = getProject(
+      isAssignableProject(state.selectedProjectId) ? state.selectedProjectId : NO_PROJECT_ID
+    );
     // An empty task name falls back to the project's, so picking a project and
     // pressing start is enough.
     const title = els.sessionTitle.value.trim() || fallbackTaskTitle(project);
@@ -2713,6 +2947,8 @@
       remainingSeconds: durationSeconds,
       cloudSynced: false,
     };
+    // A read of the row already in flight predates this session.
+    state.timerEditSeq += 1;
 
     persistTimer();
     if (!isStopwatch) primeCompletionSound();
@@ -2731,8 +2967,15 @@
     if (!state.timer || state.timerCompleting) return;
 
     state.timerCompleting = true;
+    // Ending it is an edit too: a read of the row already in flight must not
+    // bring the session back once it is gone (see refreshCloudActiveTimer).
+    state.timerEditSeq += 1;
     const timer = state.timer;
     try {
+      // A save of this session still on its way would land after the claim
+      // below and put the row back, showing a finished session as running on
+      // every other device. Saves asked for from here on stand down.
+      await state.timerSaveQueue;
       const claimed = await claimActiveTimer(timer);
       if (!claimed) {
         stopActiveTimerSounds();
@@ -2931,6 +3174,7 @@
       const saved = readStoredTimer();
 
       if (canUseCloud()) {
+        const editSeq = state.timerEditSeq;
         const activeTimerState = await fetchActiveTimerState();
         const cloudTimer = activeTimerState.timer;
 
@@ -2957,8 +3201,11 @@
         }
 
         if (cloudTimer) {
-          state.timer = cloudTimer;
+          state.timer = adoptCloudTimer(cloudTimer, normalizeTimer(state.timer || saved), editSeq);
           persistTimer();
+          // An edit the row did not have yet goes up now, rather than waiting
+          // for the next one.
+          if (state.timer.pendingEdit) await saveActiveTimerToCloud();
           if (getRemainingSeconds() <= 0) {
             await completeTimer();
           }
@@ -4582,30 +4829,58 @@
     return { ok: true, timer: data ? fromCloudActiveTimer(data) : null };
   }
 
-  async function saveActiveTimerToCloud() {
-    if (!canUseCloud() || !state.timer) return false;
+  function saveActiveTimerToCloud() {
+    const run = state.timerSaveQueue.then(writeActiveTimerToCloud, writeActiveTimerToCloud);
+    state.timerSaveQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  // Sends the timer as it is *now*, not as it was when the save was asked for,
+  // so a save that waited behind another never publishes an older version.
+  async function writeActiveTimerToCloud() {
+    if (!canUseCloud() || !state.timer || state.timerCompleting) return false;
+    const timer = state.timer;
+    const editSeq = state.timerEditSeq;
 
     let { error } = await state.supabase
       .from("active_focus_timers")
-      .upsert(toCloudActiveTimer(state.timer), { onConflict: "user_id" });
+      .upsert(toCloudActiveTimer(timer), { onConflict: "user_id" });
 
-    // Most likely the project_id column hasn't been added yet; retry without it
-    // so cross-device timer sync keeps working on an older database.
-    if (error && !state.activeTimerProjectMissing) {
+    // A database without the project_id column rejects the row for naming it;
+    // retry without it so cross-device timer sync keeps working there. Only
+    // that answer may do this — see isMissingSchema.
+    if (error && !state.activeTimerProjectMissing && isMissingSchema(error)) {
       state.activeTimerProjectMissing = true;
       ({ error } = await state.supabase
         .from("active_focus_timers")
-        .upsert(toCloudActiveTimer(state.timer), { onConflict: "user_id" }));
+        .upsert(toCloudActiveTimer(timer), { onConflict: "user_id" }));
     }
 
     if (error) {
       warnActiveTimerSync(error);
+      // Check back in a few seconds rather than at the next full poll: that
+      // read finds the edit (or the unpublished timer) still waiting and
+      // sends it again.
+      state.lastCloudTimerSyncAt = Date.now() - (state.realtimeLive ? 60000 : 15000) + 5000;
       return false;
     }
 
+    // The timer may have finished, or been replaced, while the request was out.
+    if (!state.timer || state.timer.id !== timer.id) return true;
     state.timer.cloudSynced = true;
+    // An edit made during the request still has to be sent; its own save is
+    // queued behind this one.
+    if (state.timerEditSeq === editSeq) state.timer.pendingEdit = false;
     persistTimer();
     return true;
+  }
+
+  // A change to the running session made here: until the shared row has it,
+  // reads of that row must not undo it (see adoptCloudTimer).
+  function markTimerEdited() {
+    if (!state.timer) return;
+    state.timer.pendingEdit = true;
+    state.timerEditSeq += 1;
   }
 
   async function claimActiveTimer(timer) {
@@ -4632,15 +4907,22 @@
     state.cloudTimerSyncing = true;
     state.lastCloudTimerSyncAt = Date.now();
     try {
+      const editSeq = state.timerEditSeq;
       const activeTimerState = await fetchActiveTimerState({ silent: true });
       if (!activeTimerState.ok) return;
+      // The session was started, edited or finished here while the read was
+      // out, so what it read is older than what is on screen. Acting on it
+      // could undo an edit, wipe a session that has only just started, or
+      // bring back one that has just ended; the next read is current.
+      if (state.timerCompleting || state.timerEditSeq !== editSeq) return;
 
       const cloudTimer = activeTimerState.timer;
 
       if (cloudTimer) {
         const previousStartedAt = state.timer ? state.timer.startedAt : "";
-        state.timer = cloudTimer;
+        state.timer = adoptCloudTimer(cloudTimer, state.timer, editSeq);
         persistTimer();
+        if (state.timer.pendingEdit) saveActiveTimerToCloud();
 
         if (getRemainingSeconds() <= 0) {
           await completeTimer();
@@ -4657,6 +4939,11 @@
         persistTimer();
         await loadSessions();
         renderAll();
+      } else if (state.timer) {
+        // Never published: its first save did not land. Nobody else can have
+        // finished it, so it goes up now rather than waiting for a reload
+        // before the other devices see it.
+        saveActiveTimerToCloud();
       }
     } finally {
       state.cloudTimerSyncing = false;
@@ -4695,7 +4982,7 @@
     // request for naming a column it does not have. Drop the two fields and
     // retry: the rest still syncs, just without its length, which is exactly
     // what every rest was before this feature.
-    if (!state.restCountdownColumnsMissing && isMissingRestColumns(error)) {
+    if (!state.restCountdownColumnsMissing && isMissingSchema(error)) {
       state.restCountdownColumnsMissing = true;
       return saveRestTimerToCloud();
     }
@@ -4704,10 +4991,13 @@
     return false;
   }
 
-  // Only the server saying the column is absent may latch the flag. Latching on
-  // any failure looks harmless and is not: one lost packet would silently strip
-  // the length from every rest for the rest of the session.
-  function isMissingRestColumns(error) {
+  // Only the server saying a table or column is absent may switch a sync path
+  // off for the session. Latching on any failure looks harmless and is not: one
+  // lost packet, or a request sent with a login token that expired while the
+  // laptop slept, used to stop projects reaching the cloud and strip the
+  // project from every timer and record until the page was reloaded — which is
+  // how a session started under a new project came back as "No project".
+  function isMissingSchema(error) {
     const code = error && error.code;
     return code === "PGRST204" || code === "PGRST205" || code === "42703" || code === "42P01";
   }
@@ -4735,7 +5025,7 @@
       .maybeSingle();
 
     if (error) {
-      if (!state.restCountdownColumnsMissing && isMissingRestColumns(error)) {
+      if (!state.restCountdownColumnsMissing && isMissingSchema(error)) {
         state.restCountdownColumnsMissing = true;
         return fetchRestTimerFromCloud();
       }
@@ -5334,6 +5624,8 @@
         endAt: Date.now() + 86400 * 1000,
         remainingSeconds: 86400,
         cloudSynced: Boolean(timer.cloudSynced),
+        // An edit made here that the shared row has not taken yet.
+        pendingEdit: Boolean(timer.pendingEdit),
       };
     }
 
@@ -5364,6 +5656,7 @@
       endAt,
       remainingSeconds: Math.max(0, Math.ceil((endAt - Date.now()) / 1000)),
       cloudSynced: Boolean(timer.cloudSynced),
+      pendingEdit: Boolean(timer.pendingEdit),
     };
   }
 
@@ -5453,9 +5746,12 @@
     return row;
   }
 
+  // `projectKnown` is false for a row written without its project — by an
+  // older client, or on a database without the column. That says nothing about
+  // where the session belongs; adoptCloudTimer keeps what this device knows.
   function fromCloudActiveTimer(row) {
     const projectId = row.project_id || NO_PROJECT_ID;
-    return normalizeTimer({
+    const timer = normalizeTimer({
       mode: row.mode || "countdown",
       title: row.title,
       id: row.timer_id,
@@ -5469,6 +5765,35 @@
       endAt: row.end_at,
       cloudSynced: true,
     });
+    timer.projectKnown = Boolean(row.project_id);
+    return timer;
+  }
+
+  // What the running session becomes when the shared row is read back. The row
+  // is authoritative — that is how a timer started or edited on the phone shows
+  // up here — except, for the same session:
+  // - an edit made here that the row has not taken yet (pendingEdit), or one
+  //   made while the read was in flight (editSeq moved on), is newer than the
+  //   row, so it is kept and sent again rather than undone by the read;
+  // - a row without its project keeps the project this device already has.
+  // Reading a stale row back used to put a session just moved to a new project
+  // back where it was, or under "No project".
+  function adoptCloudTimer(cloudTimer, localTimer, editSeq = state.timerEditSeq) {
+    const { projectKnown, ...timer } = cloudTimer;
+    if (!localTimer || localTimer.id !== timer.id) return timer;
+    if (localTimer.pendingEdit || editSeq !== state.timerEditSeq) {
+      return {
+        ...timer,
+        title: localTimer.title,
+        projectId: localTimer.projectId,
+        selectedTreeId: localTimer.selectedTreeId,
+        pendingEdit: true,
+      };
+    }
+    if (!projectKnown) {
+      return { ...timer, projectId: localTimer.projectId, selectedTreeId: localTimer.selectedTreeId };
+    }
+    return timer;
   }
 
   function setDuration(minutes) {
@@ -5783,6 +6108,7 @@
         console.warn(error);
         return;
       }
+      writePendingSessions([]);
     } else {
       saveLocalSessions([]);
     }
@@ -5804,6 +6130,8 @@
   // failed halfway would leave the history half-moved. With the records already
   // gone there is nothing to move.
   async function deleteUserProjects() {
+    // Parked ones too, or the next load would bring them back.
+    forgetPendingProjects((project) => !BUILTIN_PROJECT_IDS.includes(project.id));
     if (state.projects.some((project) => !BUILTIN_PROJECT_IDS.includes(project.id))) {
       state.projects = state.projects.filter((project) => BUILTIN_PROJECT_IDS.includes(project.id));
       saveLocalProjects();
@@ -5847,6 +6175,7 @@
     const fallback = getProject(NO_PROJECT_ID);
     state.timer.projectId = fallback.id;
     state.timer.selectedTreeId = fallback.tree;
+    markTimerEdited();
     // The tree picker follows the running session's project, and whoever reset
     // the selection did it while this timer still pointed at the dead one — so
     // it settled on the grey placeholder's fallback species. Ask again now that
