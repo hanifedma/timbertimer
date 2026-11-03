@@ -22,6 +22,12 @@
   // them, kept until it does (the user id is appended).
   const STORAGE_PENDING_PROJECTS = "timbertimer:pending-projects:v1:";
   const STORAGE_PENDING_SESSIONS = "timbertimer:pending-sessions:v1:";
+  // Sessions finished on this device, so a shared row still holding one is
+  // cleared rather than brought back as running.
+  const STORAGE_FINISHED_TIMERS = "timbertimer:finished-timers:v1";
+  // The error a request refused for having no session comes back with (see
+  // sessionOnlyFetch).
+  const NO_SESSION_CODE = "TIMBERTIMER_NO_SESSION";
   const STORAGE_SELECTED_PROJECT = "timbertimer:project:v1";
   const STORAGE_TASK_PROJECT = "timbertimer:task-project:v1";
   const STORAGE_CAL_DAYS = "timbertimer:cal-days:v1";
@@ -594,6 +600,10 @@
     // One upload of the parked projects / records at a time.
     projectsFlushing: false,
     sessionsFlushing: false,
+    // Reads of the cloud's projects are numbered as they go out, so one that
+    // comes back after a later one has landed is dropped (see loadProjects).
+    projectsReadSeq: 0,
+    projectsAppliedSeq: 0,
     // Bumped by every edit to the running session made on this device, so a
     // read of the shared row that was already in flight when the edit happened
     // knows its answer is older than what is on screen.
@@ -969,6 +979,9 @@
     // mobile suspended outright, so the tick may simply not have happened.
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) return;
+      // A background tab's polls are throttled to almost nothing, so what
+      // changed meanwhile is read now rather than at the next one.
+      if (canUseCloud()) catchUpWithCloud();
       completeRestIfDue();
       // The browser drops a wake lock whenever the page is hidden, so a rest
       // still running has to take it again rather than assume it still holds one.
@@ -1120,6 +1133,7 @@
           autoRefreshToken: true,
           persistSession: true,
         },
+        global: { fetch: sessionOnlyFetch(config.anonKey) },
       });
 
       const { data } = await state.supabase.auth.getSession();
@@ -1127,14 +1141,12 @@
       state.dataMode = state.user ? "cloud" : "local";
       syncRealtime();
 
-      state.supabase.auth.onAuthStateChange(async (event, session) => {
-        // init() already handles the very first load; only react to real
-        // sign-in / sign-out afterwards so the timer isn't hydrated twice.
+      state.supabase.auth.onAuthStateChange((event, session) => {
+        // init() already handles the very first load.
         if (event === "INITIAL_SESSION") return;
-        state.user = session ? session.user : null;
-        state.dataMode = state.user ? "cloud" : "local";
-        syncRealtime();
-        await reloadState();
+        // supabase-js waits for this callback before it finishes handling the
+        // change, so anything that calls back into the client runs after it.
+        setTimeout(() => onAuthChange(session), 0);
       });
     } catch (error) {
       state.supabase = null;
@@ -1144,6 +1156,63 @@
       console.warn(error);
       renderAccount();
     }
+  }
+
+  // Only signing in, signing out or switching account reloads everything.
+  // supabase-js also announces the account it already has — SIGNED_IN each
+  // time the tab is shown again, TOKEN_REFRESHED when the login is renewed —
+  // and for those the polls simply run now rather than on their schedule.
+  function onAuthChange(session) {
+    const user = session ? session.user : null;
+    const sameAccount = (user ? user.id : null) === (state.user ? state.user.id : null);
+    state.user = user;
+    state.dataMode = user ? "cloud" : "local";
+    syncRealtime();
+    if (!sameAccount) {
+      reloadState();
+      return;
+    }
+    renderAccount();
+    catchUpWithCloud();
+  }
+
+  // After a gap — a tab in the background, a login just renewed — everything
+  // is read again on the next tick, instead of up to a minute later.
+  function catchUpWithCloud() {
+    state.lastCloudTimerSyncAt = 0;
+    state.lastCloudSessionsSyncAt = 0;
+    state.lastCloudNotesSyncAt = 0;
+  }
+
+  // supabase-js sends a request it has no session for — the login expired and
+  // could not be renewed, as happens to a tab left in the background or a
+  // laptop just woken — with the public key in place of the user's token. Row
+  // level security answers that with nothing at all, and no error: no
+  // projects, no history, no running session. Taken at its word, it cleared
+  // the stopwatch and showed its project as "No project". This app never
+  // means to read or write as nobody, so such a request is refused here as the
+  // failed request it really is, and what is on screen stands until a real
+  // answer comes.
+  function sessionOnlyFetch(publicKey) {
+    return (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes("/rest/v1/")) {
+        const headers = new Headers((init && init.headers) || (input instanceof Request ? input.headers : undefined));
+        const bearer = (headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+        if (!bearer || bearer === publicKey) {
+          const body = { code: NO_SESSION_CODE, message: "No signed-in session for this request.", details: null, hint: null };
+          return Promise.resolve(new Response(JSON.stringify(body), {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          }));
+        }
+      }
+      return fetch(input, init);
+    };
+  }
+
+  function isNoSession(error) {
+    return Boolean(error && error.code === NO_SESSION_CODE);
   }
 
   // --- Realtime ------------------------------------------------------------
@@ -1243,7 +1312,9 @@
         return;
       }
 
-      showToast(t("toast.cloud_not_ready"));
+      // A login being renewed is not the database being unready; the next
+      // read simply goes through.
+      if (!isNoSession(error)) showToast(t("toast.cloud_not_ready"));
       console.warn(error);
       // A failed read is just a failed read: this account's history already on
       // screen stands, and the next read tries again. It is never swapped for
@@ -1853,12 +1924,19 @@
 
   async function loadProjects() {
     if (canUseCloud() && !state.projectsCloudMissing) {
+      const seq = ++state.projectsReadSeq;
+      const sentAt = Date.now();
       const { data, error } = await state.supabase
         .from("projects")
         .select("*")
         .order("sort_order", { ascending: true });
 
       if (!error) {
+        // A read sent after this one has already landed, so this one is older
+        // than the list on screen.
+        if (seq < state.projectsAppliedSeq) return;
+        state.projectsAppliedSeq = seq;
+        confirmLandedProjects(sentAt);
         // Anything saved here that the cloud has not confirmed yet stays in the
         // list. Without this, a project read back while its own upload was in
         // flight — or after that upload failed — dropped out, and the session
@@ -1890,6 +1968,11 @@
   // A project is parked here from the moment it is saved until the cloud has
   // it, so every list read back in between still contains it, and the save is
   // retried on the next load. Per account, so one never surfaces in another.
+  //
+  // An upload that lands marks its entry (`landedAt`) rather than dropping it.
+  // A read that left before the upload landed can still come back without the
+  // project, and only one sent after it is sure to have it — or, if it does
+  // not, to be right that it was deleted elsewhere since.
 
   function pendingProjectsKey() {
     return state.user ? STORAGE_PENDING_PROJECTS + state.user.id : null;
@@ -1900,7 +1983,9 @@
     if (!key) return [];
     try {
       const data = JSON.parse(localStorage.getItem(key) || "[]");
-      return Array.isArray(data) ? data.map(normalizeProject) : [];
+      return Array.isArray(data)
+        ? data.map((entry) => ({ ...normalizeProject(entry), landedAt: Number(entry.landedAt) || 0 }))
+        : [];
     } catch (error) {
       console.warn(error);
       return [];
@@ -1922,9 +2007,19 @@
 
   // Only the versions that were actually sent: a project saved again while its
   // upload was in flight keeps waiting for its own.
-  function settlePendingProjects(sent) {
+  function markProjectsLanded(sent) {
     const sentAt = new Map(sent.map((project) => [project.id, project.updated_at]));
-    writePendingProjects(readPendingProjects().filter((p) => sentAt.get(p.id) !== p.updated_at));
+    const now = Date.now();
+    writePendingProjects(readPendingProjects().map((entry) =>
+      sentAt.get(entry.id) === entry.updated_at && !entry.landedAt ? { ...entry, landedAt: now } : entry
+    ));
+  }
+
+  // A read sent at [readSentAt] has every upload that landed before it.
+  function confirmLandedProjects(readSentAt) {
+    const pending = readPendingProjects();
+    const kept = pending.filter((entry) => !entry.landedAt || entry.landedAt > readSentAt);
+    if (kept.length !== pending.length) writePendingProjects(kept);
   }
 
   function forgetPendingProjects(predicate) {
@@ -1937,20 +2032,20 @@
     const pending = readPendingProjects();
     if (!pending.length) return projects;
     const byId = new Map(projects.map((project) => [project.id, project]));
-    pending.forEach((project) => byId.set(project.id, project));
+    pending.forEach(({ landedAt, ...project }) => byId.set(project.id, project));
     return [...byId.values()];
   }
 
   async function flushPendingProjects() {
     if (state.projectsFlushing || !canUseCloud() || state.projectsCloudMissing) return;
-    const pending = readPendingProjects();
+    const pending = readPendingProjects().filter((entry) => !entry.landedAt);
     if (!pending.length) return;
     state.projectsFlushing = true;
     try {
       const { error } = await state.supabase
         .from("projects")
         .upsert(pending.map((project) => toCloudProject(project)), { onConflict: "user_id,id" });
-      if (!error) settlePendingProjects(pending);
+      if (!error) markProjectsLanded(pending);
       else {
         if (isMissingSchema(error)) state.projectsCloudMissing = true;
         console.warn(error);
@@ -2036,7 +2131,7 @@
     const rows = projects.map((project) => toCloudProject(project));
     const { error } = await state.supabase.from("projects").upsert(rows, { onConflict: "user_id,id" });
     if (!error) {
-      settlePendingProjects(projects);
+      markProjectsLanded(projects);
       return true;
     }
     if (isMissingSchema(error)) {
@@ -2978,6 +3073,7 @@
       await state.timerSaveQueue;
       const claimed = await claimActiveTimer(timer);
       if (!claimed) {
+        rememberFinishedHere(`focus:${timer.id}`);
         stopActiveTimerSounds();
         state.timer = null;
         clearSessionNameAfterFinish();
@@ -3035,6 +3131,11 @@
       state.finishSoonSoundTimerId = null;
       persistTimer();
       await createRecord(record);
+      // Once it is recorded, not before: if the claim did not get through, the
+      // row is still there (see isFinishedHere), and a tab closed in between
+      // should find the session still running rather than lose it. Reads of
+      // the row stand down while it finishes, so none can revive it meanwhile.
+      rememberFinishedHere(`focus:${timer.id}`);
       renderTimer();
       showToast(t("toast.session_planted"));
     } finally {
@@ -3117,6 +3218,7 @@
     persistRestTimer();
     renderRestTimer();
     releaseWakeLock();
+    rememberFinishedHere(`rest:${rest.startedAt}`);
     await deleteRestTimerFromCloud();
 
     const minutes = ranOut ? rest.durationMinutes : Math.round(elapsedSeconds / 60);
@@ -3177,8 +3279,13 @@
         const editSeq = state.timerEditSeq;
         const activeTimerState = await fetchActiveTimerState();
         const cloudTimer = activeTimerState.timer;
+        // Being finished right now; the finish settles the row and the session.
+        if (state.timerCompleting) return;
 
         if (activeTimerState.ok && !cloudTimer) {
+          // Started, edited or finished here while the read was out: the read
+          // is older than the session on screen (see refreshCloudActiveTimer).
+          if (state.timerEditSeq !== editSeq) return;
           // `saved` as well as the live one: a session started while the network
           // was down is only on disk, and reading just the in-memory timer at
           // startup — where it is always null — used to throw it away.
@@ -3195,7 +3302,10 @@
           }
 
           state.timer = null;
-          clearSessionNameAfterFinish();
+          // Only a session that was running here has ended. With none, the
+          // field holds a name being typed for the next one, and a reload —
+          // a Realtime reconnect, say — used to wipe it.
+          if (currentTimer) clearSessionNameAfterFinish();
           persistTimer();
           return;
         }
@@ -3212,10 +3322,14 @@
           return;
         }
 
+        // The row could not be read. The session here carries on as it is,
+        // and goes up only if the row is known not to have it yet: writing a
+        // published one back could revive it on a device that has since
+        // finished it.
         state.timer = normalizeTimer(state.timer || saved);
         if (state.timer) {
           persistTimer();
-          await saveActiveTimerToCloud();
+          if (!state.timer.cloudSynced || state.timer.pendingEdit) await saveActiveTimerToCloud();
           if (getRemainingSeconds() <= 0) {
             await completeTimer();
           }
@@ -3333,13 +3447,16 @@
     // when a timer started elsewhere is adopted here, show its name and tree.
     // A running stopwatch's task name can be edited (see renameRunningTimer),
     // so for one this has to work in both directions: normally the timer's
-    // title wins and is pushed into the field, but while the field is focused
-    // the reverse holds — a concurrent cloud refresh must not overwrite what
-    // is mid-keystroke, so the field wins and re-asserts itself onto the timer
-    // instead. A countdown's field is disabled, so it can never be the one
-    // holding focus and this only ever pushes into it.
+    // title wins and is pushed into the field, but while a rename typed here
+    // has not reached the cloud yet the reverse holds — a concurrent cloud
+    // refresh must not overwrite what is mid-keystroke, so the field wins and
+    // re-asserts itself onto the timer instead. Focus alone is not enough: a
+    // field left focused (Start pressed with Enter, then another tab) used to
+    // hand its text to whatever session arrived next, a different one started
+    // on the phone included. A countdown's field is disabled, so it can never
+    // be the one holding focus and this only ever pushes into it.
     if (timer) {
-      if (timer.mode === "stopwatch" && document.activeElement === els.sessionTitle) {
+      if (timer.mode === "stopwatch" && timer.pendingEdit && document.activeElement === els.sessionTitle) {
         timer.title = els.sessionTitle.value;
       } else if (els.sessionTitle.value !== timer.title) {
         els.sessionTitle.value = timer.title;
@@ -4826,7 +4943,57 @@
       return { ok: false, timer: null };
     }
 
+    if (data && isFinishedHere(`focus:${data.timer_id}`)) {
+      // The row outlived a session finished here. A session running here now
+      // is what the row should hold, so it goes up again; with none, the row
+      // just goes.
+      if (state.timer && state.timer.id !== data.timer_id) state.timer.cloudSynced = false;
+      else dropFinishedRow("active_focus_timers", "timer_id", data.timer_id);
+      return { ok: true, timer: null };
+    }
+
     return { ok: true, timer: data ? fromCloudActiveTimer(data) : null };
+  }
+
+  // --- Sessions finished here ------------------------------------------------
+  // Finishing deletes the shared row, and the delete can fail — no network, a
+  // login being renewed — while the record is kept all the same. Read back,
+  // the row left behind looked like a session still running, and one already
+  // planted started growing again. So each session (`focus:<id>`) and rest
+  // (`rest:<start>`) finished here is remembered, and a row still holding one
+  // is cleared rather than adopted. Ids never repeat, so the last fifty are
+  // plenty.
+
+  function readFinishedHere() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_FINISHED_TIMERS) || "[]");
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function rememberFinishedHere(key) {
+    const kept = readFinishedHere().filter((entry) => entry !== key);
+    try {
+      localStorage.setItem(STORAGE_FINISHED_TIMERS, JSON.stringify([...kept, key].slice(-50)));
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+
+  function isFinishedHere(key) {
+    return readFinishedHere().includes(key);
+  }
+
+  // Only that session's row: the filter is what keeps a newer one safe.
+  function dropFinishedRow(table, column, value) {
+    state.supabase
+      .from(table)
+      .delete()
+      .eq("user_id", state.user.id)
+      .eq(column, value)
+      .then(({ error }) => { if (error) console.warn(error); });
   }
 
   function saveActiveTimerToCloud() {
@@ -5011,8 +5178,10 @@
     if (error) console.warn(error);
   }
 
+  // `ok` is false when the row could not be read, which says nothing about
+  // whether a rest is running; `rest` is null when none is.
   async function fetchRestTimerFromCloud() {
-    if (!canUseCloud()) return null;
+    if (!canUseCloud()) return { ok: false, rest: null };
 
     const columns = state.restCountdownColumnsMissing
       ? "started_at"
@@ -5030,17 +5199,28 @@
         return fetchRestTimerFromCloud();
       }
       console.warn(error);
-      return null;
+      return { ok: false, rest: null };
     }
-    if (!data) return null;
+    if (!data) return { ok: true, rest: null };
 
-    return {
+    const rest = {
       startedAt: new Date(data.started_at).getTime(),
       endAt: data.end_at ? new Date(data.end_at).getTime() : null,
       durationMinutes: Number(data.duration_minutes) || 0,
       // It came from the table, so it is by definition in it.
       cloudSynced: true,
     };
+    if (isFinishedHere(`rest:${rest.startedAt}`)) {
+      // As for a focus session (see fetchActiveTimerState).
+      if (state.restTimer && state.restTimer.startedAt !== rest.startedAt) {
+        state.restTimer = { ...state.restTimer, cloudSynced: false };
+        persistRestTimer();
+      } else {
+        dropFinishedRow("active_rest_timers", "started_at", data.started_at);
+      }
+      return { ok: true, rest: null };
+    }
+    return { ok: true, rest };
   }
 
   /**
@@ -5062,7 +5242,7 @@
   }
 
   async function hydrateRestTimer() {
-    const cloud = await fetchRestTimerFromCloud();
+    const { ok, rest: cloud } = await fetchRestTimerFromCloud();
     const saved = state.restTimer || readStoredRest();
 
     if (cloud) {
@@ -5072,7 +5252,8 @@
       // lose it, and only call it published if the write actually landed.
       state.restTimer = saved;
       if (await saveRestTimerToCloud()) markRestSynced();
-    } else if (saved && !canUseCloud()) {
+    } else if (saved && (!canUseCloud() || !ok)) {
+      // Signed out, or the row could not be read: nothing says it ended.
       state.restTimer = saved;
     } else if (saved && saved.cloudSynced) {
       // It was published, and it is gone: another device ended it.
@@ -5087,16 +5268,21 @@
 
   async function refreshCloudRestTimer() {
     if (!canUseCloud()) return;
-    const cloud = await fetchRestTimerFromCloud();
+    const { ok, rest: cloud } = await fetchRestTimerFromCloud();
+    // A failed read used to come back as "no rest", which ended the one
+    // running here.
+    if (!ok) return;
     const current = state.restTimer;
 
     if (!cloud) {
       // Only a rest we had published can be "the one that vanished"; a
-      // local-only rest simply has not been pushed yet.
+      // local-only rest simply has not been pushed yet, and goes up now.
       if (current && current.cloudSynced) {
         state.restTimer = null;
         persistRestTimer();
         renderRestTimer();
+      } else if (current) {
+        if (await saveRestTimerToCloud()) markRestSynced();
       }
       return;
     }
@@ -5118,7 +5304,8 @@
 
   function warnActiveTimerSync(error, silent) {
     console.warn(error);
-    if (silent || state.activeTimerSyncWarningShown) return;
+    // The toast is about the table's SQL, which a missing login says nothing about.
+    if (silent || isNoSession(error) || state.activeTimerSyncWarningShown) return;
     state.activeTimerSyncWarningShown = true;
     showToast(t("toast.cloud_timer_sql"));
   }
